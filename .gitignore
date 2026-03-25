@@ -1,0 +1,36 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Environment variables — NEVER commit these
+.env
+.env.local
+.env.*.local
+**/.env
+
+# Build output
+frontend/dist/
+frontend/.vite/
+
+# Playwright
+backend/screenshots/
+**/test-results/
+**/playwright-report/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+
+# Claude Code
+.claude/
+.claude-flow/
+.mcp.json
+CLAUDE.md
