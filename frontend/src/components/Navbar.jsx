@@ -28,7 +28,7 @@ export default function Navbar() {
 
   return (
     <header className="bg-white border-b border-gray-100 sticky top-0 z-50">
-      <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
+      <div className="max-w-5xl mx-auto px-4 h-14 sm:h-16 flex items-center justify-between">
         <NavLink to="/dashboard" className="flex items-center gap-2">
           <div className="w-8 h-8 bg-primary-500 rounded-lg flex items-center justify-center">
             <span className="text-white font-bold text-sm">N</span>
@@ -36,7 +36,8 @@ export default function Navbar() {
           <span className="font-bold text-gray-900">Nilam Auto</span>
         </NavLink>
 
-        <nav className="flex items-center gap-1">
+        {/* Desktop nav */}
+        <nav className="hidden sm:flex items-center gap-1">
           <NavLink to="/dashboard" className={linkClass}>Dashboard</NavLink>
           <NavLink to="/settings" className={linkClass}>Settings</NavLink>
           <NavLink to="/history" className={linkClass}>History</NavLink>
@@ -61,6 +62,14 @@ export default function Navbar() {
             Logout
           </button>
         </nav>
+
+        {/* Mobile: logout button only */}
+        <button
+          onClick={handleLogout}
+          className="sm:hidden text-sm font-medium text-gray-500 px-3 py-2 rounded-lg active:bg-gray-100"
+        >
+          Logout
+        </button>
       </div>
     </header>
   )

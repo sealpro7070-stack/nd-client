@@ -66,52 +66,80 @@ export default function History() {
         ))}
       </div>
 
-      <div className="card p-0 overflow-hidden">
-        {loading ? (
-          <div className="flex justify-center py-16">
-            <div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin"></div>
+      {loading ? (
+        <div className="flex justify-center py-16">
+          <div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin"></div>
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="card text-center py-16 text-gray-400 text-sm">No submissions found.</div>
+      ) : (
+        <>
+          {/* Mobile card list */}
+          <div className="sm:hidden space-y-3">
+            {filtered.map(s => (
+              <div key={s.id} className="card py-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-gray-900 truncate">{s.books?.title || '—'}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">{s.books?.author}</p>
+                  </div>
+                  <StatusBadge status={s.status} />
+                </div>
+                <div className="flex items-center gap-3 mt-2 text-xs text-gray-500">
+                  {s.books?.language && <span className="bg-gray-100 rounded-full px-2 py-0.5">{s.books.language}</span>}
+                  {s.month && <span>{MONTHS[s.month - 1]} {s.year}</span>}
+                  {s.submitted_at && (
+                    <span>{new Date(s.submitted_at).toLocaleDateString('en-MY', { day: 'numeric', month: 'short' })}</span>
+                  )}
+                </div>
+                {s.error_message && (
+                  <p className="text-xs text-red-400 mt-1 truncate">{s.error_message}</p>
+                )}
+              </div>
+            ))}
           </div>
-        ) : filtered.length === 0 ? (
-          <div className="text-center py-16 text-gray-400 text-sm">No submissions found.</div>
-        ) : (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-100 bg-gray-50">
-                <th className="text-left px-6 py-3 font-medium text-gray-500">Book</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-500 hidden sm:table-cell">Language</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-500 hidden md:table-cell">Period</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-500">Status</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-500 hidden lg:table-cell">Date</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map(s => (
-                <tr key={s.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
-                  <td className="px-6 py-3">
-                    <p className="font-medium text-gray-900">{s.books?.title || '—'}</p>
-                    <p className="text-xs text-gray-400">{s.books?.author}</p>
-                  </td>
-                  <td className="px-4 py-3 hidden sm:table-cell text-gray-500">{s.books?.language || '—'}</td>
-                  <td className="px-4 py-3 hidden md:table-cell text-gray-500">
-                    {s.month ? `${MONTHS[s.month - 1]} ${s.year}` : '—'}
-                  </td>
-                  <td className="px-4 py-3">
-                    <StatusBadge status={s.status} />
-                    {s.error_message && (
-                      <p className="text-xs text-red-400 mt-1 max-w-xs truncate">{s.error_message}</p>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 hidden lg:table-cell text-gray-400 text-xs">
-                    {s.submitted_at
-                      ? new Date(s.submitted_at).toLocaleDateString('en-MY', { day: 'numeric', month: 'short', year: 'numeric' })
-                      : '—'}
-                  </td>
+
+          {/* Desktop table */}
+          <div className="hidden sm:block card p-0 overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-100 bg-gray-50">
+                  <th className="text-left px-6 py-3 font-medium text-gray-500">Book</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-500">Language</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-500 hidden md:table-cell">Period</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-500">Status</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-500 hidden lg:table-cell">Date</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+              </thead>
+              <tbody>
+                {filtered.map(s => (
+                  <tr key={s.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                    <td className="px-6 py-3">
+                      <p className="font-medium text-gray-900">{s.books?.title || '—'}</p>
+                      <p className="text-xs text-gray-400">{s.books?.author}</p>
+                    </td>
+                    <td className="px-4 py-3 text-gray-500">{s.books?.language || '—'}</td>
+                    <td className="px-4 py-3 hidden md:table-cell text-gray-500">
+                      {s.month ? `${MONTHS[s.month - 1]} ${s.year}` : '—'}
+                    </td>
+                    <td className="px-4 py-3">
+                      <StatusBadge status={s.status} />
+                      {s.error_message && (
+                        <p className="text-xs text-red-400 mt-1 max-w-xs truncate">{s.error_message}</p>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 hidden lg:table-cell text-gray-400 text-xs">
+                      {s.submitted_at
+                        ? new Date(s.submitted_at).toLocaleDateString('en-MY', { day: 'numeric', month: 'short', year: 'numeric' })
+                        : '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
 
       {/* Pagination */}
       {totalPages > 1 && (
