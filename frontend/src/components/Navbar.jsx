@@ -7,6 +7,7 @@ const ADMIN_EMAIL = 'm-10603978@moe-dl.edu.my'
 export default function Navbar() {
   const navigate = useNavigate()
   const [isAdmin, setIsAdmin] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -19,36 +20,95 @@ export default function Navbar() {
     navigate('/')
   }
 
+  const navItems = [
+    { to: '/dashboard', label: 'Dashboard' },
+    { to: '/settings', label: 'Settings' },
+    { to: '/history', label: 'History' },
+  ]
+
   const linkClass = ({ isActive }) =>
-    `text-sm font-medium px-3 py-2 rounded-lg transition-colors ${
+    `text-sm font-semibold px-3.5 py-2 rounded-xl transition-colors ${
       isActive
-        ? 'bg-primary-50 text-primary-600'
-        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+        ? 'bg-primary-50 text-primary-700'
+        : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'
     }`
 
   return (
     <header className="bg-white border-b border-gray-100 sticky top-0 z-50">
       <div className="max-w-5xl mx-auto px-4 h-14 sm:h-16 flex items-center justify-between">
-        <NavLink to="/dashboard" className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-primary-500 rounded-lg flex items-center justify-center">
-            <span className="text-white font-bold text-sm">N</span>
+        {/* Logo */}
+        <NavLink to="/dashboard" className="flex items-center gap-2.5 group">
+          <div className="w-9 h-9 bg-primary-600 rounded-xl flex items-center justify-center shadow-sm group-hover:bg-primary-700 transition-colors">
+            <BookIcon className="w-5 h-5 text-white" />
           </div>
-          <span className="font-bold text-gray-900">Nilam Auto</span>
+          <span className="font-bold text-gray-900 tracking-tight">Nilam Auto</span>
         </NavLink>
 
         {/* Desktop nav */}
-        <nav className="hidden sm:flex items-center gap-1">
-          <NavLink to="/dashboard" className={linkClass}>Dashboard</NavLink>
-          <NavLink to="/settings" className={linkClass}>Settings</NavLink>
-          <NavLink to="/history" className={linkClass}>History</NavLink>
+        <nav className="hidden sm:flex items-center gap-0.5">
+          {navItems.map(item => (
+            <NavLink key={item.to} to={item.to} className={linkClass}>
+              {item.label}
+            </NavLink>
+          ))}
           {isAdmin && (
             <NavLink
               to="/admin"
               className={({ isActive }) =>
-                `text-sm font-medium px-3 py-2 rounded-lg transition-colors ${
-                  isActive
-                    ? 'bg-purple-100 text-purple-700'
-                    : 'text-purple-600 hover:bg-purple-50'
+                `text-sm font-semibold px-3.5 py-2 rounded-xl transition-colors ${
+                  isActive ? 'bg-violet-50 text-violet-700' : 'text-violet-500 hover:bg-violet-50 hover:text-violet-700'
+                }`
+              }
+            >
+              Admin
+            </NavLink>
+          )}
+          <div className="w-px h-5 bg-gray-200 mx-1.5" />
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-1.5 text-sm font-semibold text-gray-400 hover:text-red-600 px-3.5 py-2 rounded-xl hover:bg-red-50 transition-colors"
+          >
+            <LogoutIcon className="w-4 h-4" />
+            Logout
+          </button>
+        </nav>
+
+        {/* Mobile: hamburger */}
+        <button
+          onClick={() => setMenuOpen(v => !v)}
+          className="sm:hidden p-2 rounded-xl hover:bg-gray-100 transition-colors"
+          aria-label="Toggle menu"
+        >
+          {menuOpen
+            ? <XIcon className="w-5 h-5 text-gray-600" />
+            : <MenuIcon className="w-5 h-5 text-gray-600" />}
+        </button>
+      </div>
+
+      {/* Mobile dropdown */}
+      {menuOpen && (
+        <div className="sm:hidden border-t border-gray-100 bg-white px-3 py-2 space-y-0.5 shadow-lg">
+          {navItems.map(item => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              onClick={() => setMenuOpen(false)}
+              className={({ isActive }) =>
+                `flex items-center text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors ${
+                  isActive ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-50'
+                }`
+              }
+            >
+              {item.label}
+            </NavLink>
+          ))}
+          {isAdmin && (
+            <NavLink
+              to="/admin"
+              onClick={() => setMenuOpen(false)}
+              className={({ isActive }) =>
+                `flex items-center text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors ${
+                  isActive ? 'bg-violet-50 text-violet-700' : 'text-violet-600 hover:bg-violet-50'
                 }`
               }
             >
@@ -57,20 +117,43 @@ export default function Navbar() {
           )}
           <button
             onClick={handleLogout}
-            className="ml-2 text-sm font-medium text-gray-500 hover:text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors"
+            className="w-full flex items-center gap-2 text-sm font-semibold text-red-500 px-4 py-2.5 rounded-xl hover:bg-red-50 transition-colors"
           >
+            <LogoutIcon className="w-4 h-4" />
             Logout
           </button>
-        </nav>
-
-        {/* Mobile: logout button only */}
-        <button
-          onClick={handleLogout}
-          className="sm:hidden text-sm font-medium text-gray-500 px-3 py-2 rounded-lg active:bg-gray-100"
-        >
-          Logout
-        </button>
-      </div>
+        </div>
+      )}
     </header>
+  )
+}
+
+function BookIcon({ className }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+    </svg>
+  )
+}
+function MenuIcon({ className }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+    </svg>
+  )
+}
+function XIcon({ className }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+    </svg>
+  )
+}
+function LogoutIcon({ className }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+    </svg>
   )
 }
