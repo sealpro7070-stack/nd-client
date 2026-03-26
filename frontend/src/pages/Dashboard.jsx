@@ -8,6 +8,8 @@ const BACKEND   = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001'
 const LANGUAGES = ['Malay', 'English', 'Chinese', 'Tamil']
 const LANG_MAP  = { Malay: 'Melayu', English: 'Inggeris', Chinese: 'Cina', Tamil: 'Tamil' }
 
+const isNative = !!(typeof window !== 'undefined' && window?.Capacitor?.isNativePlatform?.())
+
 export default function Dashboard() {
   const navigate = useNavigate()
   const [user, setUser]             = useState(null)
@@ -20,6 +22,7 @@ export default function Dashboard() {
   const [triggering, setTriggering] = useState(false)
   const [triggerMsg, setTriggerMsg] = useState('')
   const [isError, setIsError]       = useState(false)
+  const [cookieStatus, setCookieStatus] = useState(null)
 
   useEffect(() => {
     async function load() {
@@ -45,6 +48,18 @@ export default function Dashboard() {
         if (rRes.status === 'fulfilled' && rRes.value.ok) {
           const d = await rRes.value.json()
           setRecent(d.submissions || [])
+        }
+
+        // Check AINS session status (mobile only)
+        if (isNative) {
+          const { data: ud } = await supabase
+            .from('users').select('cookie_updated_at').eq('id', user.id).single()
+          if (ud?.cookie_updated_at) {
+            const age = Date.now() - new Date(ud.cookie_updated_at).getTime()
+            setCookieStatus(age < 7 * 24 * 60 * 60 * 1000 ? 'fresh' : 'stale')
+          } else {
+            setCookieStatus('none')
+          }
         }
       } catch {
         // Supabase unreachable — still show the dashboard
@@ -103,6 +118,44 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-5">
+
+      {/* ── AINS session warning (mobile) ───────────── */}
+      {isNative && cookieStatus !== 'fresh' && (
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35 }}
+          className={`rounded-2xl p-4 flex items-start gap-3 border ${
+            cookieStatus === 'stale'
+              ? 'bg-warn-50 border-warn-200'
+              : 'bg-danger-50 border-danger-200'
+          }`}
+        >
+          <span className={`text-xl flex-shrink-0 ${cookieStatus === 'stale' ? 'text-warn-500' : 'text-danger-500'}`}>
+            {cookieStatus === 'stale' ? '⚠️' : '🔒'}
+          </span>
+          <div className="flex-1 min-w-0">
+            <p className={`text-sm font-bold ${cookieStatus === 'stale' ? 'text-warn-800' : 'text-danger-800'}`}>
+              {cookieStatus === 'stale' ? 'AINS Session May Have Expired' : 'AINS Account Not Connected'}
+            </p>
+            <p className={`text-xs mt-0.5 ${cookieStatus === 'stale' ? 'text-warn-700' : 'text-danger-700'}`}>
+              {cookieStatus === 'stale'
+                ? 'Your session may be too old. Reconnect before submitting.'
+                : 'You need to log in to AINS before submitting records.'}
+            </p>
+          </div>
+          <button
+            onClick={() => navigate('/settings')}
+            className={`flex-shrink-0 text-xs font-bold px-3 py-1.5 rounded-lg transition-colors ${
+              cookieStatus === 'stale'
+                ? 'bg-warn-200 text-warn-800 hover:bg-warn-300'
+                : 'bg-danger-200 text-danger-800 hover:bg-danger-300'
+            }`}
+          >
+            Connect →
+          </button>
+        </motion.div>
+      )}
 
       {/* ── Welcome banner ─────────────────────────── */}
       <motion.div
