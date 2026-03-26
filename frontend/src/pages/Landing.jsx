@@ -111,6 +111,17 @@ export default function Landing() {
   const [loading, setLoading]   = useState(false)
   const [message, setMessage]   = useState('')
   const [isError, setIsError]   = useState(false)
+  const [resending, setResending] = useState(false)
+  const [resent, setResent]       = useState(false)
+
+  // When the user clicks the verification link, Supabase redirects back here
+  // with a session in the URL hash. Detect it and send them to the dashboard.
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_IN') navigate('/dashboard')
+    })
+    return () => subscription.unsubscribe()
+  }, [navigate])
 
   async function handleAuth(e) {
     e.preventDefault()
@@ -119,7 +130,11 @@ export default function Landing() {
     setIsError(false)
     try {
       if (mode === 'signup') {
-        const { data, error } = await supabase.auth.signUp({ email, password })
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: { emailRedirectTo: window.location.origin },
+        })
         if (error) throw error
         if (data?.user) {
           await fetch(`${BACKEND}/api/auth/register`, {
@@ -147,6 +162,21 @@ export default function Landing() {
     } finally {
       setLoading(false)
     }
+  }
+
+  async function handleResend() {
+    if (!email) { setMessage('Enter your email address first.'); setIsError(true); return }
+    setResending(true)
+    setMessage('')
+    setIsError(false)
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email,
+      options: { emailRedirectTo: window.location.origin },
+    })
+    setResending(false)
+    if (error) { setMessage(error.message); setIsError(true) }
+    else { setResent(true); setMessage('Verification email sent — check your inbox.') }
   }
 
   return (
@@ -349,6 +379,57 @@ export default function Landing() {
         </div>
       </section>
 
+      {/* ── Android App ──────────────────────────────── */}
+      <section id="android" className="py-20 border-t border-line bg-white">
+        <div className="max-w-6xl mx-auto px-5">
+          <motion.div {...inView()} className="max-w-xl mx-auto text-center">
+            <div className="inline-flex items-center gap-2 bg-ok-50 border border-ok-200 text-ok-700 text-xs font-bold px-3 py-1.5 rounded-full mb-6">
+              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M6 18c0 .55.45 1 1 1h1v3.5c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5V19h2v3.5c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5V19h1c.55 0 1-.45 1-1V8H6v10zm-2.5-1c.83 0 1.5-.67 1.5-1.5v-7c0-.83-.67-1.5-1.5-1.5S2 7.67 2 8.5v7c0 .83.67 1.5 1.5 1.5zm17 0c.83 0 1.5-.67 1.5-1.5v-7c0-.83-.67-1.5-1.5-1.5S19 7.67 19 8.5v7c0 .83.67 1.5 1.5 1.5zM15.53 2.16l1.3-1.3c.2-.2.2-.51 0-.71-.2-.2-.51-.2-.71 0l-1.48 1.48A5.934 5.934 0 0012 1c-.94 0-1.82.22-2.61.63L7.89.15c-.2-.2-.51-.2-.71 0-.2.2-.2.51 0 .71l1.31 1.31C7.01 3.07 6 4.96 6 7h12c0-2.04-1.01-3.93-2.47-4.84zM10 5H9V4h1v1zm5 0h-1V4h1v1z"/>
+              </svg>
+              Android App Available
+            </div>
+
+            <h2 className="font-display text-3xl sm:text-4xl font-bold text-heading mb-4">
+              Take it on your phone.
+            </h2>
+            <p className="text-body text-base leading-relaxed mb-8">
+              Download the Nilam Auto Android app and log in directly — no Chrome extension needed. Install in seconds, no app store required.
+            </p>
+
+            <a
+              href="/nilam-auto.apk"
+              download
+              className="inline-flex items-center gap-2.5 btn-primary text-base px-8 py-3.5 mb-8"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+              Download APK
+            </a>
+
+            <div className="text-left bg-page border border-line rounded-2xl p-5">
+              <p className="text-xs font-bold text-heading uppercase tracking-widest mb-3">How to install</p>
+              <ol className="space-y-2.5">
+                {[
+                  'Tap "Download APK" above.',
+                  'Open your Downloads folder and tap the file.',
+                  'If prompted, go to Settings → Apps → Special app access → Install unknown apps and allow your browser.',
+                  'Tap Install — done!',
+                ].map((step, i) => (
+                  <li key={i} className="flex items-start gap-3 text-sm text-muted">
+                    <span className="w-5 h-5 flex-shrink-0 bg-brand-50 text-brand-600 rounded-full flex items-center justify-center text-xs font-bold mt-0.5">
+                      {i + 1}
+                    </span>
+                    {step}
+                  </li>
+                ))}
+              </ol>
+            </div>
+          </motion.div>
+        </div>
+      </section>
+
       {/* ── Auth ─────────────────────────────────────── */}
       <section id="auth" className="py-20 border-t border-line bg-white">
         <div className="max-w-md mx-auto px-5">
@@ -420,6 +501,18 @@ export default function Landing() {
                 ) : mode === 'login' ? 'Sign In' : 'Create Account'}
               </button>
             </form>
+
+            <div className="mt-4 pt-4 border-t border-line text-center">
+              <p className="text-xs text-muted mb-2">Didn't receive your verification email?</p>
+              <button
+                type="button"
+                onClick={handleResend}
+                disabled={resending || resent}
+                className="text-sm font-semibold text-brand-600 hover:underline disabled:opacity-50 disabled:no-underline"
+              >
+                {resending ? 'Sending…' : resent ? 'Email sent ✓' : 'Resend verification email'}
+              </button>
+            </div>
           </motion.div>
         </div>
       </section>

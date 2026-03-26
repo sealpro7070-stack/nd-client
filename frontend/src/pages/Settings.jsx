@@ -48,6 +48,10 @@ export default function Settings() {
   const [saved, setSaved]       = useState(false)
   const [loading, setLoading]   = useState(true)
   const [cookieStatus, setCookieStatus] = useState(null)
+  const [aimsConnecting, setAimsConnecting] = useState(false)
+
+  // Detect native Android/iOS Capacitor context
+  const isNative = !!(typeof window !== 'undefined' && window?.Capacitor?.isNativePlatform?.())
 
   // Display-friendly selections
   const [displayLang, setDisplayLang]   = useState('Malay')
@@ -101,6 +105,32 @@ export default function Settings() {
     if (res.ok) { setSaved(true); setTimeout(() => setSaved(false), 3000) }
   }
 
+  async function handleMobileConnect() {
+    if (!user) return
+    setAimsConnecting(true)
+    try {
+      const { registerPlugin } = await import('@capacitor/core')
+      const AINSAuth = registerPlugin('AINSAuth')
+      const data = await AINSAuth.openLogin()
+      const res = await fetch(`${BACKEND}/api/auth/save-cookie`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userIdentifier: user.id,
+          cookie: data.token,
+          ssUser: data.ssUser || null,
+          ssProfile: data.ssProfile || null,
+          cookies: data.cookies || [],
+        }),
+      })
+      if (res.ok) setCookieStatus('fresh')
+    } catch (err) {
+      console.error('AINS login failed:', err.message)
+    } finally {
+      setAimsConnecting(false)
+    }
+  }
+
   if (loading) return (
     <div className="flex items-center justify-center py-24">
       <div className="w-8 h-8 border-2 border-line border-t-brand-600 rounded-full animate-spin" />
@@ -138,13 +168,30 @@ export default function Settings() {
                'No Session Saved'}
             </p>
             <p className="text-xs text-muted mt-0.5">
-              {cookieStatus === 'fresh' ? 'Your AINS cookie is fresh and ready to use.' :
-               cookieStatus === 'stale' ? 'Please log back in to AINS via the Chrome extension.' :
-               'Install the Chrome extension and visit ains.moe.gov.my.'}
+              {cookieStatus === 'fresh' ? 'Your AINS session is active and ready to use.' :
+               cookieStatus === 'stale'
+                 ? (isNative ? "Tap 'Connect AINS Account' below to reconnect." : 'Please log back in to AINS via the Chrome extension.')
+                 : (isNative ? "Tap 'Connect AINS Account' below to link your AINS session." : 'Install the Chrome extension and visit ains.moe.gov.my.')}
             </p>
           </div>
         </div>
       </div>
+
+      {isNative && (
+        <button
+          type="button"
+          onClick={handleMobileConnect}
+          disabled={aimsConnecting}
+          className="w-full py-3.5 font-bold rounded-xl btn-primary disabled:opacity-60"
+        >
+          {aimsConnecting ? (
+            <span className="flex items-center justify-center gap-2">
+              <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              Opening AINS Login…
+            </span>
+          ) : 'Connect AINS Account'}
+        </button>
+      )}
 
       <form onSubmit={handleSave} className="space-y-6">
 

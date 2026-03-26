@@ -8,6 +8,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@capacitor/android": "^6.0.0",
+    "@capacitor/core": "^6.0.0",
     "@supabase/supabase-js": "^2.39.0",
     "framer-motion": "^12.38.0",
     "lucide-react": "^1.7.0",
@@ -16,12 +18,14 @@
     "react-router-dom": "^6.21.0"
   },
   "devDependencies": {
+    "@capacitor/cli": "^6.0.0",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
     "@vitejs/plugin-react": "^4.2.1",
     "autoprefixer": "^10.4.16",
     "postcss": "^8.4.32",
     "tailwindcss": "^3.4.0",
+    "typescript": "^6.0.2",
     "vite": "^5.0.8"
   }
 }
