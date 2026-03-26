@@ -20,7 +20,6 @@ export default function Dashboard() {
   const [triggering, setTriggering] = useState(false)
   const [triggerMsg, setTriggerMsg] = useState('')
   const [isError, setIsError]       = useState(false)
-  const [showGuide, setShowGuide]   = useState(() => !localStorage.getItem('nilam_guide_dismissed'))
 
   useEffect(() => {
     async function load() {
@@ -102,96 +101,8 @@ export default function Dashboard() {
     : 'No schedule set'
   const pct = bookCount > 0 ? Math.min((stats.thisMonth / bookCount) * 100, 100) : 0
 
-  function dismissGuide() {
-    localStorage.setItem('nilam_guide_dismissed', '1')
-    setShowGuide(false)
-  }
-
   return (
     <div className="space-y-5">
-
-      {/* ── Getting Started guide ───────────────────── */}
-      {showGuide && (
-        <motion.div
-          initial={{ opacity: 0, y: 14 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.45 }}
-          className="card-p border-l-4 border-l-ok-500 bg-ok-50/30"
-        >
-          <div className="flex items-start justify-between gap-4 mb-4">
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <span className="w-5 h-5 bg-ok-100 text-ok-600 rounded-full flex items-center justify-center text-xs font-bold">✓</span>
-                <p className="text-ok-700 text-xs font-bold uppercase tracking-widest">Getting Started — PC / Web</p>
-              </div>
-              <h2 className="font-display text-lg font-bold text-heading">How to use Nilam Auto</h2>
-            </div>
-            <button
-              onClick={dismissGuide}
-              className="w-7 h-7 rounded-lg bg-white border border-line text-subtle hover:text-heading flex items-center justify-center text-sm flex-shrink-0 transition-colors"
-              aria-label="Dismiss guide"
-            >
-              ✕
-            </button>
-          </div>
-
-          <ol className="space-y-3 mb-5">
-            {[
-              {
-                n: '1',
-                title: 'Install the Chrome Extension',
-                desc: 'Open Chrome on your PC and install the Nilam Auto extension. It captures your AINS session so the bot can log in on your behalf.',
-                action: (
-                  <a
-                    href="https://github.com/YOUR_REPO/releases/latest"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 text-xs font-bold text-brand-600 hover:underline mt-1"
-                  >
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-                    Download Extension (.zip)
-                  </a>
-                ),
-              },
-              {
-                n: '2',
-                title: 'Log in to AINS',
-                desc: 'Go to ains.moe.gov.my in Chrome and sign in with your school credentials as usual.',
-              },
-              {
-                n: '3',
-                title: 'Save your session',
-                desc: 'Click the Nilam Auto icon in your Chrome toolbar, then click "Save Session". You\'ll see a confirmation — this only needs to be done once.',
-              },
-              {
-                n: '4',
-                title: 'Submit your records',
-                desc: 'Come back here, pick your language and number of books below, then hit "Submit Now". That\'s it — Nilam Auto handles the rest automatically every month.',
-              },
-            ].map((step) => (
-              <li key={step.n} className="flex items-start gap-3">
-                <span className="w-6 h-6 flex-shrink-0 bg-brand-600 text-white rounded-full flex items-center justify-center text-xs font-bold mt-0.5">
-                  {step.n}
-                </span>
-                <div>
-                  <p className="text-sm font-bold text-heading">{step.title}</p>
-                  <p className="text-xs text-muted mt-0.5 leading-relaxed">{step.desc}</p>
-                  {step.action}
-                </div>
-              </li>
-            ))}
-          </ol>
-
-          <div className="flex items-center justify-between flex-wrap gap-3 pt-3 border-t border-line">
-            <p className="text-xs text-subtle">
-              Extension not installed yet? You can still test manual submission — just install it before the auto-schedule runs.
-            </p>
-            <button onClick={dismissGuide} className="text-xs font-bold text-muted hover:text-heading transition-colors">
-              Got it, hide this
-            </button>
-          </div>
-        </motion.div>
-      )}
 
       {/* ── Welcome banner ─────────────────────────── */}
       <motion.div

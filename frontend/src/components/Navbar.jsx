@@ -44,6 +44,7 @@ export default function Navbar() {
         {/* Desktop nav */}
         <nav className="hidden sm:flex items-center gap-0.5">
           <NavLink to="/dashboard" className={linkClass}>Dashboard</NavLink>
+          <NavLink to="/guide" className={linkClass}>Setup Guide</NavLink>
           <NavLink to="/settings" className={linkClass}>Settings</NavLink>
           <NavLink to="/history" className={linkClass}>History</NavLink>
           {isAdmin && (
@@ -97,6 +98,7 @@ export default function Navbar() {
           )}
           {[
             { to: '/dashboard', label: 'Dashboard' },
+            { to: '/guide',     label: 'Setup Guide' },
             { to: '/settings',  label: 'Settings' },
             { to: '/history',   label: 'History' },
           ].map(item => (
