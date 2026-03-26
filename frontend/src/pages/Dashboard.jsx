@@ -24,29 +24,34 @@ export default function Dashboard() {
 
   useEffect(() => {
     async function load() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-      setUser(user)
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) { setLoading(false); return }
+        setUser(user)
 
-      const [sRes, stRes, rRes] = await Promise.all([
-        fetch(`${BACKEND}/api/settings?userId=${user.id}`),
-        fetch(`${BACKEND}/api/history/stats?userId=${user.id}`),
-        fetch(`${BACKEND}/api/history?userId=${user.id}&limit=5`),
-      ])
+        const [sRes, stRes, rRes] = await Promise.allSettled([
+          fetch(`${BACKEND}/api/settings?userId=${user.id}`),
+          fetch(`${BACKEND}/api/history/stats?userId=${user.id}`),
+          fetch(`${BACKEND}/api/history?userId=${user.id}&limit=5`),
+        ])
 
-      if (sRes.ok) {
-        const s = await sRes.json()
-        setSettings(s)
-        const displayLang = Object.entries(LANG_MAP).find(([, v]) => v === s.language)?.[0] || 'Malay'
-        setLang(displayLang)
-        setBookCount(s.books_per_month || 4)
+        if (sRes.status === 'fulfilled' && sRes.value.ok) {
+          const s = await sRes.value.json()
+          setSettings(s)
+          const displayLang = Object.entries(LANG_MAP).find(([, v]) => v === s.language)?.[0] || 'Malay'
+          setLang(displayLang)
+          setBookCount(s.books_per_month || 4)
+        }
+        if (stRes.status === 'fulfilled' && stRes.value.ok) setStats(await stRes.value.json())
+        if (rRes.status === 'fulfilled' && rRes.value.ok) {
+          const d = await rRes.value.json()
+          setRecent(d.submissions || [])
+        }
+      } catch {
+        // Supabase unreachable — still show the dashboard
+      } finally {
+        setLoading(false)
       }
-      if (stRes.ok) setStats(await stRes.json())
-      if (rRes.ok) {
-        const d = await rRes.json()
-        setRecent(d.submissions || [])
-      }
-      setLoading(false)
     }
     load()
   }, [])
