@@ -25,20 +25,20 @@ export default function Navbar() {
   const linkClass = ({ isActive }) =>
     `text-sm font-semibold px-3.5 py-2 rounded-lg transition-all duration-150 ${
       isActive
-        ? 'text-z-green bg-z-green/8'
-        : 'text-z-fog hover:text-z-snow hover:bg-z-lift'
+        ? 'text-brand-600 bg-brand-50'
+        : 'text-muted hover:text-heading hover:bg-gray-50'
     }`
 
   return (
-    <header className="bg-z-card/90 backdrop-blur-md border-b border-z-rim sticky top-0 z-50">
+    <header className="bg-white border-b border-line sticky top-0 z-50">
       <div className="max-w-5xl mx-auto px-4 h-14 sm:h-16 flex items-center justify-between">
 
         {/* Logo */}
         <NavLink to="/dashboard" className="flex items-center gap-2.5 group">
-          <div className="w-8 h-8 bg-z-green rounded-lg flex items-center justify-center group-hover:bg-z-green-d transition-colors shadow-glow-g-sm">
-            <BookIcon className="w-4 h-4 text-z-void" />
+          <div className="w-8 h-8 bg-brand-600 rounded-lg flex items-center justify-center group-hover:bg-brand-700 transition-colors">
+            <BookIcon className="w-4 h-4 text-white" />
           </div>
-          <span className="font-display font-bold text-z-snow tracking-tight">Nilam Auto</span>
+          <span className="font-display font-bold text-heading tracking-tight">Nilam Auto</span>
         </NavLink>
 
         {/* Desktop nav */}
@@ -51,22 +51,21 @@ export default function Navbar() {
               to="/admin"
               className={({ isActive }) =>
                 `text-sm font-semibold px-3.5 py-2 rounded-lg transition-all ${
-                  isActive ? 'text-z-blue bg-z-blue/10' : 'text-z-blue/70 hover:text-z-blue hover:bg-z-blue/8'
+                  isActive ? 'text-brand-600 bg-brand-50' : 'text-muted hover:text-brand-600 hover:bg-brand-50'
                 }`
               }
             >
               Admin
             </NavLink>
           )}
-          <div className="w-px h-4 bg-z-rim mx-2" />
-          {/* Connected badge */}
-          <div className="hidden md:flex items-center gap-1.5 bg-z-green/10 border border-z-green/25 px-3 py-1.5 rounded-full mr-2">
-            <span className="w-1.5 h-1.5 bg-z-green rounded-full animate-pulse" />
-            <span className="text-z-green text-xs font-bold font-mono">Connected</span>
+          <div className="w-px h-4 bg-line mx-2" />
+          <div className="hidden md:flex items-center gap-1.5 bg-ok-50 border border-ok-200 px-3 py-1.5 rounded-full mr-2">
+            <span className="w-1.5 h-1.5 bg-ok-500 rounded-full animate-pulse" />
+            <span className="text-ok-600 text-xs font-bold">Connected</span>
           </div>
           <button
             onClick={handleLogout}
-            className="flex items-center gap-1.5 text-sm font-semibold text-z-ash hover:text-z-red px-3.5 py-2 rounded-lg hover:bg-z-red/8 transition-all"
+            className="flex items-center gap-1.5 text-sm font-semibold text-muted hover:text-danger-600 px-3.5 py-2 rounded-lg hover:bg-danger-50 transition-all"
           >
             <LogoutIcon className="w-4 h-4" />
             Logout
@@ -76,24 +75,23 @@ export default function Navbar() {
         {/* Mobile: hamburger */}
         <button
           onClick={() => setMenuOpen(v => !v)}
-          className="sm:hidden p-2 rounded-lg hover:bg-z-lift transition-colors"
+          className="sm:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors"
         >
           {menuOpen
-            ? <XIcon className="w-5 h-5 text-z-fog" />
-            : <MenuIcon className="w-5 h-5 text-z-fog" />}
+            ? <XIcon className="w-5 h-5 text-muted" />
+            : <MenuIcon className="w-5 h-5 text-muted" />}
         </button>
       </div>
 
       {/* Mobile dropdown */}
       {menuOpen && (
-        <div className="sm:hidden border-t border-z-rim bg-z-card px-3 py-2 space-y-0.5">
-          {/* Email */}
+        <div className="sm:hidden border-t border-line bg-white px-3 py-2 space-y-0.5">
           {userEmail && (
             <div className="px-4 py-2 mb-1">
-              <p className="text-xs text-z-ash font-mono truncate">{userEmail}</p>
+              <p className="text-xs text-subtle font-mono truncate">{userEmail}</p>
               <div className="flex items-center gap-1.5 mt-1">
-                <span className="w-1.5 h-1.5 bg-z-green rounded-full animate-pulse" />
-                <span className="text-z-green text-xs font-bold">Connected</span>
+                <span className="w-1.5 h-1.5 bg-ok-500 rounded-full animate-pulse" />
+                <span className="text-ok-600 text-xs font-bold">Connected</span>
               </div>
             </div>
           )}
@@ -108,7 +106,7 @@ export default function Navbar() {
               onClick={() => setMenuOpen(false)}
               className={({ isActive }) =>
                 `flex items-center text-sm font-semibold px-4 py-3 rounded-xl transition-all ${
-                  isActive ? 'bg-z-green/10 text-z-green' : 'text-z-fog hover:bg-z-lift hover:text-z-snow'
+                  isActive ? 'bg-brand-50 text-brand-600' : 'text-muted hover:bg-gray-50 hover:text-heading'
                 }`
               }
             >
@@ -121,7 +119,7 @@ export default function Navbar() {
               onClick={() => setMenuOpen(false)}
               className={({ isActive }) =>
                 `flex items-center text-sm font-semibold px-4 py-3 rounded-xl transition-all ${
-                  isActive ? 'bg-z-blue/10 text-z-blue' : 'text-z-blue/70 hover:bg-z-lift hover:text-z-blue'
+                  isActive ? 'bg-brand-50 text-brand-600' : 'text-muted hover:bg-gray-50 hover:text-brand-600'
                 }`
               }
             >
@@ -130,7 +128,7 @@ export default function Navbar() {
           )}
           <button
             onClick={handleLogout}
-            className="w-full flex items-center gap-2 text-sm font-semibold text-z-ash hover:text-z-red px-4 py-3 rounded-xl hover:bg-z-red/8 transition-all"
+            className="w-full flex items-center gap-2 text-sm font-semibold text-muted hover:text-danger-600 px-4 py-3 rounded-xl hover:bg-danger-50 transition-all"
           >
             <LogoutIcon className="w-4 h-4" />
             Logout

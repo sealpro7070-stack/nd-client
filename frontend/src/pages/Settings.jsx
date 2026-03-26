@@ -3,52 +3,31 @@ import { motion } from 'framer-motion'
 import { supabase } from '../lib/supabase'
 
 const BACKEND    = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001'
-const LANGUAGES  = ['Melayu', 'Inggeris', 'Cina', 'Tamil']
-const BOOK_TYPES = ['Fizikal', 'E-Buku']
+const LANGUAGES  = ['Malay', 'English', 'Chinese', 'Tamil']
+const LANG_MAP   = { Malay: 'Melayu', English: 'Inggeris', Chinese: 'Cina', Tamil: 'Tamil' }
+const BOOK_TYPES = ['Physical', 'E-Book']
+const TYPE_MAP   = { Physical: 'Fizikal', 'E-Book': 'E-Buku' }
 
-/* ── Mini calendar ─────────────────────────────────── */
-function MiniCalendar({ selected, onSelect }) {
-  return (
-    <div className="grid grid-cols-7 gap-1">
-      {Array.from({ length: 28 }, (_, i) => i + 1).map(d => (
-        <button
-          key={d}
-          type="button"
-          onClick={() => onSelect(d)}
-          className={`h-9 rounded-xl text-xs font-bold transition-all duration-150 ${
-            selected === d
-              ? 'bg-z-green text-z-void shadow-glow-g-sm scale-105'
-              : 'bg-z-lift text-z-fog border border-z-rim hover:border-z-green/40 hover:text-z-green'
-          }`}
-        >
-          {d}
-        </button>
-      ))}
-    </div>
-  )
-}
-
-/* ── Number stepper ────────────────────────────────── */
 function Stepper({ value, min, max, onChange }) {
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex items-center gap-4">
       <button
         type="button"
         onClick={() => onChange(Math.max(min, value - 1))}
         disabled={value <= min}
-        className="w-11 h-11 rounded-xl bg-z-lift border border-z-rim text-z-fog text-xl font-bold hover:border-z-green/40 hover:text-z-green transition-all disabled:opacity-30 disabled:cursor-not-allowed active:scale-95"
+        className="w-11 h-11 rounded-xl bg-white border border-line text-heading text-xl font-bold hover:border-brand-300 transition-all disabled:opacity-30 disabled:cursor-not-allowed active:scale-95"
       >
         −
       </button>
       <div className="flex-1 text-center">
-        <span className="font-display text-4xl font-extrabold text-z-green">{value}</span>
-        <p className="text-xs text-z-fog mt-1">buku / bulan</p>
+        <span className="font-display text-4xl font-extrabold text-brand-600">{value}</span>
+        <p className="text-xs text-muted mt-1">books / month</p>
       </div>
       <button
         type="button"
         onClick={() => onChange(Math.min(max, value + 1))}
         disabled={value >= max}
-        className="w-11 h-11 rounded-xl bg-z-lift border border-z-rim text-z-fog text-xl font-bold hover:border-z-green/40 hover:text-z-green transition-all disabled:opacity-30 disabled:cursor-not-allowed active:scale-95"
+        className="w-11 h-11 rounded-xl bg-white border border-line text-heading text-xl font-bold hover:border-brand-300 transition-all disabled:opacity-30 disabled:cursor-not-allowed active:scale-95"
       >
         +
       </button>
@@ -56,20 +35,23 @@ function Stepper({ value, min, max, onChange }) {
   )
 }
 
-/* ── Main ──────────────────────────────────────────── */
 export default function Settings() {
   const [user, setUser]         = useState(null)
   const [form, setForm]         = useState({
     books_per_month: 4,
-    language: 'Melayu',
-    book_type: 'Fizikal',
+    language:    'Melayu',
+    book_type:   'Fizikal',
     auto_schedule: true,
-    schedule_day: 15,
+    schedule_day:  15,
   })
   const [saving, setSaving]     = useState(false)
   const [saved, setSaved]       = useState(false)
   const [loading, setLoading]   = useState(true)
   const [cookieStatus, setCookieStatus] = useState(null)
+
+  // Display-friendly selections
+  const [displayLang, setDisplayLang]   = useState('Malay')
+  const [displayType, setDisplayType]   = useState('Physical')
 
   useEffect(() => {
     async function load() {
@@ -87,6 +69,10 @@ export default function Settings() {
           auto_schedule:   data.auto_schedule ?? true,
           schedule_day:    data.schedule_day ?? 15,
         })
+        const dLang = Object.entries(LANG_MAP).find(([, v]) => v === data.language)?.[0] || 'Malay'
+        const dType = Object.entries(TYPE_MAP).find(([, v]) => v === data.book_type)?.[0] || 'Physical'
+        setDisplayLang(dLang)
+        setDisplayType(dType)
       }
 
       const { data: ud } = await supabase
@@ -117,7 +103,7 @@ export default function Settings() {
 
   if (loading) return (
     <div className="flex items-center justify-center py-24">
-      <div className="w-10 h-10 border-2 border-z-rim border-t-z-green rounded-full animate-spin" />
+      <div className="w-8 h-8 border-2 border-line border-t-brand-600 rounded-full animate-spin" />
     </div>
   )
 
@@ -129,159 +115,176 @@ export default function Settings() {
       className="max-w-2xl space-y-6"
     >
       <div>
-        <h1 className="font-display text-2xl font-extrabold text-z-snow">Tetapan</h1>
-        <p className="text-z-fog text-sm mt-1">Konfigurasikan automasi NILAM anda.</p>
+        <h1 className="font-display text-2xl font-extrabold text-heading">Settings</h1>
+        <p className="text-muted text-sm mt-1">Configure your NILAM automation preferences.</p>
       </div>
 
-      {/* ── Cookie status ───────────────────────────── */}
-      <div className={`card border-l-4 ${
-        cookieStatus === 'fresh'  ? 'border-l-z-green' :
-        cookieStatus === 'stale' ? 'border-l-z-amber' :
-        'border-l-z-rim'
+      {/* ── Session status ───────────────────────────── */}
+      <div className={`card-p border-l-4 ${
+        cookieStatus === 'fresh'  ? 'border-l-ok-500' :
+        cookieStatus === 'stale'  ? 'border-l-warn-500' :
+        'border-l-line'
       }`}>
         <div className="flex items-start gap-3">
           <div className={`w-2.5 h-2.5 rounded-full mt-1 flex-shrink-0 ${
-            cookieStatus === 'fresh' ? 'bg-z-green' :
-            cookieStatus === 'stale' ? 'bg-z-amber animate-pulse' :
-            'bg-z-ash'
+            cookieStatus === 'fresh' ? 'bg-ok-500' :
+            cookieStatus === 'stale' ? 'bg-warn-500 animate-pulse' :
+            'bg-subtle'
           }`} />
           <div>
-            <p className="text-sm font-bold text-z-snow">
-              {cookieStatus === 'fresh' ? 'Sesi Aktif' :
-               cookieStatus === 'stale' ? 'Sesi Mungkin Luput' :
-               'Tiada Sesi Disimpan'}
+            <p className="text-sm font-bold text-heading">
+              {cookieStatus === 'fresh' ? 'Session Active' :
+               cookieStatus === 'stale' ? 'Session May Have Expired' :
+               'No Session Saved'}
             </p>
-            <p className="text-xs text-z-fog mt-0.5">
-              {cookieStatus === 'fresh' ? 'Cookie AINS anda segar dan sedia digunakan.' :
-               cookieStatus === 'stale' ? 'Log masuk semula ke AINS melalui extension Chrome.' :
-               'Pasang extension Chrome dan lawati ains.moe.gov.my.'}
+            <p className="text-xs text-muted mt-0.5">
+              {cookieStatus === 'fresh' ? 'Your AINS cookie is fresh and ready to use.' :
+               cookieStatus === 'stale' ? 'Please log back in to AINS via the Chrome extension.' :
+               'Install the Chrome extension and visit ains.moe.gov.my.'}
             </p>
           </div>
         </div>
       </div>
 
-      {/* ── Form ────────────────────────────────────── */}
       <form onSubmit={handleSave} className="space-y-6">
 
-        {/* Books per month — stepper */}
-        <div className="card">
-          <label className="label">Buku Per Bulan</label>
-          <div className="mt-4 mb-2">
-            <Stepper
-              value={form.books_per_month}
-              min={1} max={8}
-              onChange={v => setForm(f => ({ ...f, books_per_month: v }))}
-            />
-          </div>
-          <p className="text-xs text-z-ash text-center mt-2 font-mono">Maksimum 8 buku sebulan</p>
-        </div>
+        {/* Group 1: Reading Preferences */}
+        <div>
+          <h2 className="font-display text-base font-bold text-heading mb-3">Reading Preferences</h2>
+          <div className="space-y-4">
 
-        {/* Language */}
-        <div className="card">
-          <label className="label">Bahasa Buku</label>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-1">
-            {LANGUAGES.map(lang => (
-              <button
-                key={lang}
-                type="button"
-                onClick={() => setForm(f => ({ ...f, language: lang }))}
-                className={`py-3 px-3 rounded-xl text-sm font-bold border transition-all duration-150 ${
-                  form.language === lang
-                    ? 'bg-z-green text-z-void border-z-green shadow-glow-g-sm scale-[1.02]'
-                    : 'bg-z-lift text-z-fog border-z-rim hover:border-z-green/40 hover:text-z-green'
-                }`}
-              >
-                {lang}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Book type */}
-        <div className="card">
-          <label className="label">Jenis Buku</label>
-          <div className="flex gap-2 mt-1">
-            {BOOK_TYPES.map(type => (
-              <button
-                key={type}
-                type="button"
-                onClick={() => setForm(f => ({ ...f, book_type: type }))}
-                className={`flex-1 py-3 px-4 rounded-xl text-sm font-bold border transition-all duration-150 ${
-                  form.book_type === type
-                    ? 'bg-z-green text-z-void border-z-green shadow-glow-g-sm'
-                    : 'bg-z-lift text-z-fog border-z-rim hover:border-z-green/40 hover:text-z-green'
-                }`}
-              >
-                {type}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Auto schedule toggle */}
-        <div className="card">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-bold text-z-snow">Auto-Jadual</p>
-              <p className="text-xs text-z-fog mt-0.5">Hantar secara automatik pada hari tertentu setiap bulan</p>
+            {/* Books per month */}
+            <div className="card-p">
+              <label className="label">Books Per Month</label>
+              <div className="mt-4 mb-2">
+                <Stepper
+                  value={form.books_per_month}
+                  min={1} max={8}
+                  onChange={v => setForm(f => ({ ...f, books_per_month: v }))}
+                />
+              </div>
+              <p className="text-xs text-subtle text-center mt-2">Maximum 8 books per month (Pro)</p>
             </div>
-            <button
-              type="button"
-              onClick={() => setForm(f => ({ ...f, auto_schedule: !f.auto_schedule }))}
-              className={`relative inline-flex h-7 w-13 items-center rounded-full transition-colors duration-200 ${form.auto_schedule ? 'bg-z-green' : 'bg-z-lift border border-z-rim'}`}
-              style={{ width: 52 }}
-            >
-              <span
-                className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-sm transition-transform duration-200 ${form.auto_schedule ? 'translate-x-7' : 'translate-x-1'}`}
-                style={{ boxShadow: form.auto_schedule ? '0 0 8px rgba(0,255,133,0.5)' : undefined }}
-              />
-            </button>
-          </div>
 
-          {/* Calendar when auto_schedule is on */}
-          {form.auto_schedule && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              className="mt-5"
-            >
-              <p className="text-xs text-z-fog mb-3">
-                Hantar pada hari{' '}
-                <span className="font-display font-bold text-z-green text-base">{form.schedule_day}</span>
-                {' '}setiap bulan
-              </p>
-              <MiniCalendar
-                selected={form.schedule_day}
-                onSelect={d => setForm(f => ({ ...f, schedule_day: d }))}
-              />
-            </motion.div>
-          )}
+            {/* Language */}
+            <div className="card-p">
+              <label className="label">Book Language</label>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-1">
+                {LANGUAGES.map(lang => (
+                  <button
+                    key={lang}
+                    type="button"
+                    onClick={() => {
+                      setDisplayLang(lang)
+                      setForm(f => ({ ...f, language: LANG_MAP[lang] }))
+                    }}
+                    className={`py-3 px-3 rounded-xl text-sm font-bold border transition-all duration-150 ${
+                      displayLang === lang
+                        ? 'bg-brand-600 text-white border-brand-600 shadow-sm scale-[1.02]'
+                        : 'bg-white text-muted border-line hover:border-brand-300 hover:text-brand-600'
+                    }`}
+                  >
+                    {lang}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Book type */}
+            <div className="card-p">
+              <label className="label">Book Type</label>
+              <div className="flex gap-2 mt-1 p-1 bg-gray-100 rounded-xl">
+                {BOOK_TYPES.map(type => (
+                  <button
+                    key={type}
+                    type="button"
+                    onClick={() => {
+                      setDisplayType(type)
+                      setForm(f => ({ ...f, book_type: TYPE_MAP[type] }))
+                    }}
+                    className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-bold transition-all duration-150 ${
+                      displayType === type
+                        ? 'bg-white text-heading shadow-sm'
+                        : 'text-muted hover:text-heading'
+                    }`}
+                  >
+                    {type}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Group 2: Schedule */}
+        <div>
+          <h2 className="font-display text-base font-bold text-heading mb-3">Schedule</h2>
+          <div className="card-p space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-bold text-heading">Auto-Schedule</p>
+                <p className="text-xs text-muted mt-0.5">Automatically submit on a set day each month</p>
+              </div>
+              {/* iOS-style toggle */}
+              <button
+                type="button"
+                onClick={() => setForm(f => ({ ...f, auto_schedule: !f.auto_schedule }))}
+                className={`relative inline-flex h-7 items-center rounded-full transition-colors duration-200 ${form.auto_schedule ? 'bg-brand-600' : 'bg-gray-200'}`}
+                style={{ width: 52 }}
+              >
+                <span
+                  className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform duration-200 ${form.auto_schedule ? 'translate-x-7' : 'translate-x-1'}`}
+                />
+              </button>
+            </div>
+
+            {form.auto_schedule && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+              >
+                <label className="label">Schedule Day</label>
+                <div className="flex items-center gap-3 mt-1">
+                  <input
+                    type="number"
+                    min={1} max={28}
+                    value={form.schedule_day}
+                    onChange={e => setForm(f => ({ ...f, schedule_day: Number(e.target.value) }))}
+                    className="input w-24"
+                  />
+                  <p className="text-sm text-muted">of every month</p>
+                </div>
+                <p className="text-xs text-brand-600 font-semibold mt-2">
+                  Will submit on day {form.schedule_day} of each month
+                </p>
+              </motion.div>
+            )}
+          </div>
         </div>
 
         {/* Save button */}
         <button
           type="submit"
           disabled={saving}
-          className={`w-full py-4 text-base font-bold rounded-xl transition-all duration-200 ${
+          className={`w-full py-3.5 text-base font-bold rounded-xl transition-all duration-200 ${
             saved
-              ? 'bg-z-green/20 text-z-green border border-z-green/40'
+              ? 'bg-ok-50 text-ok-600 border border-ok-200'
               : 'btn-primary'
           }`}
         >
           {saving ? (
             <span className="flex items-center justify-center gap-2">
-              <span className="w-4 h-4 border-2 border-z-void/30 border-t-z-void rounded-full animate-spin" />
-              Menyimpan…
+              <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              Saving…
             </span>
           ) : saved ? (
             <span className="flex items-center justify-center gap-2">
               <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
               </svg>
-              Tersimpan!
+              Saved!
             </span>
-          ) : 'Simpan Tetapan'}
+          ) : 'Save Settings'}
         </button>
       </form>
     </motion.div>

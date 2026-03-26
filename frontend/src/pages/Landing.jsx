@@ -3,7 +3,8 @@ import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { supabase } from '../lib/supabase'
 
-/* ── animation helpers ─────────────────────────────── */
+const BACKEND = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001'
+
 const up = (delay = 0) => ({
   initial: { opacity: 0, y: 18 },
   animate: { opacity: 1, y: 0 },
@@ -17,21 +18,14 @@ const inView = (delay = 0) => ({
   transition: { duration: 0.5, delay, ease: [0.25, 0.1, 0.25, 1] },
 })
 
-/* ── Bot demo mockup ───────────────────────────────── */
 const DEMO_BOOKS = [
   { title: 'Hujan', author: 'Nur Maisarah', lang: 'BM' },
   { title: 'Totto-Chan', author: 'Tetsuko K.', lang: 'BM' },
-  { title: 'Aku Terima Nikahnya', author: 'Hlovate', lang: 'BM' },
   { title: 'Harry Potter 1', author: 'J.K. Rowling', lang: 'EN' },
-]
-const MESSAGES = [
-  'Connecting to AINS portal…',
-  'Logging in with your session…',
-  'Submitting book records…',
-  'All 4 records submitted ✓',
+  { title: 'The Alchemist', author: 'Paulo Coelho', lang: 'EN' },
 ]
 
-function BotDemo() {
+function PhoneMockup() {
   const [phase, setPhase] = useState(0)
 
   useEffect(() => {
@@ -40,47 +34,57 @@ function BotDemo() {
   }, [])
 
   return (
-    <motion.div {...up(0.3)} className="relative">
-      {/* Outer glow ring */}
-      <div className="absolute inset-0 rounded-2xl bg-z-green/5 blur-2xl scale-105 pointer-events-none" />
+    <motion.div {...up(0.3)} className="relative flex justify-center">
+      {/* Subtle glow behind phone */}
+      <div className="absolute inset-4 bg-brand-100/60 rounded-3xl blur-2xl pointer-events-none" />
 
-      <div className="relative bg-z-card border border-z-rim rounded-2xl overflow-hidden shadow-glow-g-sm">
-        {/* Terminal titlebar */}
-        <div className="bg-z-lift border-b border-z-rim px-4 py-3 flex items-center gap-2">
-          <span className="w-3 h-3 rounded-full bg-z-red/70" />
-          <span className="w-3 h-3 rounded-full bg-z-amber/70" />
-          <span className="w-3 h-3 rounded-full bg-z-green/70" />
-          <span className="ml-3 font-mono text-xs text-z-ash">nilam-auto — bot process</span>
+      {/* Phone frame */}
+      <div className="relative w-64 bg-white rounded-[2rem] border-2 border-gray-200 shadow-card-lg overflow-hidden">
+        {/* Status bar */}
+        <div className="bg-heading px-5 pt-3 pb-2 flex items-center justify-between">
+          <span className="text-white text-xs font-mono">9:41</span>
+          <div className="w-16 h-4 bg-heading rounded-full border border-white/20" />
+          <span className="text-white text-xs font-mono">100%</span>
         </div>
 
-        {/* Book rows */}
-        <div className="p-5 space-y-3">
+        {/* App header */}
+        <div className="bg-brand-600 px-4 py-3 flex items-center gap-2">
+          <div className="w-6 h-6 bg-white/20 rounded-lg flex items-center justify-center">
+            <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+              <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+            </svg>
+          </div>
+          <span className="text-white text-sm font-bold font-display">Nilam Auto</span>
+        </div>
+
+        {/* Book list */}
+        <div className="px-3 py-3 space-y-2 bg-page">
           {DEMO_BOOKS.map((b, i) => {
             const submitted = phase > i
             const active    = phase === i
             return (
               <motion.div
                 key={b.title}
-                initial={{ opacity: 0, x: -8 }}
+                initial={{ opacity: 0, x: -6 }}
                 animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: i * 0.12 }}
-                className="flex items-center gap-3"
+                transition={{ delay: i * 0.1 }}
+                className="bg-white rounded-xl px-3 py-2.5 flex items-center gap-2 shadow-card"
               >
-                <div className="w-9 h-9 rounded-lg bg-z-lift flex items-center justify-center font-mono text-xs font-bold text-z-green">
+                <div className="w-7 h-7 rounded-lg bg-brand-50 flex items-center justify-center font-mono text-xs font-bold text-brand-600 flex-shrink-0">
                   {b.lang}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-z-snow truncate">{b.title}</p>
-                  <p className="text-xs text-z-fog">{b.author}</p>
+                  <p className="text-xs font-semibold text-heading truncate">{b.title}</p>
+                  <p className="text-xs text-subtle">{b.author}</p>
                 </div>
-                <span className={`text-xs font-bold px-2 py-0.5 rounded-full border transition-all duration-500 ${
+                <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full transition-all duration-500 ${
                   submitted
-                    ? 'bg-z-green/10 text-z-green border-z-green/30'
+                    ? 'bg-ok-100 text-ok-600'
                     : active
-                    ? 'bg-z-amber/10 text-z-amber border-z-amber/30 animate-pulse'
-                    : 'bg-z-lift text-z-ash border-z-rim'
+                    ? 'bg-warn-100 text-warn-600 animate-pulse'
+                    : 'bg-gray-100 text-subtle'
                 }`}>
-                  {submitted ? 'Berjaya' : active ? 'Hantar…' : 'Tunggu'}
+                  {submitted ? '✓' : active ? '…' : '—'}
                 </span>
               </motion.div>
             )
@@ -88,45 +92,48 @@ function BotDemo() {
         </div>
 
         {/* Status bar */}
-        <div className="border-t border-z-rim px-5 py-3 flex items-center gap-2.5">
-          <span className={`w-2 h-2 rounded-full flex-shrink-0 ${phase >= 4 ? 'bg-z-green' : 'bg-z-green animate-pulse'}`} />
-          <span className="font-mono text-xs text-z-fog">{MESSAGES[Math.min(phase, 3)]}</span>
+        <div className="bg-white border-t border-line px-3 py-2 flex items-center gap-2">
+          <span className="w-1.5 h-1.5 bg-ok-500 rounded-full animate-pulse flex-shrink-0" />
+          <span className="text-xs text-muted">
+            {phase >= 4 ? 'All records submitted ✓' : `Submitting record ${Math.min(phase + 1, 4)}…`}
+          </span>
         </div>
       </div>
     </motion.div>
   )
 }
 
-/* ── Main component ────────────────────────────────── */
 export default function Landing() {
   const navigate = useNavigate()
   const [email, setEmail]       = useState('')
   const [password, setPassword] = useState('')
   const [mode, setMode]         = useState('login')
   const [loading, setLoading]   = useState(false)
-  const [error, setError]       = useState('')
+  const [message, setMessage]   = useState('')
+  const [isError, setIsError]   = useState(false)
 
   async function handleAuth(e) {
     e.preventDefault()
     setLoading(true)
-    setError('')
+    setMessage('')
+    setIsError(false)
     try {
       if (mode === 'signup') {
         const { data, error } = await supabase.auth.signUp({ email, password })
         if (error) throw error
         if (data?.user) {
-          await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/auth/register`, {
+          await fetch(`${BACKEND}/api/auth/register`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ id: data.user.id, email: data.user.email }),
           })
         }
-        setError('Check your email to confirm your account.')
+        setMessage('Check your email to confirm your account.')
       } else {
         const { data, error } = await supabase.auth.signInWithPassword({ email, password })
         if (error) throw error
         if (data?.user) {
-          await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/auth/register`, {
+          await fetch(`${BACKEND}/api/auth/register`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ id: data.user.id, email: data.user.email }),
@@ -135,28 +142,31 @@ export default function Landing() {
         navigate('/dashboard')
       }
     } catch (err) {
-      setError(err.message)
+      setMessage(err.message)
+      setIsError(true)
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="min-h-screen bg-z-void text-z-snow overflow-x-hidden">
+    <div className="min-h-screen bg-page overflow-x-hidden">
 
-      {/* ── Nav ──────────────────────────────────────── */}
-      <header className="sticky top-0 z-50 bg-z-void/80 backdrop-blur-md border-b border-z-rim">
+      {/* ── Nav ─────────────────────────────────────── */}
+      <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-line">
         <div className="max-w-6xl mx-auto px-5 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 bg-z-green rounded-lg flex items-center justify-center">
-              <BookIcon className="w-4 h-4 text-z-void" />
+            <div className="w-8 h-8 bg-brand-600 rounded-lg flex items-center justify-center">
+              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+              </svg>
             </div>
-            <span className="font-display font-bold text-z-snow tracking-tight">Nilam Auto</span>
+            <span className="font-display font-bold text-heading tracking-tight">Nilam Auto</span>
           </div>
           <div className="flex items-center gap-2">
             <button
               onClick={() => { setMode('login'); document.getElementById('auth')?.scrollIntoView({ behavior: 'smooth' }) }}
-              className="text-sm font-semibold text-z-fog hover:text-z-snow px-4 py-2 rounded-xl hover:bg-z-lift transition-all"
+              className="text-sm font-semibold text-muted hover:text-heading px-4 py-2 rounded-xl hover:bg-gray-100 transition-all"
             >
               Sign In
             </button>
@@ -164,345 +174,271 @@ export default function Landing() {
               onClick={() => { setMode('signup'); document.getElementById('auth')?.scrollIntoView({ behavior: 'smooth' }) }}
               className="btn-primary !px-4 !py-2 text-sm"
             >
-              Mulakan Percuma
+              Get Started Free
             </button>
           </div>
         </div>
       </header>
 
-      {/* ── Hero ─────────────────────────────────────── */}
-      <section className="relative bg-mesh overflow-hidden">
-        {/* Decorative rings */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full border border-z-green/5 pointer-events-none" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] rounded-full border border-z-green/8 pointer-events-none" />
+      {/* ── Hero ────────────────────────────────────── */}
+      <section className="relative overflow-hidden">
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-brand-100/40 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute top-20 right-1/4 w-64 h-64 bg-brand-50 rounded-full blur-3xl pointer-events-none" />
 
-        <div className="max-w-6xl mx-auto px-5 py-16 lg:py-24 grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+        <div className="relative max-w-6xl mx-auto px-5 py-16 lg:py-24 grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
 
           {/* Left */}
           <div>
-            <motion.div {...up(0)} className="inline-flex items-center gap-2 bg-z-green/10 border border-z-green/25 text-z-green text-xs font-bold px-3 py-1.5 rounded-full mb-6">
-              <span className="w-1.5 h-1.5 bg-z-green rounded-full animate-pulse" />
-              Untuk pelajar Malaysia
+            <motion.div {...up(0)} className="inline-flex items-center gap-2 bg-brand-50 border border-brand-200 text-brand-600 text-xs font-bold px-3 py-1.5 rounded-full mb-6">
+              <span className="w-1.5 h-1.5 bg-brand-500 rounded-full animate-pulse" />
+              For Malaysian Students
             </motion.div>
 
-            <motion.h1 {...up(0.05)} className="font-display text-4xl sm:text-5xl lg:text-[3.5rem] font-extrabold leading-[1.1] mb-5">
+            <motion.h1 {...up(0.05)} className="font-display text-4xl sm:text-5xl lg:text-[3.25rem] font-extrabold text-heading leading-[1.1] mb-5">
               Automate Your{' '}
-              <span className="text-z-green">NILAM</span>
+              <span className="text-brand-600">NILAM</span>
               <br />Submissions.
-              <br />Forever.
             </motion.h1>
 
-            <motion.p {...up(0.1)} className="text-z-fog text-lg leading-relaxed mb-8 max-w-md">
+            <motion.p {...up(0.1)} className="text-body text-lg leading-relaxed mb-8 max-w-md">
               Nilam Auto submits your reading records on{' '}
-              <span className="text-z-snow font-semibold">ains.moe.gov.my</span>{' '}
+              <span className="text-heading font-semibold">ains.moe.gov.my</span>{' '}
               automatically every month — so you never miss a deadline.
             </motion.p>
 
-            <motion.div {...up(0.15)} className="flex flex-col sm:flex-row gap-3 mb-12">
+            <motion.div {...up(0.15)} className="flex flex-col sm:flex-row gap-3 mb-10">
               <button
                 onClick={() => { setMode('signup'); document.getElementById('auth')?.scrollIntoView({ behavior: 'smooth' }) }}
                 className="btn-primary text-base px-8 py-3.5"
               >
-                Mulakan Percuma
-                <ArrowIcon />
+                Get Started Free
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" /></svg>
               </button>
               <button
                 onClick={() => document.getElementById('how')?.scrollIntoView({ behavior: 'smooth' })}
                 className="btn-ghost text-base"
               >
-                Tengok Cara Kerja
+                How it works
               </button>
             </motion.div>
 
-            {/* Trust stats */}
-            <motion.div {...up(0.2)} className="flex gap-6 flex-wrap border-t border-z-rim pt-6">
+            <motion.div {...up(0.2)} className="flex gap-8 flex-wrap border-t border-line pt-6">
               {[
-                { v: '1,000+', l: 'Pelajar Malaysia' },
-                { v: 'Sehingga 8', l: 'buku / bulan' },
-                { v: '< 2 min', l: 'masa persediaan' },
+                { v: '1,000+', l: 'Malaysian students' },
+                { v: 'Up to 8', l: 'books / month' },
+                { v: '< 2 min', l: 'setup time' },
               ].map(s => (
                 <div key={s.l}>
-                  <p className="font-display font-bold text-xl text-z-snow">{s.v}</p>
-                  <p className="text-xs text-z-fog mt-0.5">{s.l}</p>
+                  <p className="font-display font-bold text-xl text-heading">{s.v}</p>
+                  <p className="text-xs text-muted mt-0.5">{s.l}</p>
                 </div>
               ))}
             </motion.div>
           </div>
 
-          {/* Right: Bot demo */}
-          <div className="lg:pl-8">
-            <BotDemo />
-          </div>
-        </div>
-      </section>
-
-      {/* ── Features ─────────────────────────────────── */}
-      <section className="py-20 border-t border-z-rim">
-        <div className="max-w-6xl mx-auto px-5">
-          <motion.div {...inView()} className="text-center mb-12">
-            <p className="text-z-green text-xs font-bold uppercase tracking-widest font-mono mb-3">Ciri-ciri</p>
-            <h2 className="font-display text-3xl sm:text-4xl font-bold text-z-snow">
-              Everything you need.<br />Nothing you don't.
-            </h2>
-          </motion.div>
-
-          {/* Magazine-style feature grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {/* Big feature */}
-            <motion.div {...inView(0)} className="sm:col-span-2 card-glow relative overflow-hidden group">
-              <div className="absolute top-4 right-4 w-24 h-24 rounded-full bg-z-green/5 blur-2xl group-hover:bg-z-green/10 transition-all" />
-              <div className="w-12 h-12 bg-z-green/10 border border-z-green/25 rounded-xl flex items-center justify-center text-z-green mb-5">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25m18 0A2.25 2.25 0 0018.75 3H5.25A2.25 2.25 0 003 5.25m18 0H3" /></svg>
-              </div>
-              <h3 className="font-display text-xl font-bold text-z-snow mb-2">One-Click Extension</h3>
-              <p className="text-z-fog leading-relaxed">Install the Chrome extension, log in to AINS once, and we capture your session. That's it. Your credentials are encrypted with AES-256 and never stored in plain text.</p>
-            </motion.div>
-
-            <motion.div {...inView(0.08)} className="card group hover:border-z-green/20 hover:shadow-glow-g-sm transition-all duration-300">
-              <div className="w-10 h-10 bg-z-blue/10 border border-z-blue/25 rounded-xl flex items-center justify-center text-z-blue mb-4">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M10.5 21l5.25-11.25L21 21m-9-3h7.5M3 5.621a48.474 48.474 0 016-.371m0 0c1.12 0 2.233.038 3.334.114M9 5.25V3m3.334 2.364C11.176 10.658 7.69 15.08 3 17.502m9.334-12.138c.896.061 1.785.147 2.666.257m-4.589 8.495a18.023 18.023 0 01-3.827-5.802" /></svg>
-              </div>
-              <h3 className="font-display text-lg font-bold text-z-snow mb-2">4 Bahasa</h3>
-              <p className="text-z-fog text-sm leading-relaxed">Melayu, Inggeris, Cina, Tamil — pilih bahasa buku dan kami akan hantar rekod yang betul.</p>
-            </motion.div>
-
-            <motion.div {...inView(0.12)} className="card group hover:border-z-amber/20 transition-all duration-300">
-              <div className="w-10 h-10 bg-z-amber/10 border border-z-amber/25 rounded-xl flex items-center justify-center text-z-amber mb-4">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 9v7.5" /></svg>
-              </div>
-              <h3 className="font-display text-lg font-bold text-z-snow mb-2">Auto-Jadual</h3>
-              <p className="text-z-fog text-sm leading-relaxed">Pilih hari dalam bulan. Kami hantar rekod secara automatik tanpa perlu ingat.</p>
-            </motion.div>
-
-            <motion.div {...inView(0.16)} className="card group hover:border-z-blue/20 transition-all duration-300">
-              <div className="w-10 h-10 bg-z-blue/10 border border-z-blue/25 rounded-xl flex items-center justify-center text-z-blue mb-4">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" /></svg>
-              </div>
-              <h3 className="font-display text-lg font-bold text-z-snow mb-2">Sejarah Lengkap</h3>
-              <p className="text-z-fog text-sm leading-relaxed">Lihat semua penyerahan dengan status, tarikh, dan nama buku dalam satu paparan.</p>
-            </motion.div>
+          {/* Right: Phone mockup */}
+          <div className="lg:pl-4">
+            <PhoneMockup />
           </div>
         </div>
       </section>
 
       {/* ── How it works ─────────────────────────────── */}
-      <section id="how" className="py-20 border-t border-z-rim bg-z-card/30">
+      <section id="how" className="py-20 border-t border-line bg-white">
         <div className="max-w-6xl mx-auto px-5">
           <motion.div {...inView()} className="text-center mb-14">
-            <p className="text-z-green text-xs font-bold uppercase tracking-widest font-mono mb-3">Cara kerja</p>
-            <h2 className="font-display text-3xl sm:text-4xl font-bold">3 langkah. Selamanya automatik.</h2>
+            <p className="text-brand-600 text-xs font-bold uppercase tracking-widest mb-3">How it works</p>
+            <h2 className="font-display text-3xl sm:text-4xl font-bold text-heading">
+              3 steps. Automatically forever.
+            </h2>
           </motion.div>
 
-          <div className="relative">
-            {/* Connecting line (desktop) */}
-            <div className="hidden lg:block absolute top-[3.5rem] left-[calc(16.67%+2rem)] right-[calc(16.67%+2rem)] h-px bg-gradient-to-r from-z-rim via-z-green/40 to-z-rim" />
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              {[
-                {
-                  n: '01', color: 'text-z-green', bg: 'bg-z-green/10 border-z-green/25',
-                  title: 'Connect',
-                  desc: 'Install extension Chrome, log in ke AINS sekali. Kami simpan sesi anda dengan penyulitan AES-256.',
-                  icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" /></svg>,
-                },
-                {
-                  n: '02', color: 'text-z-blue', bg: 'bg-z-blue/10 border-z-blue/25',
-                  title: 'Configure',
-                  desc: 'Pilih bahasa, bilangan buku (1–8), dan hari dalam bulan untuk penyerahan automatik.',
-                  icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 010 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 010-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>,
-                },
-                {
-                  n: '03', color: 'text-z-amber', bg: 'bg-z-amber/10 border-z-amber/25',
-                  title: 'Relax',
-                  desc: 'Bot kami hantar rekod bacaan setiap bulan pada hari yang anda tetapkan. Tiada lagi kemasukan data manual.',
-                  icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
-                },
-              ].map((step, i) => (
-                <motion.div key={step.n} {...inView(i * 0.1)} className="relative">
-                  <div className={`card hover:border-z-green/20 transition-all duration-300`}>
-                    <div className="flex items-center gap-3 mb-5">
-                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center border ${step.bg} ${step.color}`}>
-                        {step.icon}
-                      </div>
-                      <span className="font-mono text-xs text-z-ash font-bold">{step.n}</span>
-                    </div>
-                    <h3 className="font-display text-xl font-bold text-z-snow mb-2">{step.title}</h3>
-                    <p className="text-z-fog text-sm leading-relaxed">{step.desc}</p>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
+            {[
+              {
+                n: '1',
+                title: 'Install Extension',
+                desc: 'Add the Nilam Auto Chrome extension and visit ains.moe.gov.my to save your session securely.',
+                icon: <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25m18 0A2.25 2.25 0 0018.75 3H5.25A2.25 2.25 0 003 5.25m18 0H3" /></svg>
+              },
+              {
+                n: '2',
+                title: 'Set Preferences',
+                desc: 'Choose your language, number of books, and schedule day. We do the rest every month.',
+                icon: <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M10.343 3.94c.09-.542.56-.94 1.11-.94h1.093c.55 0 1.02.398 1.11.94l.149.894c.07.424.384.764.78.93.398.164.855.142 1.205-.108l.737-.527a1.125 1.125 0 011.45.12l.773.774c.39.389.44 1.002.12 1.45l-.527.737c-.25.35-.272.806-.107 1.204.165.397.505.71.93.78l.893.15c.543.09.94.56.94 1.109v1.094c0 .55-.397 1.02-.94 1.11l-.893.149c-.425.07-.765.383-.93.78-.165.398-.143.854.107 1.204l.527.738c.32.447.269 1.06-.12 1.45l-.774.773a1.125 1.125 0 01-1.449.12l-.738-.527c-.35-.25-.806-.272-1.203-.107-.397.165-.71.505-.781.929l-.149.894c-.09.542-.56.94-1.11.94h-1.094c-.55 0-1.019-.398-1.11-.94l-.148-.894c-.071-.424-.384-.764-.781-.93-.398-.164-.854-.142-1.204.108l-.738.527c-.447.32-1.06.269-1.45-.12l-.773-.774a1.125 1.125 0 01-.12-1.45l.527-.737c.25-.35.273-.806.108-1.204-.165-.397-.505-.71-.93-.78l-.894-.15c-.542-.09-.94-.56-.94-1.109v-1.094c0-.55.398-1.02.94-1.11l.894-.149c.424-.07.765-.383.93-.78.165-.398.143-.854-.107-1.204l-.527-.738a1.125 1.125 0 01.12-1.45l.773-.773a1.125 1.125 0 011.45-.12l.737.527c.35.25.807.272 1.204.107.397-.165.71-.505.78-.929l.15-.894z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+              },
+              {
+                n: '3',
+                title: 'Relax',
+                desc: 'Nilam Auto submits your records automatically each month. Check history anytime.',
+                icon: <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              },
+            ].map((step, i) => (
+              <motion.div key={step.n} {...inView(i * 0.08)} className="flex flex-col items-center text-center">
+                <div className="w-14 h-14 bg-brand-600 text-white rounded-2xl flex items-center justify-center mb-4 shadow-card">
+                  {step.icon}
+                </div>
+                <div className="w-7 h-7 bg-brand-50 text-brand-600 rounded-full flex items-center justify-center text-xs font-bold mb-3">
+                  {step.n}
+                </div>
+                <h3 className="font-display text-lg font-bold text-heading mb-2">{step.title}</h3>
+                <p className="text-muted text-sm leading-relaxed">{step.desc}</p>
+              </motion.div>
+            ))}
           </div>
         </div>
       </section>
 
       {/* ── Pricing ──────────────────────────────────── */}
-      <section className="py-20 border-t border-z-rim">
-        <div className="max-w-4xl mx-auto px-5">
+      <section className="py-20 border-t border-line bg-page">
+        <div className="max-w-6xl mx-auto px-5">
           <motion.div {...inView()} className="text-center mb-12">
-            <p className="text-z-green text-xs font-bold uppercase tracking-widest font-mono mb-3">Harga</p>
-            <h2 className="font-display text-3xl sm:text-4xl font-bold">Mulakan percuma. Upgrade bila sedia.</h2>
+            <p className="text-brand-600 text-xs font-bold uppercase tracking-widest mb-3">Pricing</p>
+            <h2 className="font-display text-3xl sm:text-4xl font-bold text-heading">Simple, honest pricing.</h2>
           </motion.div>
 
-          <div className="grid md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-2xl mx-auto">
             {/* Free */}
-            <motion.div {...inView(0)} className="card flex flex-col">
-              <p className="text-z-fog text-sm font-semibold mb-1">Percuma</p>
-              <p className="font-display text-4xl font-extrabold text-z-snow mb-1">RM0</p>
-              <p className="text-z-ash text-xs mb-6">Selamanya</p>
-              <ul className="space-y-3 flex-1 mb-6">
-                {['1 buku / bulan', '1 bahasa sahaja', 'Sejarah 7 hari', 'Hantar manual sahaja'].map(f => (
-                  <li key={f} className="flex items-center gap-2.5 text-sm text-z-fog">
-                    <span className="w-4 h-4 rounded-full bg-z-lift flex items-center justify-center flex-shrink-0">
-                      <svg className="w-2.5 h-2.5 text-z-ash" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
-                    </span>
+            <motion.div {...inView(0)} className="card-p">
+              <p className="text-muted font-bold text-sm mb-1">Free</p>
+              <p className="font-display text-4xl font-extrabold text-heading mb-1">RM0</p>
+              <p className="text-subtle text-xs mb-5">Forever free</p>
+              <ul className="space-y-2.5 mb-6">
+                {['1 book / month', '1 language', '7-day history', 'Manual submit only'].map(f => (
+                  <li key={f} className="flex items-center gap-2.5 text-sm text-muted">
+                    <svg className="w-4 h-4 text-subtle flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
                     {f}
                   </li>
                 ))}
               </ul>
               <button
-                onClick={() => document.getElementById('auth')?.scrollIntoView({ behavior: 'smooth' })}
+                onClick={() => { setMode('signup'); document.getElementById('auth')?.scrollIntoView({ behavior: 'smooth' }) }}
                 className="btn-ghost w-full"
               >
-                Mulakan Percuma
+                Get started
               </button>
             </motion.div>
 
             {/* Pro */}
-            <motion.div {...inView(0.08)} className="relative card-glow flex flex-col">
-              {/* Popular badge */}
-              <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-z-green text-z-void text-xs font-black px-4 py-1 rounded-full">
-                PALING POPULAR
+            <motion.div {...inView(0.08)} className="bg-brand-600 rounded-card p-6 relative overflow-hidden">
+              <div className="absolute -right-8 -top-8 w-32 h-32 bg-white/5 rounded-full pointer-events-none" />
+              <div className="relative">
+                <div className="inline-flex items-center gap-1.5 bg-white/20 text-white text-xs font-bold px-2.5 py-1 rounded-full mb-3">
+                  Most Popular
+                </div>
+                <p className="text-brand-200 font-bold text-sm mb-1">Pro</p>
+                <p className="font-display text-4xl font-extrabold text-white mb-1">RM18</p>
+                <p className="text-brand-200 text-xs mb-5">/ year · ≈ RM1.50/month</p>
+                <ul className="space-y-2.5 mb-6">
+                  {['Up to 8 books / month', 'All 4 languages', 'Full history', 'Monthly auto-schedule', 'Priority support'].map(f => (
+                    <li key={f} className="flex items-center gap-2.5 text-sm text-white">
+                      <svg className="w-4 h-4 text-brand-200 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
+                      {f}
+                    </li>
+                  ))}
+                </ul>
+                <button
+                  onClick={() => navigate('/upgrade')}
+                  className="w-full py-3 bg-white text-brand-600 font-bold rounded-xl hover:bg-brand-50 transition-colors"
+                >
+                  Unlock Pro — RM18 / Year
+                </button>
               </div>
-              <p className="text-z-green text-sm font-bold mb-1">Pro</p>
-              <p className="font-display text-4xl font-extrabold text-z-snow mb-1">RM18</p>
-              <p className="text-z-ash text-xs mb-6">/ tahun — kurang RM1.50 sebulan</p>
-              <ul className="space-y-3 flex-1 mb-6">
-                {[
-                  'Sehingga 8 buku / bulan',
-                  'Semua 4 bahasa',
-                  'Auto-jadual bulanan',
-                  'Sejarah penuh',
-                  'Pemberitahuan status',
-                  'Sokongan keutamaan',
-                ].map(f => (
-                  <li key={f} className="flex items-center gap-2.5 text-sm text-z-snow">
-                    <span className="w-4 h-4 rounded-full bg-z-green/15 flex items-center justify-center flex-shrink-0">
-                      <svg className="w-2.5 h-2.5 text-z-green" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
-                    </span>
-                    {f}
-                  </li>
-                ))}
-              </ul>
-              <button
-                onClick={() => navigate('/upgrade')}
-                className="btn-primary w-full text-base py-3.5"
-              >
-                Dapatkan Pro
-                <ArrowIcon />
-              </button>
             </motion.div>
           </div>
         </div>
       </section>
 
-      {/* ── Auth modal-like section ───────────────────── */}
-      <section id="auth" className="py-20 border-t border-z-rim bg-z-card/20">
+      {/* ── Auth ─────────────────────────────────────── */}
+      <section id="auth" className="py-20 border-t border-line bg-white">
         <div className="max-w-md mx-auto px-5">
           <motion.div {...inView()} className="text-center mb-8">
-            <h2 className="font-display text-2xl font-bold text-z-snow mb-2">
-              {mode === 'login' ? 'Selamat kembali' : 'Mulakan perjalanan anda'}
+            <h2 className="font-display text-3xl font-bold text-heading">
+              {mode === 'login' ? 'Welcome back' : 'Create your account'}
             </h2>
-            <p className="text-z-fog text-sm">
-              {mode === 'login' ? 'Log masuk ke akaun Nilam Auto anda.' : 'Buat akaun percuma dalam masa beberapa saat.'}
+            <p className="text-muted text-sm mt-2">
+              {mode === 'login' ? "Don't have an account? " : 'Already have an account? '}
+              <button
+                onClick={() => { setMode(mode === 'login' ? 'signup' : 'login'); setMessage('') }}
+                className="text-brand-600 font-semibold hover:underline"
+              >
+                {mode === 'login' ? 'Sign up free' : 'Sign in'}
+              </button>
             </p>
           </motion.div>
 
-          <motion.div {...inView(0.05)} className="card-glow">
+          <motion.div {...inView(0.05)} className="card-p">
             {/* Tabs */}
-            <div className="flex bg-z-lift rounded-xl p-1 mb-6">
-              {['login', 'signup'].map(m => (
+            <div className="flex gap-1 p-1 bg-gray-100 rounded-xl mb-6">
+              {[{ k: 'login', l: 'Sign In' }, { k: 'signup', l: 'Sign Up' }].map(t => (
                 <button
-                  key={m}
-                  onClick={() => { setMode(m); setError('') }}
-                  className={`flex-1 text-sm font-bold py-2 rounded-lg transition-all ${
-                    mode === m ? 'bg-z-green text-z-void shadow-sm' : 'text-z-fog hover:text-z-snow'
+                  key={t.k}
+                  onClick={() => { setMode(t.k); setMessage('') }}
+                  className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${
+                    mode === t.k ? 'bg-white text-heading shadow-sm' : 'text-muted hover:text-heading'
                   }`}
                 >
-                  {m === 'login' ? 'Log Masuk' : 'Daftar'}
+                  {t.l}
                 </button>
               ))}
             </div>
 
             <form onSubmit={handleAuth} className="space-y-4">
               <div>
-                <label className="label">Alamat E-mel</label>
-                <input type="email" className="input" placeholder="anda@sekolah.edu.my" value={email} onChange={e => setEmail(e.target.value)} required />
+                <label className="label">Email address</label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  placeholder="student@school.edu.my"
+                  required
+                  className="input"
+                />
               </div>
               <div>
-                <label className="label">Kata Laluan</label>
-                <input type="password" className="input" placeholder="Masukkan kata laluan" value={password} onChange={e => setPassword(e.target.value)} required />
+                <label className="label">Password</label>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  required
+                  minLength={6}
+                  className="input"
+                />
               </div>
 
-              {error && (
-                <div className={`flex items-start gap-2.5 text-sm rounded-xl px-4 py-3 border ${
-                  error.includes('Check your email')
-                    ? 'bg-z-green/10 text-z-green border-z-green/25'
-                    : 'bg-z-red/10 text-z-red border-z-red/25'
-                }`}>
-                  <svg className="w-4 h-4 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                  </svg>
-                  {error}
-                </div>
+              {message && (
+                <p className={`text-sm font-semibold ${isError ? 'text-danger-600' : 'text-ok-600'}`}>
+                  {message}
+                </p>
               )}
 
-              <button type="submit" disabled={loading} className="btn-primary w-full py-3.5 text-base mt-2">
-                {loading
-                  ? <><span className="w-4 h-4 border-2 border-z-void/30 border-t-z-void rounded-full animate-spin" />Sila tunggu...</>
-                  : mode === 'login' ? 'Log Masuk' : 'Buat Akaun'}
+              <button type="submit" disabled={loading} className="btn-primary w-full py-3">
+                {loading ? (
+                  <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Processing…</>
+                ) : mode === 'login' ? 'Sign In' : 'Create Account'}
               </button>
             </form>
-
-            <p className="text-center text-xs text-z-ash mt-4">
-              Kelayakan AINS anda disulitkan dan tidak pernah disimpan sebagai teks biasa.
-            </p>
           </motion.div>
         </div>
       </section>
 
       {/* ── Footer ───────────────────────────────────── */}
-      <footer className="border-t border-z-rim py-8">
-        <div className="max-w-6xl mx-auto px-5 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 bg-z-green rounded-lg flex items-center justify-center">
-              <BookIcon className="w-4 h-4 text-z-void" />
+      <footer className="bg-heading text-white py-10 border-t border-white/10">
+        <div className="max-w-6xl mx-auto px-5 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 bg-brand-600 rounded-lg flex items-center justify-center">
+              <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+              </svg>
             </div>
-            <span className="font-display font-bold text-z-snow text-sm">Nilam Auto</span>
+            <span className="font-display font-bold text-sm">Nilam Auto</span>
           </div>
-          <p className="text-z-ash text-xs text-center">
-            Untuk pelajar Malaysia. Tidak bersekutu dengan KPM atau Kementerian Pelajaran.
-          </p>
+          <p className="text-white/40 text-xs">© 2025 Nilam Auto. Built for Malaysian students.</p>
+          <p className="text-white/40 text-xs">Data encrypted with AES-256</p>
         </div>
       </footer>
-
     </div>
-  )
-}
-
-/* ── Icons ─────────────────────────────────────────── */
-function BookIcon({ className }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-    </svg>
-  )
-}
-function ArrowIcon() {
-  return (
-    <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
-    </svg>
   )
 }
