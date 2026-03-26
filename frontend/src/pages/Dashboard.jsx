@@ -72,6 +72,11 @@ export default function Dashboard() {
 
   async function handleSubmit() {
     if (!user) return
+    if (isNative && cookieStatus !== 'fresh') {
+      setTriggerMsg('Connect your AINS account in Settings first.')
+      setIsError(true)
+      return
+    }
     setTriggering(true)
     setTriggerMsg('')
     setIsError(false)
