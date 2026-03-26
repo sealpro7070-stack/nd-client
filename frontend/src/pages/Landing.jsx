@@ -249,6 +249,30 @@ export default function Landing() {
         </div>
       </header>
 
+      {/* ── Extension download bar ───────────────────── */}
+      <div className="bg-brand-600 text-white py-3 px-5">
+        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <span className="hidden sm:flex w-7 h-7 bg-white/20 rounded-lg items-center justify-center flex-shrink-0">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25m18 0A2.25 2.25 0 0018.75 3H5.25A2.25 2.25 0 003 5.25m18 0H3"/></svg>
+            </span>
+            <div>
+              <span className="text-sm font-bold">Chrome Extension — Desktop Only</span>
+              <span className="hidden sm:inline text-brand-200 text-sm"> · Required for session saving on PC</span>
+            </div>
+          </div>
+          <a
+            href="/nilam-auto-extension.zip"
+            download
+            onClick={e => { e.preventDefault(); document.getElementById('extension')?.scrollIntoView({ behavior: 'smooth' }) }}
+            className="flex-shrink-0 flex items-center gap-2 bg-white text-brand-600 font-bold text-sm px-5 py-2 rounded-xl hover:bg-brand-50 transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+            Download Extension
+          </a>
+        </div>
+      </div>
+
       {/* ── Hero ────────────────────────────────────── */}
       <section className="relative overflow-hidden">
         <div className="absolute top-0 left-1/4 w-96 h-96 bg-brand-100/40 rounded-full blur-3xl pointer-events-none" />
@@ -355,6 +379,98 @@ export default function Landing() {
               </motion.div>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* ── Chrome Extension ─────────────────────────── */}
+      <section id="extension" className="py-20 border-t border-line bg-white">
+        <div className="max-w-4xl mx-auto px-5">
+          <motion.div {...inView()} className="text-center mb-10">
+            <div className="inline-flex items-center gap-2 bg-brand-50 border border-brand-200 text-brand-600 text-xs font-bold px-3 py-1.5 rounded-full mb-4">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+              Desktop Only — Google Chrome
+            </div>
+            <h2 className="font-display text-3xl sm:text-4xl font-bold text-heading mb-3">
+              Download the Chrome Extension
+            </h2>
+            <p className="text-muted text-base max-w-xl mx-auto">
+              The extension captures your AINS login session so Nilam Auto can submit records on your behalf — without ever storing your password.
+            </p>
+          </motion.div>
+
+          {/* Download card */}
+          <motion.div {...inView(0.05)} className="bg-brand-600 rounded-2xl p-6 sm:p-8 mb-8 text-white relative overflow-hidden">
+            <div className="absolute -right-12 -top-12 w-48 h-48 bg-white/5 rounded-full pointer-events-none" />
+            <div className="relative flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5">
+              <div>
+                <p className="text-brand-200 text-xs font-bold uppercase tracking-widest mb-1">Nilam Auto Extension</p>
+                <p className="font-display text-xl font-bold mb-1">For Google Chrome · Desktop PC only</p>
+                <p className="text-brand-200 text-sm">Free · Works on Windows, Mac, Linux</p>
+              </div>
+              <a
+                href="/nilam-auto-extension.zip"
+                download
+                className="flex-shrink-0 flex items-center gap-2.5 bg-white text-brand-600 font-bold px-7 py-3.5 rounded-xl hover:bg-brand-50 transition-colors text-base"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                Download Extension (.zip)
+              </a>
+            </div>
+          </motion.div>
+
+          {/* Install steps */}
+          <motion.div {...inView(0.08)} className="bg-page border border-line rounded-2xl p-6 sm:p-8">
+            <p className="text-xs font-bold text-heading uppercase tracking-widest mb-6">How to install — step by step</p>
+            <ol className="space-y-5">
+              {[
+                {
+                  title: 'Download the extension file',
+                  desc: 'Click "Download Extension (.zip)" above. Save the file anywhere on your PC — your Downloads folder is fine.',
+                },
+                {
+                  title: 'Extract the zip file',
+                  desc: 'Right-click the downloaded .zip file → "Extract All" (Windows) or double-click (Mac). You\'ll get a folder called nilam-auto-extension.',
+                },
+                {
+                  title: 'Open Chrome Extensions page',
+                  desc: 'Open Google Chrome. In the address bar type chrome://extensions and press Enter.',
+                },
+                {
+                  title: 'Enable Developer Mode',
+                  desc: 'In the top-right corner of the Extensions page, toggle on "Developer mode". New buttons will appear at the top.',
+                },
+                {
+                  title: 'Load the extension',
+                  desc: 'Click "Load unpacked". A file picker will open — navigate to and select the nilam-auto-extension folder you extracted in Step 2.',
+                },
+                {
+                  title: 'Pin it to your toolbar',
+                  desc: 'Click the puzzle-piece icon (Extensions) in Chrome\'s toolbar → find Nilam Auto → click the pin icon. The Nilam Auto icon will now always show in your toolbar.',
+                },
+                {
+                  title: 'Save your AINS session',
+                  desc: 'Go to ains.moe.gov.my and log in as usual. Then click the Nilam Auto icon in your toolbar and press "Save Session". Done — you\'re connected!',
+                },
+              ].map((step, i) => (
+                <li key={i} className="flex gap-4">
+                  <span className="w-7 h-7 flex-shrink-0 bg-brand-600 text-white rounded-full flex items-center justify-center text-xs font-bold mt-0.5">
+                    {i + 1}
+                  </span>
+                  <div>
+                    <p className="text-sm font-bold text-heading mb-0.5">{step.title}</p>
+                    <p className="text-sm text-muted leading-relaxed">{step.desc}</p>
+                  </div>
+                </li>
+              ))}
+            </ol>
+
+            <div className="mt-6 flex items-start gap-3 bg-warn-50 border border-warn-200 rounded-xl px-4 py-3">
+              <svg className="w-4 h-4 text-warn-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd"/></svg>
+              <p className="text-xs text-warn-700 leading-relaxed">
+                <span className="font-bold">This extension only works on desktop PC with Google Chrome.</span> It does not work on mobile phones, tablets, Firefox, or Safari. Android users can use the app directly — no extension needed.
+              </p>
+            </div>
+          </motion.div>
         </div>
       </section>
 
