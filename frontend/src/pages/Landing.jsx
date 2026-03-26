@@ -123,6 +123,19 @@ export default function Landing() {
     return () => subscription.unsubscribe()
   }, [navigate])
 
+  // Mirror user to backend — non-fatal, never blocks auth flow
+  async function syncUserToBackend(user) {
+    try {
+      await fetch(`${BACKEND}/api/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: user.id, email: user.email }),
+      })
+    } catch {
+      // Backend unreachable (e.g. localhost fallback on mobile) — ignore, auth still works
+    }
+  }
+
   async function handleAuth(e) {
     e.preventDefault()
     setLoading(true)
@@ -135,29 +148,49 @@ export default function Landing() {
           password,
           options: { emailRedirectTo: window.location.origin },
         })
-        if (error) throw error
-        if (data?.user) {
-          await fetch(`${BACKEND}/api/auth/register`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id: data.user.id, email: data.user.email }),
-          })
+        if (error) {
+          // Normalise duplicate-account errors into a friendly message
+          const msg = error.message?.toLowerCase() ?? ''
+          if (msg.includes('already registered') || msg.includes('already been registered') || msg.includes('email address is already taken')) {
+            setMessage('An account with this email already exists. Please sign in instead.')
+          } else {
+            setMessage(error.message)
+          }
+          setIsError(true)
+          return
         }
+        // Supabase quirk: returns success but empty identities when email already exists + confirmation is on
+        if (data?.user?.identities?.length === 0) {
+          setMessage('An account with this email already exists. Please sign in instead.')
+          setIsError(true)
+          return
+        }
+        if (data?.user) syncUserToBackend(data.user)
         setMessage('Check your email to confirm your account.')
       } else {
         const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-        if (error) throw error
-        if (data?.user) {
-          await fetch(`${BACKEND}/api/auth/register`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id: data.user.id, email: data.user.email }),
-          })
+        if (error) {
+          const msg = error.message?.toLowerCase() ?? ''
+          if (msg.includes('invalid login') || msg.includes('invalid credentials') || msg.includes('wrong password')) {
+            setMessage('Incorrect email or password. Please try again.')
+          } else if (msg.includes('email not confirmed')) {
+            setMessage('Please verify your email first. Check your inbox or resend below.')
+          } else {
+            setMessage(error.message)
+          }
+          setIsError(true)
+          return
         }
+        if (data?.user) syncUserToBackend(data.user)
         navigate('/dashboard')
       }
     } catch (err) {
-      setMessage(err.message)
+      const raw = err.message?.toLowerCase() ?? ''
+      if (raw.includes('failed to fetch') || raw.includes('networkerror') || raw.includes('network request failed')) {
+        setMessage('Connection error. Check your internet and try again.')
+      } else {
+        setMessage(err.message)
+      }
       setIsError(true)
     } finally {
       setLoading(false)
@@ -194,6 +227,12 @@ export default function Landing() {
             <span className="font-display font-bold text-heading tracking-tight">Nilam Auto</span>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => document.getElementById('guide')?.scrollIntoView({ behavior: 'smooth' })}
+              className="hidden sm:block text-sm font-semibold text-muted hover:text-heading px-4 py-2 rounded-xl hover:bg-gray-100 transition-all"
+            >
+              Guide
+            </button>
             <button
               onClick={() => { setMode('login'); document.getElementById('auth')?.scrollIntoView({ behavior: 'smooth' }) }}
               className="text-sm font-semibold text-muted hover:text-heading px-4 py-2 rounded-xl hover:bg-gray-100 transition-all"
@@ -288,7 +327,7 @@ export default function Landing() {
               {
                 n: '1',
                 title: 'Install Extension',
-                desc: 'Add the Nilam Auto Chrome extension and visit ains.moe.gov.my to save your session securely.',
+                desc: 'Download the Nilam Auto Chrome extension, load it in Chrome, then visit ains.moe.gov.my to save your session.',
                 icon: <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25m18 0A2.25 2.25 0 0018.75 3H5.25A2.25 2.25 0 003 5.25m18 0H3" /></svg>
               },
               {
@@ -316,6 +355,101 @@ export default function Landing() {
               </motion.div>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* ── Full Guide ───────────────────────────────── */}
+      <section id="guide" className="py-20 border-t border-line bg-page">
+        <div className="max-w-4xl mx-auto px-5">
+          <motion.div {...inView()} className="text-center mb-14">
+            <p className="text-brand-600 text-xs font-bold uppercase tracking-widest mb-3">Step-by-step guide</p>
+            <h2 className="font-display text-3xl sm:text-4xl font-bold text-heading">
+              Complete setup in under 5 minutes
+            </h2>
+            <p className="text-muted text-base mt-3">For PC users. Follow these steps once — then it runs automatically every month.</p>
+          </motion.div>
+
+          <div className="space-y-4">
+            {[
+              {
+                n: '1',
+                label: 'Create your account',
+                body: 'Click "Get Started Free" above, enter your email and a password, then check your inbox for a verification email. Click the link to activate your account.',
+                tip: 'Use your personal email (Gmail, Outlook etc) — not your school email which may block automated emails.',
+              },
+              {
+                n: '2',
+                label: 'Download & install the Chrome extension',
+                body: 'Download the Nilam Auto extension (.zip file) using the button below. Then open Chrome, go to chrome://extensions, turn on Developer Mode (top-right toggle), click "Load unpacked", and select the extracted extension folder.',
+                cta: (
+                  <a
+                    href="/nilam-auto-extension.zip"
+                    download
+                    className="inline-flex items-center gap-2 mt-3 bg-brand-600 text-white text-sm font-bold px-5 py-2.5 rounded-xl hover:bg-brand-700 transition-colors"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                    Download Chrome Extension (.zip)
+                  </a>
+                ),
+                tip: 'Only works on Google Chrome or Chromium-based browsers (Edge, Brave). Does not work on Firefox or Safari.',
+              },
+              {
+                n: '3',
+                label: 'Log in to AINS',
+                body: 'Open a new tab and go to ains.moe.gov.my. Sign in with your usual school credentials (IC number / password). Make sure you reach your student dashboard — the extension needs to detect an active session.',
+                tip: 'If your school changes your password, you\'ll need to repeat this step to save the new session.',
+              },
+              {
+                n: '4',
+                label: 'Save your session via the extension',
+                body: 'While on ains.moe.gov.my (and still logged in), click the Nilam Auto icon in your Chrome toolbar. A small popup will appear — click "Save Session". You will see a green confirmation message. This is the one-time setup step.',
+                tip: 'The extension only reads your session cookie — it never stores your username or password.',
+              },
+              {
+                n: '5',
+                label: 'Configure your preferences',
+                body: 'Come back to nilamauto.netlify.app and log in. On your dashboard, choose your language (Malay, English, Chinese, or Tamil) and the number of books (1–8). Pro users can enable the monthly auto-schedule.',
+              },
+              {
+                n: '6',
+                label: 'Submit your records',
+                body: 'Click "Submit Now" on your dashboard. The bot will log in to AINS on your behalf and submit your reading records automatically. This usually takes 30–90 seconds.',
+                tip: 'You can check the status and see which books were submitted under the History tab.',
+              },
+              {
+                n: '7',
+                label: 'Sit back — it runs every month',
+                body: 'Pro users: enable auto-schedule in Settings and pick a day of the month. Nilam Auto will submit your records on that day every month without you having to do anything.',
+              },
+            ].map((step, i) => (
+              <motion.div key={step.n} {...inView(i * 0.05)} className="flex gap-5 bg-white rounded-2xl border border-line p-5 hover:border-brand-200 transition-colors">
+                <div className="w-9 h-9 bg-brand-600 text-white rounded-xl flex items-center justify-center text-sm font-extrabold flex-shrink-0 mt-0.5 shadow-sm">
+                  {step.n}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-display font-bold text-heading mb-1.5">{step.label}</p>
+                  <p className="text-sm text-muted leading-relaxed">{step.body}</p>
+                  {step.cta}
+                  {step.tip && (
+                    <div className="flex items-start gap-2 mt-3 bg-brand-50 border border-brand-100 rounded-xl px-3 py-2">
+                      <span className="text-brand-500 text-xs mt-0.5 flex-shrink-0">💡</span>
+                      <p className="text-xs text-brand-700 leading-relaxed">{step.tip}</p>
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            ))}
+          </div>
+
+          <motion.div {...inView(0.1)} className="mt-10 text-center">
+            <button
+              onClick={() => { setMode('signup'); document.getElementById('auth')?.scrollIntoView({ behavior: 'smooth' }) }}
+              className="btn-primary text-base px-8 py-3.5"
+            >
+              Get Started Free — takes 5 minutes
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" /></svg>
+            </button>
+          </motion.div>
         </div>
       </section>
 
