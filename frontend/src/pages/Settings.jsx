@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
+import { Capacitor } from '@capacitor/core'
 import { supabase } from '../lib/supabase'
 
 const BACKEND    = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001'
@@ -51,7 +52,7 @@ export default function Settings() {
   const [aimsConnecting, setAimsConnecting] = useState(false)
 
   // Detect native Android/iOS Capacitor context
-  const isNative = !!(typeof window !== 'undefined' && window?.Capacitor?.isNativePlatform?.())
+  const isNative = Capacitor.isNativePlatform()
 
   // Display-friendly selections
   const [displayLang, setDisplayLang]   = useState('Malay')

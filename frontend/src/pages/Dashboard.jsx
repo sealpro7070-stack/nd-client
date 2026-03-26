@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
+import { Capacitor } from '@capacitor/core'
 import { supabase } from '../lib/supabase'
 import BookCard from '../components/BookCard'
 
@@ -8,7 +9,7 @@ const BACKEND   = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001'
 const LANGUAGES = ['Malay', 'English', 'Chinese', 'Tamil']
 const LANG_MAP  = { Malay: 'Melayu', English: 'Inggeris', Chinese: 'Cina', Tamil: 'Tamil' }
 
-const isNative = !!(typeof window !== 'undefined' && window?.Capacitor?.isNativePlatform?.())
+const isNative = Capacitor.isNativePlatform()
 
 export default function Dashboard() {
   const navigate = useNavigate()
