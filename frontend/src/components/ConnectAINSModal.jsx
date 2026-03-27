@@ -12,6 +12,17 @@ export default function ConnectAINSModal({ userId, isOpen, onClose, onSuccess })
   const canvasRef = useRef(null)
   const pollIntervalRef = useRef(null)
 
+  // Draw screenshot onto canvas whenever it updates
+  useEffect(() => {
+    if (!screenshot || !canvasRef.current) return
+    const img = new Image()
+    img.onload = () => {
+      const ctx = canvasRef.current?.getContext('2d')
+      if (ctx) ctx.drawImage(img, 0, 0, 1280, 800)
+    }
+    img.src = `data:image/png;base64,${screenshot}`
+  }, [screenshot])
+
   // Initialize session and start polling
   useEffect(() => {
     if (!isOpen) return

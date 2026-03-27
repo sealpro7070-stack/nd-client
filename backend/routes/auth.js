@@ -71,8 +71,8 @@ router.get('/check-login-status', async (req, res) => {
   if (!userId) return res.status(400).json({ error: 'userId required' })
 
   try {
-    const url = sm.getUrl(userId)
-    const pageText = await sm.getPageText(userId)
+    const url = sm.getUrl(userId) || ''
+    const pageText = await sm.getPageText(userId).catch(() => '')
 
     // Check login success: on dashboard (ains.moe.gov.my) and no login page
     const onAins = url.includes('ains.moe.gov.my')
@@ -90,10 +90,7 @@ router.get('/check-login-status', async (req, res) => {
         const encrypted = encrypt(cookieString)
         const { error } = await supabase
           .from('users')
-          .update({
-            ains_cookie_encrypted: encrypted,
-            ains_creds_updated_at: new Date().toISOString()
-          })
+          .update({ ains_cookie_encrypted: encrypted })
           .eq('id', userId)
 
         if (error) {
