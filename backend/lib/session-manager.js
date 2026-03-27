@@ -196,10 +196,21 @@ async function performLogin(userId, email, password, onStatus) {
     )
     console.log(`[login] MFA approved, now on: ${page.url()}`)
 
+    // After Google OAuth, the browser goes through api.moe.gov.my/callback before
+    // landing on the actual AINS app. Wait for the final ains.moe.gov.my URL.
+    if (!page.url().includes('ains.moe.gov.my')) {
+      console.log('[login] Waiting for final redirect to ains.moe.gov.my...')
+      await page.waitForURL(/ains\.moe\.gov\.my/, { timeout: 30000 })
+      console.log(`[login] Landed on AINS: ${page.url()}`)
+    }
+
+    // Wait for page to fully load so the Vue app can initialise sessionStorage
+    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {})
+
     // Wait for AINS Vue app to set jb-app-token in sessionStorage
     await page.waitForFunction(
       () => sessionStorage.getItem('jb-app-token') !== null,
-      { timeout: 8000 }
+      { timeout: 10000 }
     ).catch(() => {
       console.warn('[login] Timed out waiting for jb-app-token — capturing whatever is available')
     })
