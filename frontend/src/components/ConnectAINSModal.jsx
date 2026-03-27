@@ -57,8 +57,9 @@ export default function ConnectAINSModal({ userId, isOpen, onClose, onSuccess })
           return
         }
 
-        // Detect dead session from backend
-        const isExpired = data.message?.toLowerCase().includes('expired') ||
+        // Detect dead session from backend (sessionLost flag or expired message)
+        const isExpired = data.sessionLost ||
+                          data.message?.toLowerCase().includes('expired') ||
                           data.message?.toLowerCase().includes('not started')
         if (isExpired) {
           stopPolling()

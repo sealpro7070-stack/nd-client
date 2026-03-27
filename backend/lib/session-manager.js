@@ -21,21 +21,37 @@ async function createSession(userId) {
 
   const browser = await chromium.launch({
     headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-blink-features=AutomationControlled'],
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-blink-features=AutomationControlled',
+      '--disable-features=IsolateOrigins,site-per-process',
+      '--disable-ipc-flooding-protection',
+    ],
   })
 
   const context = await browser.newContext({
-    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-    viewport: { width: 1280, height: 800 },
+    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+    viewport: { width: 1366, height: 768 },
     locale: 'ms-MY',
     timezoneId: 'Asia/Kuala_Lumpur',
+    extraHTTPHeaders: { 'Accept-Language': 'ms-MY,ms;q=0.9,en-US;q=0.8,en;q=0.7' },
   })
 
   const page = await context.newPage()
 
-  // Mask automation signals
+  // Thorough automation masking — prevents Microsoft bot detection
   await context.addInitScript(() => {
     Object.defineProperty(navigator, 'webdriver', { get: () => undefined })
+    Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] })
+    Object.defineProperty(navigator, 'languages', { get: () => ['ms-MY', 'ms', 'en-US', 'en'] })
+    Object.defineProperty(navigator, 'platform', { get: () => 'Win32' })
+    window.chrome = { runtime: {}, loadTimes: () => {}, csi: () => {}, app: {} }
+    const originalQuery = window.navigator.permissions.query
+    window.navigator.permissions.query = (params) =>
+      params.name === 'notifications'
+        ? Promise.resolve({ state: Notification.permission })
+        : originalQuery(params)
   })
 
   sessions[userId] = {
@@ -150,6 +166,8 @@ async function getScreenshot(userId) {
   if (!session) throw new Error('Session not found')
 
   try {
+    // Wait for page to settle after navigation before capturing
+    await session.page.waitForLoadState('domcontentloaded', { timeout: 3000 }).catch(() => {})
     const buffer = await session.page.screenshot({ type: 'png' })
     session.lastActivity = Date.now()
     return buffer.toString('base64')

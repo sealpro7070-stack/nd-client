@@ -80,7 +80,7 @@ router.get('/check-login-status', async (req, res) => {
   try {
     const session = sm.getSession(userId)
     if (!session) {
-      return res.json({ loggedIn: false, message: 'Session expired or not started. Please try again.' })
+      return res.json({ loggedIn: false, sessionLost: true, message: 'Session expired or not started. Please tap Restart to try again.' })
     }
 
     let url = ''
@@ -91,6 +91,7 @@ router.get('/check-login-status', async (req, res) => {
     const onAins = url.includes('ains.moe.gov.my')
     const onLoginPage = /Log masuk dengan akaun DELIMa|Sign in with DELIMa|login\.microsoft/i.test(pageText)
     const hasError = /No Authorization|Tiada Kebenaran|password.*incorrect|account.*not.*exist/i.test(pageText)
+    const sessionLostOnPage = /session.*lost|sesi.*tamat|your session.*expired|something went wrong.*sign.*in again/i.test(pageText)
     const isLoggedIn = onAins && !onLoginPage && !hasError
 
     if (isLoggedIn) {
@@ -191,6 +192,11 @@ router.get('/check-login-status', async (req, res) => {
     }
 
     // Still waiting or error
+    if (sessionLostOnPage) {
+      await sm.destroySession(userId).catch(() => {})
+      return res.json({ loggedIn: false, sessionLost: true, message: 'Session lost. Tap "Restart" to try again.' })
+    }
+
     let screenshot = null
     try { screenshot = await sm.getScreenshot(userId) } catch { /* session gone */ }
     res.json({
