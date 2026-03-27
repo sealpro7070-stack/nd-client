@@ -84,8 +84,8 @@ export default function Dashboard() {
         body: JSON.stringify({ userId, count }),
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Failed to start')
-      setTriggerMsg(data.message || 'Bot started! Check back in a few minutes.')
+      if (!res.ok || data.success === false) throw new Error(data.error || 'Failed to start')
+      setTriggerMsg(data.message || 'Done! Check History for details.')
       setSettings(s => ({ ...s, language: apiLang, books_per_month: count }))
     } catch (err) {
       setTriggerMsg(err.message)

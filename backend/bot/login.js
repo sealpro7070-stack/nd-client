@@ -93,13 +93,15 @@ async function injectSession(context, page, token, ssUser, ssProfile, cookies = 
 
 /**
  * loginWithCredentials — Full Playwright login using DELIMa username+password
+ * DELIMa uses Microsoft Azure AD — login.microsoftonline.com
+ * Flow: AINS → click "Log masuk" → Microsoft login → username → password → back to AINS
  */
 async function loginWithCredentials(context, page, username, password) {
   console.log(`[login] loginWithCredentials for user: ${username.substring(0, 4)}****`)
 
   page.on('response', res => {
     if (res.status() >= 400) {
-      console.log(`[network] ${res.status()} ${res.url().replace('https://ains-api.moe.gov.my/api', '[api]')}`)
+      console.log(`[network] ${res.status()} ${res.url()}`)
     }
   })
 
@@ -107,94 +109,137 @@ async function loginWithCredentials(context, page, username, password) {
   await page.goto(AINS_BASE, { waitUntil: 'networkidle', timeout: 30000 })
   await page.waitForTimeout(2000)
   console.log(`[login] Loaded AINS: ${page.url()}`)
+  await page.screenshot({ path: path.join(SCREENSHOTS_DIR, `step1-ains-${Date.now()}.png`), fullPage: true }).catch(() => {})
 
   // 2. Click the DELIMa login button
   const loginBtnSelectors = [
     'text=Log masuk dengan akaun DELIMa',
     'text=DELIMa',
-    'a[href*="delima"]',
     'a[href*="login"]',
     'button:has-text("Log masuk")',
+    'button:has-text("Login")',
   ]
+  let clicked = false
   for (const sel of loginBtnSelectors) {
     try {
       const btn = page.locator(sel).first()
       if (await btn.count() > 0) {
         await btn.click()
         console.log(`[login] Clicked login button via: ${sel}`)
+        clicked = true
         break
       }
     } catch {}
   }
+  if (!clicked) console.warn('[login] No login button found on AINS page')
 
-  // 3. Wait for login form
-  await page.waitForTimeout(3000)
-  console.log(`[login] After click URL: ${page.url()}`)
-  await page.screenshot({ path: require('path').join(SCREENSHOTS_DIR, `creds-form-${Date.now()}.png`), fullPage: true }).catch(() => {})
+  // 3. Wait for redirect to Microsoft login
+  await page.waitForTimeout(4000)
+  const urlAfterClick = page.url()
+  console.log(`[login] After click URL: ${urlAfterClick}`)
+  await page.screenshot({ path: path.join(SCREENSHOTS_DIR, `step2-loginform-${Date.now()}.png`), fullPage: true }).catch(() => {})
 
-  // 4. Fill username (try multiple selectors)
-  const usernameSelectors = [
-    '#username', 'input[name="username"]', 'input[name="ic"]',
-    'input[id*="user"]', 'input[placeholder*="IC"]',
-    'input[placeholder*="Nombor"]', 'input[type="text"]',
-  ]
-  for (const sel of usernameSelectors) {
+  const isMicrosoft = urlAfterClick.includes('login.microsoftonline.com') || urlAfterClick.includes('login.microsoft.com')
+
+  if (isMicrosoft) {
+    // ── Microsoft Azure AD login ──────────────────────────────────────────
+    console.log('[login] Microsoft login page detected')
+
+    // Step A: Enter username (IC number / DELIMa account)
     try {
-      const el = page.locator(sel).first()
-      if (await el.count() > 0) {
-        await el.fill(username)
-        console.log(`[login] Filled username via: ${sel}`)
-        break
-      }
-    } catch {}
-  }
+      await page.waitForSelector('input[name="loginfmt"]', { timeout: 12000 })
+      await page.fill('input[name="loginfmt"]', username)
+      console.log('[login] Filled Microsoft username (loginfmt)')
+      await page.waitForTimeout(500)
+      // "Next" button on Microsoft login
+      const nextBtn = page.locator('#idSIButton9, input[type="submit"], button[type="submit"]').first()
+      await nextBtn.click()
+      console.log('[login] Clicked Next')
+    } catch (e) {
+      console.warn('[login] Microsoft username step failed:', e.message)
+    }
 
-  // 5. Fill password
-  try {
-    await page.locator('input[type="password"]').first().fill(password)
-    console.log('[login] Filled password')
-  } catch {
-    console.warn('[login] Could not fill password field')
-  }
+    // Wait for password screen
+    await page.waitForTimeout(4000)
+    await page.screenshot({ path: path.join(SCREENSHOTS_DIR, `step3-afterusername-${Date.now()}.png`), fullPage: true }).catch(() => {})
+    console.log('[login] After username URL:', page.url())
 
-  await page.waitForTimeout(500)
-
-  // 6. Submit the form
-  const submitSelectors = [
-    'button[type="submit"]', 'input[type="submit"]',
-    'button:has-text("Log masuk")', 'button:has-text("Login")',
-    'button:has-text("Sign in")', 'button:has-text("Masuk")',
-  ]
-  for (const sel of submitSelectors) {
+    // Step B: Enter password
     try {
-      const btn = page.locator(sel).first()
-      if (await btn.count() > 0) {
-        await btn.click()
-        console.log(`[login] Submitted via: ${sel}`)
-        break
+      await page.waitForSelector('input[name="passwd"]', { timeout: 12000 })
+      await page.fill('input[name="passwd"]', password)
+      console.log('[login] Filled Microsoft password (passwd)')
+      await page.waitForTimeout(500)
+      // "Sign in" button
+      const signInBtn = page.locator('#idSIButton9, input[type="submit"], button[type="submit"]').first()
+      await signInBtn.click()
+      console.log('[login] Clicked Sign in')
+    } catch (e) {
+      console.warn('[login] Microsoft password step failed:', e.message)
+    }
+
+    // Wait for post-login redirect
+    await page.waitForTimeout(4000)
+    await page.screenshot({ path: path.join(SCREENSHOTS_DIR, `step4-afterpassword-${Date.now()}.png`), fullPage: true }).catch(() => {})
+    console.log('[login] After password URL:', page.url())
+
+    // Step C: Dismiss "Stay signed in?" if shown
+    try {
+      const noBtn = page.locator('#idBtn_Back')
+      if (await noBtn.count() > 0) {
+        await noBtn.click()
+        console.log('[login] Dismissed "Stay signed in?" dialog')
+        await page.waitForTimeout(2000)
       }
     } catch {}
+
+  } else {
+    // ── Fallback: non-Microsoft form ──────────────────────────────────────
+    console.log('[login] Non-Microsoft login form, trying generic selectors')
+    const usernameSelectors = [
+      '#username', 'input[name="username"]', 'input[name="ic"]',
+      'input[placeholder*="IC"]', 'input[placeholder*="Nombor"]', 'input[type="text"]',
+    ]
+    for (const sel of usernameSelectors) {
+      try {
+        const el = page.locator(sel).first()
+        if (await el.count() > 0) { await el.fill(username); console.log(`[login] Filled username via: ${sel}`); break }
+      } catch {}
+    }
+    try {
+      await page.locator('input[type="password"]').first().fill(password)
+      console.log('[login] Filled password (fallback)')
+    } catch { console.warn('[login] Could not fill password field') }
+    await page.waitForTimeout(500)
+    const submitSelectors = ['button[type="submit"]', 'input[type="submit"]', 'button:has-text("Log masuk")', 'button:has-text("Login")']
+    for (const sel of submitSelectors) {
+      try {
+        const btn = page.locator(sel).first()
+        if (await btn.count() > 0) { await btn.click(); console.log(`[login] Submitted via: ${sel}`); break }
+      } catch {}
+    }
   }
 
-  // 7. Wait for redirect back to AINS
+  // 4. Wait for redirect back to AINS
   try {
     await page.waitForURL(/ains\.moe\.gov\.my/, { timeout: 30000 })
+    console.log('[login] Redirected back to AINS')
   } catch {
-    console.warn('[login] Did not redirect back to ains.moe.gov.my within 30s')
+    console.warn('[login] Did not redirect to ains.moe.gov.my within 30s, URL:', page.url())
   }
   await page.waitForTimeout(3000)
+  await page.screenshot({ path: path.join(SCREENSHOTS_DIR, `final-${Date.now()}.png`), fullPage: true }).catch(() => {})
 
-  await page.screenshot({ path: require('path').join(SCREENSHOTS_DIR, `creds-result-${Date.now()}.png`), fullPage: true }).catch(() => {})
-
-  // 8. Check login status
+  // 5. Check login status
   const url = page.url()
   const pageText = await page.textContent('body').catch(() => '')
-  const onLoginPage = /Log masuk dengan akaun DELIMa|Sign in with DELIMa/i.test(pageText)
-  const hasAuthError = /No Authorization|Tiada Kebenaran|kata laluan|password.*incorrect|invalid/i.test(pageText)
-  const isLoggedIn = !onLoginPage && !hasAuthError
+  const onLoginPage = /Log masuk dengan akaun DELIMa|Sign in with DELIMa/i.test(pageText) || url.includes('login.microsoft')
+  const hasAuthError = /No Authorization|Tiada Kebenaran/i.test(pageText)
+  const hasCredError = /account.*not.*exist|password.*incorrect|username.*incorrect|kata laluan.*salah|akaun.*tidak.*wujud|That.*account.*doesn.*exist/i.test(pageText)
+  const isLoggedIn = url.includes('ains.moe.gov.my') && !onLoginPage && !hasAuthError && !hasCredError
 
-  console.log(`[login] URL: ${url}`)
-  console.log(`[login] Result: ${isLoggedIn ? 'LOGGED IN' : 'FAILED'} (loginPage=${onLoginPage}, authError=${hasAuthError})`)
+  console.log(`[login] Final URL: ${url}`)
+  console.log(`[login] Result: ${isLoggedIn ? 'LOGGED IN' : 'FAILED'} (onLogin=${onLoginPage}, authError=${hasAuthError}, credError=${hasCredError})`)
 
   return isLoggedIn
 }
