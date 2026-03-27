@@ -70,6 +70,9 @@ export default function Dashboard() {
     setTriggerMsg('')
     setIsError(false)
     try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token || ''
+
       await fetch(`${BACKEND}/api/settings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -77,7 +80,7 @@ export default function Dashboard() {
       })
       const res  = await fetch(`${BACKEND}/api/trigger`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ userId, count }),
       })
       const data = await res.json()

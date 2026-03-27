@@ -2,10 +2,11 @@ const express = require('express')
 const router = express.Router()
 const supabase = require('../lib/supabase')
 const { startBot } = require('../bot/bot')
+const { requireAuth, checkRateLimit } = require('../lib/auth-middleware')
 
 // POST /api/trigger
 // Body: { userId } OR { userIdentifier: email }
-router.post('/', async (req, res) => {
+router.post('/', requireAuth, async (req, res) => {
   console.log('[trigger] Received request:', JSON.stringify(req.body).substring(0, 100))
   let { userId, count } = req.body
 
@@ -18,6 +19,11 @@ router.post('/', async (req, res) => {
   if (!user) return res.status(404).json({ error: 'User not found' })
   if (!user.is_active) return res.status(403).json({ error: 'Account not activated. Please subscribe.' })
   if (!user.ains_cookie_encrypted) return res.status(400).json({ error: 'No AINS session saved. Use "Connect AINS Account" on the dashboard.' })
+
+  // Rate limit: 5 runs per user per hour
+  if (!checkRateLimit(userId)) {
+    return res.status(429).json({ error: 'Too many requests. Maximum 5 submissions per hour.' })
+  }
 
   const countNum = count ? parseInt(count) : null
 

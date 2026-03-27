@@ -94,26 +94,79 @@ router.get('/check-login-status', async (req, res) => {
     const isLoggedIn = onAins && !onLoginPage && !hasError
 
     if (isLoggedIn) {
-      // Capture cookies
       const cookies = await sm.getCookies(userId)
-      const cookieString = cookies.map(c => `${c.name}=${c.value}`).join('; ')
+      if (cookies && cookies.length > 0) {
+        // Also capture sessionStorage values AINS needs for auth
+        const sessionObj = sm.getSession(userId)
+        const [ssToken, ssUser, ssProfile] = await Promise.all([
+          sessionObj.page.evaluate(() => sessionStorage.getItem('jb-app-token')).catch(() => null),
+          sessionObj.page.evaluate(() => sessionStorage.getItem('jb-app-user')).catch(() => null),
+          sessionObj.page.evaluate(() => sessionStorage.getItem('jb-app-profile')).catch(() => null),
+        ])
 
-      if (cookieString) {
-        // Encrypt and save
-        const encrypted = encrypt(cookieString)
+        console.log(`[auth] Session captured: ssToken=${!!ssToken}, ssUser=${!!ssUser}, cookies=${cookies.length}`)
+
+        // One AINS per account: extract AINS user identifier from ssUser and check uniqueness
+        if (ssUser) {
+          try {
+            const parsed = JSON.parse(ssUser)
+            const ainsId = parsed?.id || parsed?.userId || parsed?.username || parsed?.ic || null
+            if (ainsId) {
+              const crypto = require('crypto')
+              const hash = crypto.createHash('sha256').update(String(ainsId)).digest('hex')
+
+              const { data: conflict } = await supabase
+                .from('users')
+                .select('id')
+                .eq('ains_user_id_hash', hash)
+                .neq('id', userId)
+                .single()
+
+              if (conflict) {
+                await sm.destroySession(userId)
+                return res.status(409).json({ error: 'This AINS account is already connected to another Nilam Auto account.' })
+              }
+
+              // Save the hash for future uniqueness checks (ignore if column doesn't exist yet)
+              await supabase.from('users').update({ ains_user_id_hash: hash }).eq('id', userId).catch(() => {})
+            }
+          } catch (e) {
+            console.warn('[auth] Could not parse ssUser for uniqueness check:', e.message)
+          }
+        }
+
+        // Save full session data as JSON — preserving domain info and sessionStorage values
+        const sessionData = JSON.stringify({
+          ssToken,
+          ssUser,
+          ssProfile,
+          cookies: cookies.map(c => ({
+            name: c.name,
+            value: c.value,
+            domain: c.domain,
+            path: c.path || '/',
+            httpOnly: c.httpOnly || false,
+            secure: c.secure || false,
+            sameSite: c.sameSite === 'no_restriction' ? 'None'
+                    : c.sameSite === 'lax'            ? 'Lax'
+                    : c.sameSite === 'strict'          ? 'Strict'
+                    : 'Lax',
+            expires: c.expirationDate || -1,
+          }))
+        })
+
+        const encrypted = encrypt(sessionData)
         const { error } = await supabase
           .from('users')
           .update({ ains_cookie_encrypted: encrypted })
           .eq('id', userId)
 
         if (error) {
-          console.error('[auth] Failed to save cookie:', error.message)
+          console.error('[auth] Failed to save session:', error.message)
           return res.status(500).json({ error: `Failed to save credentials: ${error.message}` })
         }
 
-        // Clean up session
         await sm.destroySession(userId)
-
         return res.json({ success: true, loggedIn: true, message: 'AINS login captured and saved!' })
       }
     }

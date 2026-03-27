@@ -115,3 +115,9 @@ create index if not exists idx_submissions_status on submissions(status);
 create index if not exists idx_submissions_year_month on submissions(year, month);
 create index if not exists idx_books_language on books(language);
 create index if not exists idx_settings_user_id on settings(user_id);
+
+-- Add AINS user ID hash for one-AINS-per-account enforcement
+-- Run this if column doesn't exist: ALTER TABLE users ADD COLUMN IF NOT EXISTS ains_user_id_hash text;
+-- Run this for uniqueness: CREATE UNIQUE INDEX IF NOT EXISTS idx_users_ains_user_id_hash ON users(ains_user_id_hash) WHERE ains_user_id_hash IS NOT NULL;
+alter table users add column if not exists ains_user_id_hash text;
+create unique index if not exists idx_users_ains_user_id_hash on users(ains_user_id_hash) where ains_user_id_hash is not null;

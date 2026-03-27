@@ -43,13 +43,37 @@ async function startBot(userId, directCookie, directSsUser, directSsProfile, dir
 
   console.log(`[bot] Settings: ${userSettings.books_per_month} books/month, language=${userSettings.language}`)
 
-  // 3. Decrypt AINS session cookie
-  let cookie
+  // 3. Decrypt and parse AINS session data
+  let ssToken = null, ssUser = null, ssProfile = null, cookiesToInject = []
   try {
-    cookie = decrypt(user.ains_cookie_encrypted)
-    console.log(`[bot] Cookie decrypted: ${cookie.substring(0, 30)}...`)
+    const rawDecrypted = decrypt(user.ains_cookie_encrypted)
+    console.log(`[bot] Raw decrypted preview: ${rawDecrypted.substring(0, 40)}...`)
+
+    try {
+      // New format: JSON with ssToken, ssUser, ssProfile, cookies
+      const sessionData = JSON.parse(rawDecrypted)
+      ssToken = sessionData.ssToken
+      ssUser = sessionData.ssUser
+      ssProfile = sessionData.ssProfile
+      cookiesToInject = sessionData.cookies || []
+      console.log(`[bot] Session JSON parsed: ssToken=${!!ssToken}, cookies=${cookiesToInject.length}`)
+    } catch {
+      // Legacy format: plain cookie string
+      console.log('[bot] Legacy cookie string format detected')
+      ssToken = rawDecrypted
+      cookiesToInject = rawDecrypted.split(';').map(part => {
+        const trimmed = part.trim()
+        const idx = trimmed.indexOf('=')
+        if (idx === -1) return null
+        return { name: trimmed.substring(0, idx), value: trimmed.substring(idx + 1), domain: '.ains.moe.gov.my', path: '/' }
+      }).filter(Boolean)
+    }
   } catch (err) {
-    throw new Error(`Failed to decrypt AINS cookie: ${err.message}`)
+    throw new Error(`Failed to decrypt AINS session: ${err.message}`)
+  }
+
+  if (!ssToken) {
+    throw new Error('AINS session token missing. Please reconnect your AINS account from the dashboard.')
   }
 
   // 4. Check how many successful submissions already this month
@@ -120,21 +144,14 @@ async function startBot(userId, directCookie, directSsUser, directSsProfile, dir
 
   if (insertErr) throw new Error(`Failed to create submission records: ${insertErr.message}`)
 
-  // 7. Run the browser bot with injected cookie
-  // Parse cookie string back to object
-  const cookieObj = {}
-  cookie.split(';').forEach(part => {
-    const [name, value] = part.trim().split('=')
-    if (name && value) cookieObj[name] = value
-  })
-
+  // 7. Run the browser bot with injected session
   const result = await runBot({
     user,
     settings: userSettings,
-    cookie,
-    ssUser: null,
-    ssProfile: null,
-    cookies: Object.entries(cookieObj).map(([name, value]) => ({ name, value, domain: '.ains.moe.gov.my', path: '/' })),
+    cookie: ssToken,
+    ssUser,
+    ssProfile,
+    cookies: cookiesToInject,
     books: shuffled,
     submissions: insertedSubs
   })

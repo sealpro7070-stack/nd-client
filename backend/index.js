@@ -15,7 +15,13 @@ const app = express()
 const PORT = process.env.PORT || 3001
 
 app.use(cors({
-  origin: true, // allow all origins — restrict via FRONTEND_URL once stable
+  origin: [
+    process.env.FRONTEND_URL || 'https://nilam-auto.vercel.app',
+    'https://nilam-auto.vercel.app',
+    /\.vercel\.app$/,
+    'http://localhost:5173',
+    'http://localhost:3000',
+  ],
   credentials: true
 }))
 app.use(express.json())
