@@ -96,12 +96,31 @@ router.get('/check-login-status', async (req, res) => {
     if (isLoggedIn) {
       const cookies = await sm.getCookies(userId)
       if (cookies && cookies.length > 0) {
-        // Also capture sessionStorage values AINS needs for auth
+        // Wait for AINS Vue app to finish initializing sessionStorage after OAuth redirect
         const sessionObj = sm.getSession(userId)
+        await sessionObj.page.waitForFunction(
+          () => sessionStorage.getItem('jb-app-token') !== null,
+          { timeout: 8000 }
+        ).catch(() => {
+          console.warn('[auth] Timed out waiting for jb-app-token — capturing whatever is available')
+        })
+
+        // Dump all storage keys to help debug missing keys
+        const storageKeys = await sessionObj.page.evaluate(() => ({
+          ss: Object.keys(sessionStorage),
+          ls: Object.keys(localStorage),
+        })).catch(() => ({ ss: [], ls: [] }))
+        console.log('[auth] Storage keys after login:', JSON.stringify(storageKeys))
+
+        // Try sessionStorage first, fall back to localStorage
+        const getAny = (key) => sessionObj.page.evaluate(
+          (k) => sessionStorage.getItem(k) || localStorage.getItem(k), key
+        ).catch(() => null)
+
         const [ssToken, ssUser, ssProfile] = await Promise.all([
-          sessionObj.page.evaluate(() => sessionStorage.getItem('jb-app-token')).catch(() => null),
-          sessionObj.page.evaluate(() => sessionStorage.getItem('jb-app-user')).catch(() => null),
-          sessionObj.page.evaluate(() => sessionStorage.getItem('jb-app-profile')).catch(() => null),
+          getAny('jb-app-token'),
+          getAny('jb-app-user'),
+          getAny('jb-app-profile'),
         ])
 
         console.log(`[auth] Session captured: ssToken=${!!ssToken}, ssUser=${!!ssUser}, cookies=${cookies.length}`)

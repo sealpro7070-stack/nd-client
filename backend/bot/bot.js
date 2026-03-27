@@ -73,7 +73,9 @@ async function startBot(userId, directCookie, directSsUser, directSsProfile, dir
   }
 
   if (!ssToken) {
-    throw new Error('AINS session token missing. Please reconnect your AINS account from the dashboard.')
+    // ssToken may be null if AINS hadn't set sessionStorage yet at capture time.
+    // Proceed with cookies only — AINS may auto-refresh via its refresh-token cookie.
+    console.warn('[bot] ssToken is null — attempting cookie-only session injection')
   }
 
   // 4. Check how many successful submissions already this month
