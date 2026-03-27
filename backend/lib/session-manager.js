@@ -107,13 +107,41 @@ async function performLogin(userId, email, password, onStatus) {
 
   try {
     console.log(`[login] Navigating to AINS for user ${userId}`)
-    await page.goto(AINS_URL, { waitUntil: 'networkidle', timeout: 30000 })
+    await page.goto(AINS_URL, { waitUntil: 'domcontentloaded', timeout: 30000 })
 
-    // Wait for Microsoft login page
-    await page.waitForURL(/login\.microsoftonline\.com|login\.microsoft\.com/, { timeout: 15000 })
-    console.log(`[login] On Microsoft login page`)
+    // If AINS landing page — find and click the login / DELIMa button
+    const onMicrosoft = () => /login\.microsoftonline\.com|login\.microsoft\.com/.test(page.url())
+    if (!onMicrosoft()) {
+      console.log(`[login] On AINS landing page (${page.url()}), looking for login button`)
+
+      // Try common login entry points in order of likelihood
+      const loginClicked = await page.evaluate(() => {
+        const candidates = [
+          ...document.querySelectorAll('a, button'),
+        ]
+        const login = candidates.find(el => {
+          const t = (el.textContent || '').toLowerCase()
+          const h = (el.getAttribute('href') || '').toLowerCase()
+          return t.includes('delima') || t.includes('log masuk') || t.includes('login') ||
+                 t.includes('sign in') || h.includes('login') || h.includes('auth')
+        })
+        if (login) { login.click(); return true }
+        return false
+      })
+
+      if (!loginClicked) {
+        // Fall back to navigating directly to the login path
+        console.log('[login] No login button found, trying /login path')
+        await page.goto(`${AINS_URL}/login`, { waitUntil: 'domcontentloaded', timeout: 15000 }).catch(() => {})
+      }
+
+      // Wait up to 20s for redirect to Microsoft
+      await page.waitForURL(/login\.microsoftonline\.com|login\.microsoft\.com/, { timeout: 20000 })
+    }
+    console.log(`[login] On Microsoft login page: ${page.url()}`)
 
     // Type email
+    await page.waitForSelector('input[type="email"], #i0116', { timeout: 10000 })
     await page.locator('input[type="email"], #i0116').first().fill(email)
     await page.locator('input[type="submit"], #idSIButton9').first().click()
 
