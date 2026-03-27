@@ -22,7 +22,7 @@ const STEPS = [
     n: '3',
     title: 'Connect your AINS account',
     body: 'On the Dashboard, click "Connect & Submit". A popup will appear asking for your DELIMa / AINS username (IC number) and password. Enter them once.',
-    tip: 'Your credentials are encrypted with AES-256 before being stored. They are never saved in plain text and are only used to log in to AINS on your behalf.',
+    tip: 'Use your IC number and DELIMa password — NOT Google or Microsoft login. Google login requires phone verification that the bot cannot complete. Your credentials are AES-256 encrypted and never shared.',
   },
   {
     n: '4',
@@ -92,7 +92,11 @@ export default function Guide() {
         <h2 className="font-display text-base font-bold text-heading">Common Questions</h2>
         {[
           {
-            q: 'Is it safe to give my AINS password?',
+            q: 'Can I use Google or Microsoft to log in?',
+            a: 'No — use your IC number and DELIMa password only. Google/Microsoft login requires phone verification (2FA) that the background bot cannot complete. Log in to ains.moe.gov.my directly with IC + password to confirm your DELIMa credentials work.',
+          },
+          {
+            q: 'Is it safe to give my DELIMa password?',
             a: 'Yes. Your credentials are encrypted with AES-256-GCM before being stored. They are never visible to anyone — only the bot uses them to log in on your behalf.',
           },
           {
