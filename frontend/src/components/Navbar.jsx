@@ -62,7 +62,7 @@ export default function Navbar() {
           <div className="w-px h-4 bg-line mx-2" />
           <div className="hidden md:flex items-center gap-1.5 bg-ok-50 border border-ok-200 px-3 py-1.5 rounded-full mr-2">
             <span className="w-1.5 h-1.5 bg-ok-500 rounded-full animate-pulse" />
-            <span className="text-ok-600 text-xs font-bold">Connected</span>
+            <span className="text-ok-600 text-xs font-bold">Logged In</span>
           </div>
           <button
             onClick={handleLogout}
@@ -92,7 +92,7 @@ export default function Navbar() {
               <p className="text-xs text-subtle font-mono truncate">{userEmail}</p>
               <div className="flex items-center gap-1.5 mt-1">
                 <span className="w-1.5 h-1.5 bg-ok-500 rounded-full animate-pulse" />
-                <span className="text-ok-600 text-xs font-bold">Connected</span>
+                <span className="text-ok-600 text-xs font-bold">Logged In</span>
               </div>
             </div>
           )}
