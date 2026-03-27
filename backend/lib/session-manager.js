@@ -180,9 +180,37 @@ async function performLogin(userId, email, password, onStatus) {
       await page.locator('input[type="submit"], #idSIButton9').first().click()
     }
 
-    console.log(`[login] Credentials submitted (${isGoogle ? 'Google' : 'Microsoft'}), waiting for MFA`)
+    console.log(`[login] Credentials submitted (${isGoogle ? 'Google' : 'Microsoft'}), checking for MFA challenge`)
 
-    if (onStatus) onStatus('waiting_mfa')
+    // Wait briefly for the MFA challenge page to fully render
+    await page.waitForTimeout(3000)
+
+    // Detect Google number-matching challenge (a 2-digit number is shown on screen;
+    // user must tap the matching number on their phone)
+    let mfaNumber = null
+    if (page.url().includes('accounts.google.com')) {
+      mfaNumber = await page.evaluate(() => {
+        // Walk text nodes looking for a standalone 2-digit number in a visible element
+        const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT)
+        let node
+        while ((node = walker.nextNode())) {
+          const txt = (node.textContent || '').trim()
+          if (/^\d{2}$/.test(txt)) {
+            const el = node.parentElement
+            if (el && el.offsetParent !== null) return txt
+          }
+        }
+        return null
+      }).catch(() => null)
+
+      if (mfaNumber) {
+        console.log(`[login] Number-matching challenge detected: ${mfaNumber}`)
+      } else {
+        console.log('[login] No number challenge — simple push approval')
+      }
+    }
+
+    if (onStatus) onStatus('waiting_mfa', { mfaNumber })
 
     // Wait for MFA approval — URL leaves the auth provider pages
     await page.waitForURL(

@@ -36,7 +36,7 @@ router.post('/connect', requireAuth, async (req, res) => {
         userId,
         email,
         password,
-        (status) => { loginState[userId] = { status } }
+        (status, data = {}) => { loginState[userId] = { status, ...data } }
       )
 
       // One AINS per account: check uniqueness via sha256 of ssUser identifier

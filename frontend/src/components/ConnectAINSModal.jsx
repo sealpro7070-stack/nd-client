@@ -9,6 +9,7 @@ export default function ConnectAINSModal({ isOpen, onClose, onSuccess }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [errorMsg, setErrorMsg] = useState('')
+  const [mfaNumber, setMfaNumber] = useState(null)
   const pollRef = useRef(null)
   const activeRef = useRef(false)
 
@@ -94,6 +95,7 @@ export default function ConnectAINSModal({ isOpen, onClose, onSuccess }) {
         if (!activeRef.current) return
 
         if (data.status === 'waiting_mfa') {
+          setMfaNumber(data.mfaNumber || null)
           setPhase('waiting_mfa')
         } else if (data.status === 'success') {
           stopPolling()
@@ -209,12 +211,24 @@ export default function ConnectAINSModal({ isOpen, onClose, onSuccess }) {
           {phase === 'waiting_mfa' && (
             <div className="py-6 text-center space-y-4">
               <div className="text-4xl">📱</div>
-              <div>
-                <p className="font-semibold text-heading text-lg">Check your phone</p>
-                <p className="text-sm text-muted mt-1">
-                  Approve the Microsoft Authenticator notification to continue.
-                </p>
-              </div>
+              {mfaNumber ? (
+                <div>
+                  <p className="font-semibold text-heading text-lg">Check your phone</p>
+                  <p className="text-sm text-muted mt-1 mb-3">
+                    Tap the number below in your Google app to verify:
+                  </p>
+                  <div className="inline-block bg-brand-600 text-white text-5xl font-bold rounded-2xl px-8 py-4 tracking-widest shadow-lg">
+                    {mfaNumber}
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <p className="font-semibold text-heading text-lg">Check your phone</p>
+                  <p className="text-sm text-muted mt-1">
+                    Approve the sign-in notification on your phone to continue.
+                  </p>
+                </div>
+              )}
               <div className="w-6 h-6 border-2 border-brand-400 border-t-transparent rounded-full animate-spin mx-auto" />
               <button onClick={handleClose} className="w-full py-2.5 rounded-xl border border-line text-muted font-bold hover:bg-gray-50 transition-colors text-sm">
                 Cancel
