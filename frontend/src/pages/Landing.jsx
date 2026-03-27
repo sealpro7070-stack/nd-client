@@ -333,8 +333,8 @@ export default function Landing() {
               },
               {
                 n: '2',
-                title: 'Enter AINS Credentials',
-                desc: 'Click Submit Now — enter your DELIMa/AINS username and password once. Stored encrypted.',
+                title: 'Log In to AINS',
+                desc: 'Click "Connect & Submit" — complete your AINS login (including any 2FA). We capture your session securely.',
                 icon: <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" /></svg>
               },
               {
@@ -385,9 +385,9 @@ export default function Landing() {
               },
               {
                 n: '3',
-                label: 'Enter your AINS credentials',
-                body: 'On the Dashboard, click "Connect & Submit". A popup will ask for your DELIMa / AINS username (IC number) and password. Enter them once — they are stored encrypted.',
-                tip: 'Your credentials are encrypted with AES-256 and never shared. The bot uses them to log in on your behalf each month.',
+                label: 'Log in and we\'ll capture it',
+                body: 'On the Dashboard, click "Connect & Submit". You\'ll see the AINS login page. Complete your login normally (including 2FA if needed). Once you\'re logged in, we capture your session and the popup closes.',
+                tip: 'Your session is encrypted and stored securely. Your password is never sent to us — only your session cookie.',
               },
               {
                 n: '4',

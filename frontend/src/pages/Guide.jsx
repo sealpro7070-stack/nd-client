@@ -21,13 +21,13 @@ const STEPS = [
   {
     n: '3',
     title: 'Connect your AINS account',
-    body: 'On the Dashboard, click "Connect & Submit". A popup will appear asking for your DELIMa / AINS username (IC number) and password. Enter them once.',
-    tip: 'Use your IC number and DELIMa password — NOT Google or Microsoft login. Google login requires phone verification that the bot cannot complete. Your credentials are AES-256 encrypted and never shared.',
+    body: 'On the Dashboard, click "Connect & Submit". A popup will show the AINS login page. Complete your login normally — if you use 2FA (Microsoft/Google), you'll verify it yourself. Once logged in, we capture your session and close the popup.',
+    tip: 'You have 15 minutes to complete login. Your session is encrypted and stored securely — never your password.',
   },
   {
     n: '4',
-    title: 'Submit your records',
-    body: 'After saving your credentials, the bot will automatically log in to AINS and submit your reading records. This usually takes 1–2 minutes. Check History to see what was submitted.',
+    title: 'Bot submits automatically',
+    body: 'Once your session is captured, the bot automatically logs in using your session and submits your records. This takes 1–2 minutes. Check History to see what was submitted.',
   },
   {
     n: '5',
@@ -51,13 +51,13 @@ export default function Guide() {
         <div className="absolute -right-8 -top-8 w-32 h-32 bg-white/5 rounded-full pointer-events-none" />
         <div className="relative">
           <p className="text-brand-200 text-xs font-bold uppercase tracking-widest mb-2">How it works</p>
-          <p className="font-display text-xl font-bold mb-3">Nilam Auto logs in for you</p>
+          <p className="font-display text-xl font-bold mb-3">You log in. We automate the rest.</p>
           <p className="text-brand-100 text-sm leading-relaxed">
-            You give us your AINS/DELIMa credentials once. We encrypt them and use them each month to log in and submit your reading records automatically — so you never have to think about NILAM again.
+            You log in to AINS yourself (including any 2FA required). We capture your session and use it each month to submit your reading records automatically — so you never miss a deadline.
           </p>
           <div className="mt-4 flex items-center gap-2 bg-white/10 rounded-xl px-3 py-2 w-fit">
             <svg className="w-4 h-4 text-brand-200" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-            <span className="text-white text-xs font-bold">AES-256 encrypted · Never shared</span>
+            <span className="text-white text-xs font-bold">Session-based · No password storage</span>
           </div>
         </div>
       </motion.div>
@@ -93,15 +93,15 @@ export default function Guide() {
         {[
           {
             q: 'Can I use Google or Microsoft to log in?',
-            a: 'No — use your IC number and DELIMa password only. Google/Microsoft login requires phone verification (2FA) that the background bot cannot complete. Log in to ains.moe.gov.my directly with IC + password to confirm your DELIMa credentials work.',
+            a: 'Yes — and that\'s the benefit of this approach. You complete the login yourself (including any 2FA), then we capture your session. Unlike the old approach, you\'re in control.',
           },
           {
-            q: 'Is it safe to give my DELIMa password?',
-            a: 'Yes. Your credentials are encrypted with AES-256-GCM before being stored. They are never visible to anyone — only the bot uses them to log in on your behalf.',
+            q: 'Is my password stored?',
+            a: 'No. We capture your session cookie after you log in, not your password. Your password never leaves your browser.',
           },
           {
-            q: 'What if I change my AINS password?',
-            a: 'Go to Settings → AINS Account → Update, and enter your new credentials. The bot will use them from then on.',
+            q: 'What if my session expires?',
+            a: 'Sessions expire after ~30 days. Go to Settings → AINS Account → Reconnect, log in again, and we\'ll capture a fresh session.',
           },
           {
             q: 'Does it work on mobile?',

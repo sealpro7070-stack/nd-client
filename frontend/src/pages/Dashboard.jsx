@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { supabase } from '../lib/supabase'
 import BookCard from '../components/BookCard'
+import ConnectAINSModal from '../components/ConnectAINSModal'
 
 const BACKEND   = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001'
 const LANGUAGES = ['Malay', 'English', 'Chinese', 'Tamil']
@@ -22,12 +23,8 @@ export default function Dashboard() {
   const [isError, setIsError]       = useState(false)
   const [credsStatus, setCredsStatus] = useState(null) // null | 'saved' | 'none'
 
-  // Credentials modal state
-  const [showCredsModal, setShowCredsModal] = useState(false)
-  const [aimsUsername, setAimsUsername]     = useState('')
-  const [aimsPassword, setAimsPassword]     = useState('')
-  const [savingCreds, setSavingCreds]       = useState(false)
-  const [credsError, setCredsError]         = useState('')
+  // AINS connection modal state
+  const [showAINSModal, setShowAINSModal] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -98,34 +95,20 @@ export default function Dashboard() {
   async function handleSubmit() {
     if (!user) return
     if (credsStatus !== 'saved') {
-      setShowCredsModal(true)
+      setShowAINSModal(true)
       return
     }
     await doTrigger(user.id, LANG_MAP[lang] || lang, bookCount)
   }
 
-  async function handleSaveCreds() {
-    if (!aimsUsername || !aimsPassword) return
-    setSavingCreds(true)
-    setCredsError('')
-    try {
-      const res = await fetch(`${BACKEND}/api/auth/save-credentials`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.id, username: aimsUsername, password: aimsPassword }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Failed to save')
-      setCredsStatus('saved')
-      setShowCredsModal(false)
-      setAimsUsername('')
-      setAimsPassword('')
-      // Auto-trigger now that credentials are saved
+  const handleAINSConnected = async () => {
+    // After user connects, refresh creds status and auto-trigger submission
+    const { data: ud } = await supabase
+      .from('users').select('ains_creds_updated_at').eq('id', user.id).single()
+    setCredsStatus(ud?.ains_creds_updated_at ? 'saved' : 'none')
+    // Auto-trigger
+    if (ud?.ains_creds_updated_at) {
       await doTrigger(user.id, LANG_MAP[lang] || lang, bookCount)
-    } catch (err) {
-      setCredsError(err.message)
-    } finally {
-      setSavingCreds(false)
     }
   }
 
@@ -308,8 +291,8 @@ export default function Dashboard() {
 
         <p className="text-xs text-subtle mt-3">
           {credsStatus === 'saved'
-            ? 'Your AINS credentials are saved. The bot will log in automatically.'
-            : 'First-time setup: you\'ll be asked for your AINS/DELIMa login credentials.'}
+            ? 'Your AINS session is active. The bot will use it for monthly submissions.'
+            : 'Click "Connect & Submit" to log in to your AINS account. You\'ll complete the login yourself, and we\'ll capture the session.'}
         </p>
       </motion.div>
 
@@ -340,78 +323,13 @@ export default function Dashboard() {
         )}
       </motion.div>
 
-      {/* ── AINS Credentials Modal ─────────────────── */}
-      {showCredsModal && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl"
-          >
-            <div className="w-10 h-10 bg-brand-50 rounded-xl flex items-center justify-center mb-4">
-              <LockIcon className="w-5 h-5 text-brand-600" />
-            </div>
-            <h3 className="font-display font-bold text-lg text-heading mb-1">Connect AINS Account</h3>
-            <p className="text-sm text-muted mb-3">
-              Enter your <span className="font-bold text-heading">direct DELIMa credentials</span> — IC number and DELIMa password.
-            </p>
-            <div className="flex items-start gap-2 bg-warn-50 border border-warn-200 rounded-xl px-3 py-2.5 mb-4">
-              <svg className="w-4 h-4 text-warn-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd"/></svg>
-              <p className="text-xs text-warn-800 leading-relaxed">
-                <span className="font-bold">Do NOT use Google or Microsoft login.</span> Use your IC number and the DELIMa password you set at <span className="font-mono">moe.gov.my</span>. Google login requires phone verification which the bot cannot do.
-              </p>
-            </div>
-            <div className="space-y-3">
-              <div>
-                <label className="label">DELIMa Username (IC Number)</label>
-                <input
-                  type="text"
-                  value={aimsUsername}
-                  onChange={e => setAimsUsername(e.target.value)}
-                  placeholder="e.g. 040101010101"
-                  className="input"
-                  autoComplete="username"
-                />
-              </div>
-              <div>
-                <label className="label">DELIMa Password</label>
-                <input
-                  type="password"
-                  value={aimsPassword}
-                  onChange={e => setAimsPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="input"
-                  autoComplete="current-password"
-                />
-              </div>
-              {credsError && (
-                <p className="text-xs text-danger-600 font-semibold">{credsError}</p>
-              )}
-            </div>
-            <div className="flex gap-3 mt-5">
-              <button
-                onClick={() => { setShowCredsModal(false); setCredsError('') }}
-                className="flex-1 py-3 rounded-xl border border-line text-muted font-bold hover:bg-gray-50 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSaveCreds}
-                disabled={savingCreds || !aimsUsername || !aimsPassword}
-                className="flex-1 btn-primary py-3 disabled:opacity-50"
-              >
-                {savingCreds ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    Saving…
-                  </span>
-                ) : 'Save & Submit'}
-              </button>
-            </div>
-            <p className="text-xs text-subtle mt-3 text-center">🔒 AES-256 encrypted · Never stored in plain text</p>
-          </motion.div>
-        </div>
-      )}
+      {/* ── AINS Connection Modal ─────────────────── */}
+      <ConnectAINSModal
+        userId={user?.id}
+        isOpen={showAINSModal}
+        onClose={() => setShowAINSModal(false)}
+        onSuccess={handleAINSConnected}
+      />
 
     </div>
   )

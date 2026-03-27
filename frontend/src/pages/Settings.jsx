@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { supabase } from '../lib/supabase'
+import ConnectAINSModal from '../components/ConnectAINSModal'
 
 const BACKEND    = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001'
 const LANGUAGES  = ['Malay', 'English', 'Chinese', 'Tamil']
@@ -48,12 +49,7 @@ export default function Settings() {
   const [saved, setSaved]       = useState(false)
   const [loading, setLoading]   = useState(true)
   const [credsStatus, setCredsStatus] = useState(null) // null | 'saved' | 'none'
-  const [showCredsForm, setShowCredsForm] = useState(false)
-  const [aimsUsername, setAimsUsername]   = useState('')
-  const [aimsPassword, setAimsPassword]   = useState('')
-  const [savingCreds, setSavingCreds]     = useState(false)
-  const [credsSaved, setCredsSaved]       = useState(false)
-  const [credsError, setCredsError]       = useState('')
+  const [showAINSModal, setShowAINSModal] = useState(false)
 
   const [displayLang, setDisplayLang] = useState('Malay')
   const [displayType, setDisplayType] = useState('Physical')
@@ -103,30 +99,11 @@ export default function Settings() {
     if (res.ok) { setSaved(true); setTimeout(() => setSaved(false), 3000) }
   }
 
-  async function handleSaveCreds(e) {
-    e.preventDefault()
-    if (!user || !aimsUsername || !aimsPassword) return
-    setSavingCreds(true)
-    setCredsError('')
-    setCredsSaved(false)
-    try {
-      const res = await fetch(`${BACKEND}/api/auth/save-credentials`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.id, username: aimsUsername, password: aimsPassword }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Failed to save')
-      setCredsStatus('saved')
-      setCredsSaved(true)
-      setAimsUsername('')
-      setAimsPassword('')
-      setTimeout(() => { setShowCredsForm(false); setCredsSaved(false) }, 1500)
-    } catch (err) {
-      setCredsError(err.message)
-    } finally {
-      setSavingCreds(false)
-    }
+  const handleAINSConnected = async () => {
+    // Refresh credentials status after connection
+    const { data: ud } = await supabase
+      .from('users').select('ains_creds_updated_at').eq('id', user.id).single()
+    setCredsStatus(ud?.ains_creds_updated_at ? 'saved' : 'none')
   }
 
   if (loading) return (
@@ -156,74 +133,33 @@ export default function Settings() {
               <div className={`w-2.5 h-2.5 rounded-full mt-1 flex-shrink-0 ${credsStatus === 'saved' ? 'bg-ok-500' : 'bg-danger-400 animate-pulse'}`} />
               <div>
                 <p className="text-sm font-bold text-heading">
-                  {credsStatus === 'saved' ? 'Credentials Saved' : 'Not Connected'}
+                  {credsStatus === 'saved' ? 'AINS Connected' : 'Not Connected'}
                 </p>
                 <p className="text-xs text-muted mt-0.5">
                   {credsStatus === 'saved'
-                    ? 'Your AINS/DELIMa credentials are stored encrypted. The bot will log in automatically.'
-                    : 'Enter your AINS/DELIMa username and password so the bot can log in on your behalf.'}
+                    ? 'Your AINS session is active. The bot will use it for monthly submissions until it expires.'
+                    : 'Log in to your AINS account to enable automated monthly submissions.'}
                 </p>
               </div>
             </div>
             <button
               type="button"
-              onClick={() => { setShowCredsForm(v => !v); setCredsError('') }}
+              onClick={() => setShowAINSModal(true)}
               className="flex-shrink-0 text-xs font-bold px-3 py-1.5 rounded-lg bg-brand-50 text-brand-600 hover:bg-brand-100 transition-colors"
             >
-              {credsStatus === 'saved' ? 'Update' : 'Set Up'}
+              {credsStatus === 'saved' ? 'Reconnect' : 'Connect'}
             </button>
           </div>
-
-          {showCredsForm && (
-            <motion.form
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              onSubmit={handleSaveCreds}
-              className="mt-4 pt-4 border-t border-line space-y-3"
-            >
-              <div className="flex items-start gap-2 bg-warn-50 border border-warn-200 rounded-xl px-3 py-2.5">
-                <svg className="w-4 h-4 text-warn-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd"/></svg>
-                <p className="text-xs text-warn-800 leading-relaxed">
-                  <span className="font-bold">Use your IC number + DELIMa password only.</span> Do not use Google or Microsoft — those require phone verification the bot cannot complete.
-                </p>
-              </div>
-              <div>
-                <label className="label">DELIMa Username (IC Number)</label>
-                <input
-                  type="text"
-                  value={aimsUsername}
-                  onChange={e => setAimsUsername(e.target.value)}
-                  placeholder="e.g. 040101010101"
-                  className="input"
-                  autoComplete="username"
-                />
-              </div>
-              <div>
-                <label className="label">DELIMa Password</label>
-                <input
-                  type="password"
-                  value={aimsPassword}
-                  onChange={e => setAimsPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="input"
-                  autoComplete="current-password"
-                />
-              </div>
-              {credsError && <p className="text-xs text-danger-600 font-semibold">{credsError}</p>}
-              <button
-                type="submit"
-                disabled={savingCreds || !aimsUsername || !aimsPassword}
-                className={`w-full py-2.5 rounded-xl font-bold text-sm transition-all ${
-                  credsSaved ? 'bg-ok-50 text-ok-600 border border-ok-200' : 'btn-primary'
-                } disabled:opacity-50`}
-              >
-                {savingCreds ? 'Saving…' : credsSaved ? '✓ Saved!' : 'Save Credentials'}
-              </button>
-              <p className="text-xs text-subtle text-center">🔒 AES-256 encrypted · Never stored in plain text</p>
-            </motion.form>
-          )}
         </div>
       </div>
+
+      {/* ── AINS Connection Modal ─────────────────── */}
+      <ConnectAINSModal
+        userId={user?.id}
+        isOpen={showAINSModal}
+        onClose={() => setShowAINSModal(false)}
+        onSuccess={handleAINSConnected}
+      />
 
       <form onSubmit={handleSave} className="space-y-6">
 
