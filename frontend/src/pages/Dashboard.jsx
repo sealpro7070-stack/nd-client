@@ -55,7 +55,10 @@ export default function Dashboard() {
         // Check if AINS session is saved
         const { data: ud } = await supabase
           .from('users').select('ains_cookie_encrypted').eq('id', user.id).single()
-        setCredsStatus(ud?.ains_cookie_encrypted ? 'saved' : 'none')
+        const connected = !!ud?.ains_cookie_encrypted
+        setCredsStatus(connected ? 'saved' : 'none')
+        // Auto-prompt to connect AINS if not yet linked
+        if (!connected) setShowAINSModal(true)
       } catch {
         // Supabase unreachable — still show the dashboard
       } finally {
