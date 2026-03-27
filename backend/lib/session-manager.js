@@ -235,26 +235,34 @@ async function performLogin(userId, email, password, onStatus) {
     // Wait for page to fully load so the Vue app can initialise sessionStorage
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {})
 
-    // Wait for AINS Vue app to set jb-app-token in sessionStorage
-    await page.waitForFunction(
-      () => sessionStorage.getItem('jb-app-token') !== null,
-      { timeout: 10000 }
-    ).catch(() => {
-      console.warn('[login] Timed out waiting for jb-app-token — capturing whatever is available')
-    })
-
-    const storageKeys = await page.evaluate(() => ({
-      ss: Object.keys(sessionStorage),
-      ls: Object.keys(localStorage),
-    })).catch(() => ({ ss: [], ls: [] }))
-    console.log('[login] Storage keys after login:', JSON.stringify(storageKeys))
-
+    // Retry loop: Google OAuth sometimes takes extra redirects and API calls before
+    // the Vue app finishes setting jb-app-token in sessionStorage. Retry up to 6×5s.
     const getAny = (key) => page.evaluate(
       (k) => sessionStorage.getItem(k) || localStorage.getItem(k), key
     ).catch(() => null)
 
-    const [ssToken, ssUser, ssProfile] = await Promise.all([
-      getAny('jb-app-token'),
+    let ssToken = null
+    for (let attempt = 1; attempt <= 6; attempt++) {
+      ssToken = await getAny('jb-app-token')
+      const storageKeys = await page.evaluate(() => ({
+        url: window.location.href,
+        ss: Object.keys(sessionStorage),
+      })).catch(() => ({ url: 'unknown', ss: [] }))
+      console.log(`[login] Attempt ${attempt}: ssToken=${!!ssToken}, url=${storageKeys.url}, ssKeys=${storageKeys.ss.join(',')}`)
+      if (ssToken) break
+      if (attempt < 6) await page.waitForTimeout(5000)
+    }
+
+    // If still nothing, try navigating to root to re-trigger Vue router initialisation
+    if (!ssToken) {
+      console.warn('[login] jb-app-token still null — re-navigating to AINS root to trigger router')
+      await page.goto(AINS_URL, { waitUntil: 'networkidle', timeout: 20000 }).catch(() => {})
+      await page.waitForTimeout(5000)
+      ssToken = await getAny('jb-app-token')
+      console.log(`[login] After re-navigate: ssToken=${!!ssToken}`)
+    }
+
+    const [ssUser, ssProfile] = await Promise.all([
       getAny('jb-app-user'),
       getAny('jb-app-profile'),
     ])
