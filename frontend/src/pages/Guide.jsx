@@ -21,7 +21,7 @@ const STEPS = [
   {
     n: '3',
     title: 'Connect your AINS account',
-    body: 'On the Dashboard, click "Connect & Submit". A popup will show the AINS login page. Complete your login normally — if you use 2FA (Microsoft/Google), you'll verify it yourself. Once logged in, we capture your session and close the popup.',
+    body: 'On the Dashboard, click "Connect & Submit". A popup will show the AINS login page. Complete your login normally — if you use 2FA (Microsoft/Google), you\'ll verify it yourself. Once logged in, we capture your session and close the popup.',
     tip: 'You have 15 minutes to complete login. Your session is encrypted and stored securely — never your password.',
   },
   {
