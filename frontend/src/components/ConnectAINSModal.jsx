@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion } from 'framer-motion'
 
 const BACKEND = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001'
@@ -122,30 +122,31 @@ export default function ConnectAINSModal({ userId, isOpen, onClose, onSuccess })
     }
   }
 
-  const handleKeydown = async (e) => {
-    if (!screenshot || loading || e.target.tagName === 'INPUT') return
+  // Buffer for batching typed characters
+  const typeBufferRef = useRef('')
+  const flushTimerRef = useRef(null)
+
+  const flushTypeBuffer = useCallback(async () => {
+    const text = typeBufferRef.current
+    typeBufferRef.current = ''
+    if (!text) return
 
     try {
-      let type = 'key'
-      let payload = { userId, type, key: e.key }
+      await fetch(`${BACKEND}/api/auth/send-input`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, type: 'type', text })
+      })
+    } catch {}
+  }, [userId])
 
-      if (e.key === 'Enter') {
-        payload.key = 'Enter'
-      } else if (e.key === 'Tab') {
-        e.preventDefault()
-        payload.key = 'Tab'
-      } else if (e.key.length === 1) {
-        type = 'type'
-        payload = { userId, type, text: e.key }
-      } else {
-        return
-      }
-
-      setStatus('Sending input...')
+  const sendKeyAndRefresh = async (key) => {
+    try {
+      setStatus('Sending...')
       const res = await fetch(`${BACKEND}/api/auth/send-input`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify({ userId, type: 'key', key })
       })
       const data = await res.json()
       if (data.screenshot) setScreenshot(data.screenshot)
@@ -153,6 +154,35 @@ export default function ConnectAINSModal({ userId, isOpen, onClose, onSuccess })
       setStatus('Ready. Continue logging in.')
     } catch (err) {
       setError(err.message)
+    }
+  }
+
+  const handleKeydown = async (e) => {
+    if (!screenshot || loading || e.target.tagName === 'INPUT') return
+    e.preventDefault()
+
+    const specialKeys = ['Enter', 'Tab', 'Backspace', 'Delete', 'Escape', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown']
+
+    if (specialKeys.includes(e.key)) {
+      // Flush any buffered text first, then send the special key
+      if (typeBufferRef.current) await flushTypeBuffer()
+      await sendKeyAndRefresh(e.key)
+    } else if (e.key.length === 1) {
+      // Buffer printable characters and flush after 300ms of no typing
+      typeBufferRef.current += e.key
+      setStatus(`Typing: ${typeBufferRef.current}`)
+      clearTimeout(flushTimerRef.current)
+      flushTimerRef.current = setTimeout(async () => {
+        await flushTypeBuffer()
+        // Refresh screenshot after flush
+        try {
+          const res = await fetch(`${BACKEND}/api/auth/get-screenshot?userId=${userId}`)
+          const data = await res.json()
+          if (data.screenshot) setScreenshot(data.screenshot)
+          if (data.url) setUrl(data.url)
+          setStatus('Ready. Continue logging in.')
+        } catch {}
+      }, 300)
     }
   }
 
