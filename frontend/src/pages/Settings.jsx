@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
-import { Capacitor } from '@capacitor/core'
 import { supabase } from '../lib/supabase'
 
 const BACKEND    = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001'
@@ -48,15 +47,16 @@ export default function Settings() {
   const [saving, setSaving]     = useState(false)
   const [saved, setSaved]       = useState(false)
   const [loading, setLoading]   = useState(true)
-  const [cookieStatus, setCookieStatus] = useState(null)
-  const [aimsConnecting, setAimsConnecting] = useState(false)
+  const [credsStatus, setCredsStatus] = useState(null) // null | 'saved' | 'none'
+  const [showCredsForm, setShowCredsForm] = useState(false)
+  const [aimsUsername, setAimsUsername]   = useState('')
+  const [aimsPassword, setAimsPassword]   = useState('')
+  const [savingCreds, setSavingCreds]     = useState(false)
+  const [credsSaved, setCredsSaved]       = useState(false)
+  const [credsError, setCredsError]       = useState('')
 
-  // Detect native Android/iOS Capacitor context
-  const isNative = Capacitor.isNativePlatform()
-
-  // Display-friendly selections
-  const [displayLang, setDisplayLang]   = useState('Malay')
-  const [displayType, setDisplayType]   = useState('Physical')
+  const [displayLang, setDisplayLang] = useState('Malay')
+  const [displayType, setDisplayType] = useState('Physical')
 
   useEffect(() => {
     async function load() {
@@ -81,11 +81,8 @@ export default function Settings() {
       }
 
       const { data: ud } = await supabase
-        .from('users').select('cookie_updated_at').eq('id', user.id).single()
-      if (ud?.cookie_updated_at) {
-        const age = Date.now() - new Date(ud.cookie_updated_at).getTime()
-        setCookieStatus(age < 7 * 24 * 60 * 60 * 1000 ? 'fresh' : 'stale')
-      }
+        .from('users').select('ains_creds_updated_at').eq('id', user.id).single()
+      setCredsStatus(ud?.ains_creds_updated_at ? 'saved' : 'none')
 
       setLoading(false)
     }
@@ -106,29 +103,29 @@ export default function Settings() {
     if (res.ok) { setSaved(true); setTimeout(() => setSaved(false), 3000) }
   }
 
-  async function handleMobileConnect() {
-    if (!user) return
-    setAimsConnecting(true)
+  async function handleSaveCreds(e) {
+    e.preventDefault()
+    if (!user || !aimsUsername || !aimsPassword) return
+    setSavingCreds(true)
+    setCredsError('')
+    setCredsSaved(false)
     try {
-      const { registerPlugin } = await import('@capacitor/core')
-      const AINSAuth = registerPlugin('AINSAuth')
-      const data = await AINSAuth.openLogin()
-      const res = await fetch(`${BACKEND}/api/auth/save-cookie`, {
+      const res = await fetch(`${BACKEND}/api/auth/save-credentials`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userIdentifier: user.id,
-          cookie: data.token,
-          ssUser: data.ssUser || null,
-          ssProfile: data.ssProfile || null,
-          cookies: data.cookies || [],
-        }),
+        body: JSON.stringify({ userId: user.id, username: aimsUsername, password: aimsPassword }),
       })
-      if (res.ok) setCookieStatus('fresh')
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to save')
+      setCredsStatus('saved')
+      setCredsSaved(true)
+      setAimsUsername('')
+      setAimsPassword('')
+      setTimeout(() => { setShowCredsForm(false); setCredsSaved(false) }, 1500)
     } catch (err) {
-      console.error('AINS login failed:', err.message)
+      setCredsError(err.message)
     } finally {
-      setAimsConnecting(false)
+      setSavingCreds(false)
     }
   }
 
@@ -150,49 +147,77 @@ export default function Settings() {
         <p className="text-muted text-sm mt-1">Configure your NILAM automation preferences.</p>
       </div>
 
-      {/* ── Session status ───────────────────────────── */}
-      <div className={`card-p border-l-4 ${
-        cookieStatus === 'fresh'  ? 'border-l-ok-500' :
-        cookieStatus === 'stale'  ? 'border-l-warn-500' :
-        'border-l-line'
-      }`}>
-        <div className="flex items-start gap-3">
-          <div className={`w-2.5 h-2.5 rounded-full mt-1 flex-shrink-0 ${
-            cookieStatus === 'fresh' ? 'bg-ok-500' :
-            cookieStatus === 'stale' ? 'bg-warn-500 animate-pulse' :
-            'bg-subtle'
-          }`} />
-          <div>
-            <p className="text-sm font-bold text-heading">
-              {cookieStatus === 'fresh' ? 'Session Active' :
-               cookieStatus === 'stale' ? 'Session May Have Expired' :
-               'No Session Saved'}
-            </p>
-            <p className="text-xs text-muted mt-0.5">
-              {cookieStatus === 'fresh' ? 'Your AINS session is active and ready to use.' :
-               cookieStatus === 'stale'
-                 ? (isNative ? "Tap 'Connect AINS Account' below to reconnect." : 'Please log back in to AINS via the Chrome extension.')
-                 : (isNative ? "Tap 'Connect AINS Account' below to link your AINS session." : 'Install the Chrome extension and visit ains.moe.gov.my.')}
-            </p>
+      {/* ── AINS Account ─────────────────────────────── */}
+      <div>
+        <h2 className="font-display text-base font-bold text-heading mb-3">AINS Account</h2>
+        <div className={`card-p border-l-4 ${credsStatus === 'saved' ? 'border-l-ok-500' : 'border-l-danger-400'}`}>
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <div className={`w-2.5 h-2.5 rounded-full mt-1 flex-shrink-0 ${credsStatus === 'saved' ? 'bg-ok-500' : 'bg-danger-400 animate-pulse'}`} />
+              <div>
+                <p className="text-sm font-bold text-heading">
+                  {credsStatus === 'saved' ? 'Credentials Saved' : 'Not Connected'}
+                </p>
+                <p className="text-xs text-muted mt-0.5">
+                  {credsStatus === 'saved'
+                    ? 'Your AINS/DELIMa credentials are stored encrypted. The bot will log in automatically.'
+                    : 'Enter your AINS/DELIMa username and password so the bot can log in on your behalf.'}
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => { setShowCredsForm(v => !v); setCredsError('') }}
+              className="flex-shrink-0 text-xs font-bold px-3 py-1.5 rounded-lg bg-brand-50 text-brand-600 hover:bg-brand-100 transition-colors"
+            >
+              {credsStatus === 'saved' ? 'Update' : 'Set Up'}
+            </button>
           </div>
+
+          {showCredsForm && (
+            <motion.form
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              onSubmit={handleSaveCreds}
+              className="mt-4 pt-4 border-t border-line space-y-3"
+            >
+              <div>
+                <label className="label">AINS Username / IC Number</label>
+                <input
+                  type="text"
+                  value={aimsUsername}
+                  onChange={e => setAimsUsername(e.target.value)}
+                  placeholder="e.g. 040101010101"
+                  className="input"
+                  autoComplete="username"
+                />
+              </div>
+              <div>
+                <label className="label">AINS Password</label>
+                <input
+                  type="password"
+                  value={aimsPassword}
+                  onChange={e => setAimsPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="input"
+                  autoComplete="current-password"
+                />
+              </div>
+              {credsError && <p className="text-xs text-danger-600 font-semibold">{credsError}</p>}
+              <button
+                type="submit"
+                disabled={savingCreds || !aimsUsername || !aimsPassword}
+                className={`w-full py-2.5 rounded-xl font-bold text-sm transition-all ${
+                  credsSaved ? 'bg-ok-50 text-ok-600 border border-ok-200' : 'btn-primary'
+                } disabled:opacity-50`}
+              >
+                {savingCreds ? 'Saving…' : credsSaved ? '✓ Saved!' : 'Save Credentials'}
+              </button>
+              <p className="text-xs text-subtle text-center">🔒 AES-256 encrypted · Never stored in plain text</p>
+            </motion.form>
+          )}
         </div>
       </div>
-
-      {isNative && (
-        <button
-          type="button"
-          onClick={handleMobileConnect}
-          disabled={aimsConnecting}
-          className="w-full py-3.5 font-bold rounded-xl btn-primary disabled:opacity-60"
-        >
-          {aimsConnecting ? (
-            <span className="flex items-center justify-center gap-2">
-              <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              Opening AINS Login…
-            </span>
-          ) : 'Connect AINS Account'}
-        </button>
-      )}
 
       <form onSubmit={handleSave} className="space-y-6">
 
@@ -273,7 +298,6 @@ export default function Settings() {
                 <p className="text-sm font-bold text-heading">Auto-Schedule</p>
                 <p className="text-xs text-muted mt-0.5">Automatically submit on a set day each month</p>
               </div>
-              {/* iOS-style toggle */}
               <button
                 type="button"
                 onClick={() => setForm(f => ({ ...f, auto_schedule: !f.auto_schedule }))}

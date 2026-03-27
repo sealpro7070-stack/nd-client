@@ -3,45 +3,31 @@ const router = express.Router()
 const supabase = require('../lib/supabase')
 const { encrypt } = require('../lib/crypto')
 
-// POST /api/auth/save-cookie
-// Body: { userIdentifier (email or UUID), cookie }
-router.post('/save-cookie', async (req, res) => {
-  const { userIdentifier, userId, cookie, ssUser, ssProfile, cookies } = req.body
+// POST /api/auth/save-credentials
+// Body: { userId, username, password }
+router.post('/save-credentials', async (req, res) => {
+  const { userId, username, password } = req.body
 
-  // Support both old (userId) and new (userIdentifier) field names
-  const identifier = userIdentifier || userId
-
-  if (!identifier || !cookie) {
-    return res.status(400).json({ error: 'userIdentifier and cookie are required' })
+  if (!userId || !username || !password) {
+    return res.status(400).json({ error: 'userId, username and password are required' })
   }
 
   try {
-    // Store all 3 sessionStorage keys + browser cookies so bot can inject all
-    const sessionData = JSON.stringify({ token: cookie, ssUser: ssUser || null, ssProfile: ssProfile || null, cookies: cookies || [] })
-    const cookieEncrypted = encrypt(sessionData)
+    const usernameEncrypted = encrypt(username)
+    const passwordEncrypted = encrypt(password)
 
-    // Detect if identifier is a UUID or an email
-    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(identifier)
-
-    let query = supabase
+    const { error } = await supabase
       .from('users')
       .update({
-        cookie_encrypted: cookieEncrypted,
-        cookie_updated_at: new Date().toISOString()
+        ains_username_encrypted: usernameEncrypted,
+        ains_password_encrypted: passwordEncrypted,
+        ains_creds_updated_at: new Date().toISOString()
       })
-
-    if (isUUID) {
-      query = query.eq('id', identifier)
-    } else {
-      // Treat as email
-      query = query.eq('email', identifier.toLowerCase().trim())
-    }
-
-    const { error, count } = await query
+      .eq('id', userId)
 
     if (error) return res.status(500).json({ error: error.message })
 
-    res.json({ success: true, message: 'Cookie saved securely' })
+    res.json({ success: true, message: 'AINS credentials saved securely' })
   } catch (err) {
     res.status(500).json({ error: err.message })
   }

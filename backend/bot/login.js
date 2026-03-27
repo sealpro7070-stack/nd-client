@@ -91,4 +91,112 @@ async function injectSession(context, page, token, ssUser, ssProfile, cookies = 
   return isLoggedIn
 }
 
-module.exports = { injectSession }
+/**
+ * loginWithCredentials — Full Playwright login using DELIMa username+password
+ */
+async function loginWithCredentials(context, page, username, password) {
+  console.log(`[login] loginWithCredentials for user: ${username.substring(0, 4)}****`)
+
+  page.on('response', res => {
+    if (res.status() >= 400) {
+      console.log(`[network] ${res.status()} ${res.url().replace('https://ains-api.moe.gov.my/api', '[api]')}`)
+    }
+  })
+
+  // 1. Navigate to AINS
+  await page.goto(AINS_BASE, { waitUntil: 'networkidle', timeout: 30000 })
+  await page.waitForTimeout(2000)
+  console.log(`[login] Loaded AINS: ${page.url()}`)
+
+  // 2. Click the DELIMa login button
+  const loginBtnSelectors = [
+    'text=Log masuk dengan akaun DELIMa',
+    'text=DELIMa',
+    'a[href*="delima"]',
+    'a[href*="login"]',
+    'button:has-text("Log masuk")',
+  ]
+  for (const sel of loginBtnSelectors) {
+    try {
+      const btn = page.locator(sel).first()
+      if (await btn.count() > 0) {
+        await btn.click()
+        console.log(`[login] Clicked login button via: ${sel}`)
+        break
+      }
+    } catch {}
+  }
+
+  // 3. Wait for login form
+  await page.waitForTimeout(3000)
+  console.log(`[login] After click URL: ${page.url()}`)
+  await page.screenshot({ path: require('path').join(SCREENSHOTS_DIR, `creds-form-${Date.now()}.png`), fullPage: true }).catch(() => {})
+
+  // 4. Fill username (try multiple selectors)
+  const usernameSelectors = [
+    '#username', 'input[name="username"]', 'input[name="ic"]',
+    'input[id*="user"]', 'input[placeholder*="IC"]',
+    'input[placeholder*="Nombor"]', 'input[type="text"]',
+  ]
+  for (const sel of usernameSelectors) {
+    try {
+      const el = page.locator(sel).first()
+      if (await el.count() > 0) {
+        await el.fill(username)
+        console.log(`[login] Filled username via: ${sel}`)
+        break
+      }
+    } catch {}
+  }
+
+  // 5. Fill password
+  try {
+    await page.locator('input[type="password"]').first().fill(password)
+    console.log('[login] Filled password')
+  } catch {
+    console.warn('[login] Could not fill password field')
+  }
+
+  await page.waitForTimeout(500)
+
+  // 6. Submit the form
+  const submitSelectors = [
+    'button[type="submit"]', 'input[type="submit"]',
+    'button:has-text("Log masuk")', 'button:has-text("Login")',
+    'button:has-text("Sign in")', 'button:has-text("Masuk")',
+  ]
+  for (const sel of submitSelectors) {
+    try {
+      const btn = page.locator(sel).first()
+      if (await btn.count() > 0) {
+        await btn.click()
+        console.log(`[login] Submitted via: ${sel}`)
+        break
+      }
+    } catch {}
+  }
+
+  // 7. Wait for redirect back to AINS
+  try {
+    await page.waitForURL(/ains\.moe\.gov\.my/, { timeout: 30000 })
+  } catch {
+    console.warn('[login] Did not redirect back to ains.moe.gov.my within 30s')
+  }
+  await page.waitForTimeout(3000)
+
+  await page.screenshot({ path: require('path').join(SCREENSHOTS_DIR, `creds-result-${Date.now()}.png`), fullPage: true }).catch(() => {})
+
+  // 8. Check login status
+  const url = page.url()
+  const pageText = await page.textContent('body').catch(() => '')
+  const onLoginPage = /Log masuk dengan akaun DELIMa|Sign in with DELIMa/i.test(pageText)
+  const hasAuthError = /No Authorization|Tiada Kebenaran|kata laluan|password.*incorrect|invalid/i.test(pageText)
+  const isLoggedIn = !onLoginPage && !hasAuthError
+
+  console.log(`[login] URL: ${url}`)
+  console.log(`[login] Result: ${isLoggedIn ? 'LOGGED IN' : 'FAILED'} (loginPage=${onLoginPage}, authError=${hasAuthError})`)
+
+  return isLoggedIn
+}
+
+module.exports = { injectSession, loginWithCredentials }

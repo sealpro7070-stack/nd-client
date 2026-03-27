@@ -1,15 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Capacitor } from '@capacitor/core'
 import { supabase } from '../lib/supabase'
 import BookCard from '../components/BookCard'
 
 const BACKEND   = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001'
 const LANGUAGES = ['Malay', 'English', 'Chinese', 'Tamil']
 const LANG_MAP  = { Malay: 'Melayu', English: 'Inggeris', Chinese: 'Cina', Tamil: 'Tamil' }
-
-const isNative = Capacitor.isNativePlatform()
 
 export default function Dashboard() {
   const navigate = useNavigate()
@@ -23,7 +20,14 @@ export default function Dashboard() {
   const [triggering, setTriggering] = useState(false)
   const [triggerMsg, setTriggerMsg] = useState('')
   const [isError, setIsError]       = useState(false)
-  const [cookieStatus, setCookieStatus] = useState(null)
+  const [credsStatus, setCredsStatus] = useState(null) // null | 'saved' | 'none'
+
+  // Credentials modal state
+  const [showCredsModal, setShowCredsModal] = useState(false)
+  const [aimsUsername, setAimsUsername]     = useState('')
+  const [aimsPassword, setAimsPassword]     = useState('')
+  const [savingCreds, setSavingCreds]       = useState(false)
+  const [credsError, setCredsError]         = useState('')
 
   useEffect(() => {
     async function load() {
@@ -51,15 +55,10 @@ export default function Dashboard() {
           setRecent(d.submissions || [])
         }
 
-        // Check AINS session status for all users
+        // Check if AINS credentials are saved
         const { data: ud } = await supabase
-          .from('users').select('cookie_updated_at').eq('id', user.id).single()
-        if (ud?.cookie_updated_at) {
-          const age = Date.now() - new Date(ud.cookie_updated_at).getTime()
-          setCookieStatus(age < 7 * 24 * 60 * 60 * 1000 ? 'fresh' : 'stale')
-        } else {
-          setCookieStatus('none')
-        }
+          .from('users').select('ains_creds_updated_at').eq('id', user.id).single()
+        setCredsStatus(ud?.ains_creds_updated_at ? 'saved' : 'none')
       } catch {
         // Supabase unreachable — still show the dashboard
       } finally {
@@ -69,39 +68,64 @@ export default function Dashboard() {
     load()
   }, [])
 
-  async function handleSubmit() {
-    if (!user) return
-    if (cookieStatus !== 'fresh') {
-      setTriggerMsg(isNative
-        ? 'Connect your AINS account in Settings first.'
-        : 'Save your AINS session via the Chrome extension first.')
-      setIsError(true)
-      return
-    }
+  async function doTrigger(userId, apiLang, count) {
     setTriggering(true)
     setTriggerMsg('')
     setIsError(false)
     try {
-      const apiLang = LANG_MAP[lang] || lang
       await fetch(`${BACKEND}/api/settings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.id, language: apiLang, books_per_month: bookCount }),
+        body: JSON.stringify({ userId, language: apiLang, books_per_month: count }),
       })
       const res  = await fetch(`${BACKEND}/api/trigger`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.id, count: bookCount }),
+        body: JSON.stringify({ userId, count }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to start')
       setTriggerMsg(data.message || 'Bot started! Check back in a few minutes.')
-      setSettings(s => ({ ...s, language: apiLang, books_per_month: bookCount }))
+      setSettings(s => ({ ...s, language: apiLang, books_per_month: count }))
     } catch (err) {
       setTriggerMsg(err.message)
       setIsError(true)
     } finally {
       setTriggering(false)
+    }
+  }
+
+  async function handleSubmit() {
+    if (!user) return
+    if (credsStatus !== 'saved') {
+      setShowCredsModal(true)
+      return
+    }
+    await doTrigger(user.id, LANG_MAP[lang] || lang, bookCount)
+  }
+
+  async function handleSaveCreds() {
+    if (!aimsUsername || !aimsPassword) return
+    setSavingCreds(true)
+    setCredsError('')
+    try {
+      const res = await fetch(`${BACKEND}/api/auth/save-credentials`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id, username: aimsUsername, password: aimsPassword }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to save')
+      setCredsStatus('saved')
+      setShowCredsModal(false)
+      setAimsUsername('')
+      setAimsPassword('')
+      // Auto-trigger now that credentials are saved
+      await doTrigger(user.id, LANG_MAP[lang] || lang, bookCount)
+    } catch (err) {
+      setCredsError(err.message)
+    } finally {
+      setSavingCreds(false)
     }
   }
 
@@ -125,44 +149,6 @@ export default function Dashboard() {
   return (
     <div className="space-y-5">
 
-      {/* ── AINS session warning (mobile) ───────────── */}
-      {cookieStatus !== 'fresh' && cookieStatus !== null && (
-        <motion.div
-          initial={{ opacity: 0, y: -8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.35 }}
-          className={`rounded-2xl p-4 flex items-start gap-3 border ${
-            cookieStatus === 'stale'
-              ? 'bg-warn-50 border-warn-200'
-              : 'bg-danger-50 border-danger-200'
-          }`}
-        >
-          <span className={`text-xl flex-shrink-0 ${cookieStatus === 'stale' ? 'text-warn-500' : 'text-danger-500'}`}>
-            {cookieStatus === 'stale' ? '⚠️' : '🔒'}
-          </span>
-          <div className="flex-1 min-w-0">
-            <p className={`text-sm font-bold ${cookieStatus === 'stale' ? 'text-warn-800' : 'text-danger-800'}`}>
-              {cookieStatus === 'stale' ? 'AINS Session May Have Expired' : 'AINS Account Not Connected'}
-            </p>
-            <p className={`text-xs mt-0.5 ${cookieStatus === 'stale' ? 'text-warn-700' : 'text-danger-700'}`}>
-              {cookieStatus === 'stale'
-                ? 'Your session may be too old. Reconnect before submitting.'
-                : 'You need to log in to AINS before submitting records.'}
-            </p>
-          </div>
-          <button
-            onClick={() => navigate('/settings')}
-            className={`flex-shrink-0 text-xs font-bold px-3 py-1.5 rounded-lg transition-colors ${
-              cookieStatus === 'stale'
-                ? 'bg-warn-200 text-warn-800 hover:bg-warn-300'
-                : 'bg-danger-200 text-danger-800 hover:bg-danger-300'
-            }`}
-          >
-            Connect →
-          </button>
-        </motion.div>
-      )}
-
       {/* ── Welcome banner ─────────────────────────── */}
       <motion.div
         initial={{ opacity: 0, y: 14 }}
@@ -182,9 +168,11 @@ export default function Dashboard() {
                 : 'No records submitted this month yet.'}
             </p>
           </div>
-          <div className="flex items-center gap-1.5 bg-white/15 px-3 py-1.5 rounded-full flex-shrink-0">
-            <span className="w-1.5 h-1.5 bg-ok-400 rounded-full animate-pulse" />
-            <span className="text-white text-xs font-bold">Connected</span>
+          <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full flex-shrink-0 ${credsStatus === 'saved' ? 'bg-white/15' : 'bg-warn-500/80'}`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${credsStatus === 'saved' ? 'bg-ok-400 animate-pulse' : 'bg-white'}`} />
+            <span className="text-white text-xs font-bold">
+              {credsStatus === 'saved' ? 'AINS Connected' : 'AINS Not Set'}
+            </span>
           </div>
         </div>
 
@@ -301,6 +289,8 @@ export default function Dashboard() {
           >
             {triggering ? (
               <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Submitting…</>
+            ) : credsStatus !== 'saved' ? (
+              <><LockIcon className="w-4 h-4" />Connect & Submit</>
             ) : (
               <><BoltIcon className="w-4 h-4" />Submit {bookCount} {lang} Book{bookCount !== 1 ? 's' : ''}</>
             )}
@@ -317,7 +307,9 @@ export default function Dashboard() {
         </div>
 
         <p className="text-xs text-subtle mt-3">
-          Make sure your Chrome extension session is saved before submitting.
+          {credsStatus === 'saved'
+            ? 'Your AINS credentials are saved. The bot will log in automatically.'
+            : 'First-time setup: you\'ll be asked for your AINS/DELIMa login credentials.'}
         </p>
       </motion.div>
 
@@ -348,6 +340,73 @@ export default function Dashboard() {
         )}
       </motion.div>
 
+      {/* ── AINS Credentials Modal ─────────────────── */}
+      {showCredsModal && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl"
+          >
+            <div className="w-10 h-10 bg-brand-50 rounded-xl flex items-center justify-center mb-4">
+              <LockIcon className="w-5 h-5 text-brand-600" />
+            </div>
+            <h3 className="font-display font-bold text-lg text-heading mb-1">Connect AINS Account</h3>
+            <p className="text-sm text-muted mb-5">
+              Enter your DELIMa / AINS login details. Stored encrypted — never shared.
+            </p>
+            <div className="space-y-3">
+              <div>
+                <label className="label">AINS Username / IC Number</label>
+                <input
+                  type="text"
+                  value={aimsUsername}
+                  onChange={e => setAimsUsername(e.target.value)}
+                  placeholder="e.g. 040101010101"
+                  className="input"
+                  autoComplete="username"
+                />
+              </div>
+              <div>
+                <label className="label">AINS Password</label>
+                <input
+                  type="password"
+                  value={aimsPassword}
+                  onChange={e => setAimsPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="input"
+                  autoComplete="current-password"
+                />
+              </div>
+              {credsError && (
+                <p className="text-xs text-danger-600 font-semibold">{credsError}</p>
+              )}
+            </div>
+            <div className="flex gap-3 mt-5">
+              <button
+                onClick={() => { setShowCredsModal(false); setCredsError('') }}
+                className="flex-1 py-3 rounded-xl border border-line text-muted font-bold hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveCreds}
+                disabled={savingCreds || !aimsUsername || !aimsPassword}
+                className="flex-1 btn-primary py-3 disabled:opacity-50"
+              >
+                {savingCreds ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Saving…
+                  </span>
+                ) : 'Save & Submit'}
+              </button>
+            </div>
+            <p className="text-xs text-subtle mt-3 text-center">🔒 AES-256 encrypted · Never stored in plain text</p>
+          </motion.div>
+        </div>
+      )}
+
     </div>
   )
 }
@@ -363,6 +422,9 @@ function ClockIcon({ className }) {
 }
 function BoltIcon({ className }) {
   return <svg className={className} fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+}
+function LockIcon({ className }) {
+  return <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
 }
 function CheckCircleIcon({ className }) {
   return <svg className={className} fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/></svg>

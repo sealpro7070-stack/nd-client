@@ -1,7 +1,0 @@
-<?xml version='1.0' encoding='utf-8'?>
-<resources>
-    <string name="app_name">Nilam Auto</string>
-    <string name="title_activity_main">Nilam Auto</string>
-    <string name="package_name">my.nilam.auto</string>
-    <string name="custom_url_scheme">my.nilam.auto</string>
-</resources>

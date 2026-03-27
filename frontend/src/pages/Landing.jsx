@@ -249,29 +249,6 @@ export default function Landing() {
         </div>
       </header>
 
-      {/* ── Extension download bar ───────────────────── */}
-      <div className="bg-brand-600 text-white py-3 px-5">
-        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <span className="hidden sm:flex w-7 h-7 bg-white/20 rounded-lg items-center justify-center flex-shrink-0">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25m18 0A2.25 2.25 0 0018.75 3H5.25A2.25 2.25 0 003 5.25m18 0H3"/></svg>
-            </span>
-            <div>
-              <span className="text-sm font-bold">Chrome Extension — Desktop Only</span>
-              <span className="hidden sm:inline text-brand-200 text-sm"> · Required for session saving on PC</span>
-            </div>
-          </div>
-          <a
-            href="/nilam-auto-extension.zip"
-            download
-            onClick={e => { e.preventDefault(); document.getElementById('extension')?.scrollIntoView({ behavior: 'smooth' }) }}
-            className="flex-shrink-0 flex items-center gap-2 bg-white text-brand-600 font-bold text-sm px-5 py-2 rounded-xl hover:bg-brand-50 transition-colors"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-            Download Extension
-          </a>
-        </div>
-      </div>
 
       {/* ── Hero ────────────────────────────────────── */}
       <section className="relative overflow-hidden">
@@ -350,20 +327,20 @@ export default function Landing() {
             {[
               {
                 n: '1',
-                title: 'Install Extension',
-                desc: 'Download the Nilam Auto Chrome extension, load it in Chrome, then visit ains.moe.gov.my to save your session.',
-                icon: <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25m18 0A2.25 2.25 0 0018.75 3H5.25A2.25 2.25 0 003 5.25m18 0H3" /></svg>
+                title: 'Create Account',
+                desc: 'Sign up with your email, verify it, then log in to your Nilam Auto dashboard.',
+                icon: <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" /></svg>
               },
               {
                 n: '2',
-                title: 'Set Preferences',
-                desc: 'Choose your language, number of books, and schedule day. We do the rest every month.',
-                icon: <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M10.343 3.94c.09-.542.56-.94 1.11-.94h1.093c.55 0 1.02.398 1.11.94l.149.894c.07.424.384.764.78.93.398.164.855.142 1.205-.108l.737-.527a1.125 1.125 0 011.45.12l.773.774c.39.389.44 1.002.12 1.45l-.527.737c-.25.35-.272.806-.107 1.204.165.397.505.71.93.78l.893.15c.543.09.94.56.94 1.109v1.094c0 .55-.397 1.02-.94 1.11l-.893.149c-.425.07-.765.383-.93.78-.165.398-.143.854.107 1.204l.527.738c.32.447.269 1.06-.12 1.45l-.774.773a1.125 1.125 0 01-1.449.12l-.738-.527c-.35-.25-.806-.272-1.203-.107-.397.165-.71.505-.781.929l-.149.894c-.09.542-.56.94-1.11.94h-1.094c-.55 0-1.019-.398-1.11-.94l-.148-.894c-.071-.424-.384-.764-.781-.93-.398-.164-.854-.142-1.204.108l-.738.527c-.447.32-1.06.269-1.45-.12l-.773-.774a1.125 1.125 0 01-.12-1.45l.527-.737c.25-.35.273-.806.108-1.204-.165-.397-.505-.71-.93-.78l-.894-.15c-.542-.09-.94-.56-.94-1.109v-1.094c0-.55.398-1.02.94-1.11l.894-.149c.424-.07.765-.383.93-.78.165-.398.143-.854-.107-1.204l-.527-.738a1.125 1.125 0 01.12-1.45l.773-.773a1.125 1.125 0 011.45-.12l.737.527c.35.25.807.272 1.204.107.397-.165.71-.505.78-.929l.15-.894z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                title: 'Enter AINS Credentials',
+                desc: 'Click Submit Now — enter your DELIMa/AINS username and password once. Stored encrypted.',
+                icon: <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" /></svg>
               },
               {
                 n: '3',
                 title: 'Relax',
-                desc: 'Nilam Auto submits your records automatically each month. Check history anytime.',
+                desc: 'Nilam Auto logs in to AINS and submits your records automatically every month.',
                 icon: <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
               },
             ].map((step, i) => (
@@ -382,107 +359,15 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* ── Chrome Extension ─────────────────────────── */}
-      <section id="extension" className="py-20 border-t border-line bg-white">
-        <div className="max-w-4xl mx-auto px-5">
-          <motion.div {...inView()} className="text-center mb-10">
-            <div className="inline-flex items-center gap-2 bg-brand-50 border border-brand-200 text-brand-600 text-xs font-bold px-3 py-1.5 rounded-full mb-4">
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
-              Desktop Only — Google Chrome
-            </div>
-            <h2 className="font-display text-3xl sm:text-4xl font-bold text-heading mb-3">
-              Download the Chrome Extension
-            </h2>
-            <p className="text-muted text-base max-w-xl mx-auto">
-              The extension captures your AINS login session so Nilam Auto can submit records on your behalf — without ever storing your password.
-            </p>
-          </motion.div>
-
-          {/* Download card */}
-          <motion.div {...inView(0.05)} className="bg-brand-600 rounded-2xl p-6 sm:p-8 mb-8 text-white relative overflow-hidden">
-            <div className="absolute -right-12 -top-12 w-48 h-48 bg-white/5 rounded-full pointer-events-none" />
-            <div className="relative flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5">
-              <div>
-                <p className="text-brand-200 text-xs font-bold uppercase tracking-widest mb-1">Nilam Auto Extension</p>
-                <p className="font-display text-xl font-bold mb-1">For Google Chrome · Desktop PC only</p>
-                <p className="text-brand-200 text-sm">Free · Works on Windows, Mac, Linux</p>
-              </div>
-              <a
-                href="/nilam-auto-extension.zip"
-                download
-                className="flex-shrink-0 flex items-center gap-2.5 bg-white text-brand-600 font-bold px-7 py-3.5 rounded-xl hover:bg-brand-50 transition-colors text-base"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-                Download Extension (.zip)
-              </a>
-            </div>
-          </motion.div>
-
-          {/* Install steps */}
-          <motion.div {...inView(0.08)} className="bg-page border border-line rounded-2xl p-6 sm:p-8">
-            <p className="text-xs font-bold text-heading uppercase tracking-widest mb-6">How to install — step by step</p>
-            <ol className="space-y-5">
-              {[
-                {
-                  title: 'Download the extension file',
-                  desc: 'Click "Download Extension (.zip)" above. Save the file anywhere on your PC — your Downloads folder is fine.',
-                },
-                {
-                  title: 'Extract the zip file',
-                  desc: 'Right-click the downloaded .zip file → "Extract All" (Windows) or double-click (Mac). You\'ll get a folder called nilam-auto-extension.',
-                },
-                {
-                  title: 'Open Chrome Extensions page',
-                  desc: 'Open Google Chrome. In the address bar type chrome://extensions and press Enter.',
-                },
-                {
-                  title: 'Enable Developer Mode',
-                  desc: 'In the top-right corner of the Extensions page, toggle on "Developer mode". New buttons will appear at the top.',
-                },
-                {
-                  title: 'Load the extension',
-                  desc: 'Click "Load unpacked". A file picker will open — navigate to and select the nilam-auto-extension folder you extracted in Step 2.',
-                },
-                {
-                  title: 'Pin it to your toolbar',
-                  desc: 'Click the puzzle-piece icon (Extensions) in Chrome\'s toolbar → find Nilam Auto → click the pin icon. The Nilam Auto icon will now always show in your toolbar.',
-                },
-                {
-                  title: 'Save your AINS session',
-                  desc: 'Go to ains.moe.gov.my and log in as usual. Then click the Nilam Auto icon in your toolbar and press "Save Session". Done — you\'re connected!',
-                },
-              ].map((step, i) => (
-                <li key={i} className="flex gap-4">
-                  <span className="w-7 h-7 flex-shrink-0 bg-brand-600 text-white rounded-full flex items-center justify-center text-xs font-bold mt-0.5">
-                    {i + 1}
-                  </span>
-                  <div>
-                    <p className="text-sm font-bold text-heading mb-0.5">{step.title}</p>
-                    <p className="text-sm text-muted leading-relaxed">{step.desc}</p>
-                  </div>
-                </li>
-              ))}
-            </ol>
-
-            <div className="mt-6 flex items-start gap-3 bg-warn-50 border border-warn-200 rounded-xl px-4 py-3">
-              <svg className="w-4 h-4 text-warn-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd"/></svg>
-              <p className="text-xs text-warn-700 leading-relaxed">
-                <span className="font-bold">This extension only works on desktop PC with Google Chrome.</span> It does not work on mobile phones, tablets, Firefox, or Safari. Android users can use the app directly — no extension needed.
-              </p>
-            </div>
-          </motion.div>
-        </div>
-      </section>
-
       {/* ── Full Guide ───────────────────────────────── */}
       <section id="guide" className="py-20 border-t border-line bg-page">
         <div className="max-w-4xl mx-auto px-5">
           <motion.div {...inView()} className="text-center mb-14">
             <p className="text-brand-600 text-xs font-bold uppercase tracking-widest mb-3">Step-by-step guide</p>
             <h2 className="font-display text-3xl sm:text-4xl font-bold text-heading">
-              Complete setup in under 5 minutes
+              Set up in under 2 minutes
             </h2>
-            <p className="text-muted text-base mt-3">For PC users. Follow these steps once — then it runs automatically every month.</p>
+            <p className="text-muted text-base mt-3">Works on any browser, any device — no extension needed.</p>
           </motion.div>
 
           <div className="space-y-4">
@@ -490,52 +375,24 @@ export default function Landing() {
               {
                 n: '1',
                 label: 'Create your account',
-                body: 'Click "Get Started Free" above, enter your email and a password, then check your inbox for a verification email. Click the link to activate your account.',
+                body: 'Click "Get Started Free", enter your email and a password, then check your inbox for a verification email. Click the link to activate your account.',
                 tip: 'Use your personal email (Gmail, Outlook etc) — not your school email which may block automated emails.',
               },
               {
                 n: '2',
-                label: 'Download & install the Chrome extension',
-                body: 'Download the Nilam Auto extension (.zip file) using the button below. Then open Chrome, go to chrome://extensions, turn on Developer Mode (top-right toggle), click "Load unpacked", and select the extracted extension folder.',
-                cta: (
-                  <a
-                    href="/nilam-auto-extension.zip"
-                    download
-                    className="inline-flex items-center gap-2 mt-3 bg-brand-600 text-white text-sm font-bold px-5 py-2.5 rounded-xl hover:bg-brand-700 transition-colors"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-                    Download Chrome Extension (.zip)
-                  </a>
-                ),
-                tip: 'Only works on Google Chrome or Chromium-based browsers (Edge, Brave). Does not work on Firefox or Safari.',
+                label: 'Choose your preferences',
+                body: 'Log in and go to Settings. Choose your language (Malay, English, Chinese, or Tamil), number of books per month (1–8), and pick a schedule day for the auto-run.',
               },
               {
                 n: '3',
-                label: 'Log in to AINS',
-                body: 'Open a new tab and go to ains.moe.gov.my. Sign in with your usual school credentials (IC number / password). Make sure you reach your student dashboard — the extension needs to detect an active session.',
-                tip: 'If your school changes your password, you\'ll need to repeat this step to save the new session.',
+                label: 'Enter your AINS credentials',
+                body: 'On the Dashboard, click "Connect & Submit". A popup will ask for your DELIMa / AINS username (IC number) and password. Enter them once — they are stored encrypted.',
+                tip: 'Your credentials are encrypted with AES-256 and never shared. The bot uses them to log in on your behalf each month.',
               },
               {
                 n: '4',
-                label: 'Save your session via the extension',
-                body: 'While on ains.moe.gov.my (and still logged in), click the Nilam Auto icon in your Chrome toolbar. A small popup will appear — click "Save Session". You will see a green confirmation message. This is the one-time setup step.',
-                tip: 'The extension only reads your session cookie — it never stores your username or password.',
-              },
-              {
-                n: '5',
-                label: 'Configure your preferences',
-                body: 'Come back to nilamauto.netlify.app and log in. On your dashboard, choose your language (Malay, English, Chinese, or Tamil) and the number of books (1–8). Pro users can enable the monthly auto-schedule.',
-              },
-              {
-                n: '6',
-                label: 'Submit your records',
-                body: 'Click "Submit Now" on your dashboard. The bot will log in to AINS on your behalf and submit your reading records automatically. This usually takes 30–90 seconds.',
-                tip: 'You can check the status and see which books were submitted under the History tab.',
-              },
-              {
-                n: '7',
                 label: 'Sit back — it runs every month',
-                body: 'Pro users: enable auto-schedule in Settings and pick a day of the month. Nilam Auto will submit your records on that day every month without you having to do anything.',
+                body: 'Nilam Auto logs in to AINS and submits your reading records automatically on your schedule day each month. Check History anytime to see what was submitted.',
               },
             ].map((step, i) => (
               <motion.div key={step.n} {...inView(i * 0.05)} className="flex gap-5 bg-white rounded-2xl border border-line p-5 hover:border-brand-200 transition-colors">
@@ -545,7 +402,6 @@ export default function Landing() {
                 <div className="flex-1 min-w-0">
                   <p className="font-display font-bold text-heading mb-1.5">{step.label}</p>
                   <p className="text-sm text-muted leading-relaxed">{step.body}</p>
-                  {step.cta}
                   {step.tip && (
                     <div className="flex items-start gap-2 mt-3 bg-brand-50 border border-brand-100 rounded-xl px-3 py-2">
                       <span className="text-brand-500 text-xs mt-0.5 flex-shrink-0">💡</span>
@@ -562,7 +418,7 @@ export default function Landing() {
               onClick={() => { setMode('signup'); document.getElementById('auth')?.scrollIntoView({ behavior: 'smooth' }) }}
               className="btn-primary text-base px-8 py-3.5"
             >
-              Get Started Free — takes 5 minutes
+              Get Started Free — takes 2 minutes
               <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" /></svg>
             </button>
           </motion.div>
@@ -626,57 +482,6 @@ export default function Landing() {
               </div>
             </motion.div>
           </div>
-        </div>
-      </section>
-
-      {/* ── Android App ──────────────────────────────── */}
-      <section id="android" className="py-20 border-t border-line bg-white">
-        <div className="max-w-6xl mx-auto px-5">
-          <motion.div {...inView()} className="max-w-xl mx-auto text-center">
-            <div className="inline-flex items-center gap-2 bg-ok-50 border border-ok-200 text-ok-700 text-xs font-bold px-3 py-1.5 rounded-full mb-6">
-              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M6 18c0 .55.45 1 1 1h1v3.5c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5V19h2v3.5c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5V19h1c.55 0 1-.45 1-1V8H6v10zm-2.5-1c.83 0 1.5-.67 1.5-1.5v-7c0-.83-.67-1.5-1.5-1.5S2 7.67 2 8.5v7c0 .83.67 1.5 1.5 1.5zm17 0c.83 0 1.5-.67 1.5-1.5v-7c0-.83-.67-1.5-1.5-1.5S19 7.67 19 8.5v7c0 .83.67 1.5 1.5 1.5zM15.53 2.16l1.3-1.3c.2-.2.2-.51 0-.71-.2-.2-.51-.2-.71 0l-1.48 1.48A5.934 5.934 0 0012 1c-.94 0-1.82.22-2.61.63L7.89.15c-.2-.2-.51-.2-.71 0-.2.2-.2.51 0 .71l1.31 1.31C7.01 3.07 6 4.96 6 7h12c0-2.04-1.01-3.93-2.47-4.84zM10 5H9V4h1v1zm5 0h-1V4h1v1z"/>
-              </svg>
-              Android App Available
-            </div>
-
-            <h2 className="font-display text-3xl sm:text-4xl font-bold text-heading mb-4">
-              Take it on your phone.
-            </h2>
-            <p className="text-body text-base leading-relaxed mb-8">
-              Download the Nilam Auto Android app and log in directly — no Chrome extension needed. Install in seconds, no app store required.
-            </p>
-
-            <a
-              href="/nilam-auto.apk"
-              download
-              className="inline-flex items-center gap-2.5 btn-primary text-base px-8 py-3.5 mb-8"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-              </svg>
-              Download APK
-            </a>
-
-            <div className="text-left bg-page border border-line rounded-2xl p-5">
-              <p className="text-xs font-bold text-heading uppercase tracking-widest mb-3">How to install</p>
-              <ol className="space-y-2.5">
-                {[
-                  'Tap "Download APK" above.',
-                  'Open your Downloads folder and tap the file.',
-                  'If prompted, go to Settings → Apps → Special app access → Install unknown apps and allow your browser.',
-                  'Tap Install — done!',
-                ].map((step, i) => (
-                  <li key={i} className="flex items-start gap-3 text-sm text-muted">
-                    <span className="w-5 h-5 flex-shrink-0 bg-brand-50 text-brand-600 rounded-full flex items-center justify-center text-xs font-bold mt-0.5">
-                      {i + 1}
-                    </span>
-                    {step}
-                  </li>
-                ))}
-              </ol>
-            </div>
-          </motion.div>
         </div>
       </section>
 

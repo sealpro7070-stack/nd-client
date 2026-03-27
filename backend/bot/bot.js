@@ -1,6 +1,6 @@
 /**
  * bot.js — Main bot orchestrator
- * Fetches user data, decrypts cookie, picks books, runs fillForm per book.
+ * Fetches user data, decrypts AINS credentials, picks books, runs fillForm.
  */
 
 require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') })
@@ -21,12 +21,12 @@ async function startBot(userId, directCookie, directSsUser, directSsProfile, dir
 
   if (userErr || !user) throw new Error(`User not found: ${userId}`)
   if (!user.is_active) throw new Error('Account not activated')
-  if (!directCookie && !user.cookie_encrypted) throw new Error('No session token saved. Use the Chrome extension first.')
+  if (!user.ains_username_encrypted) throw new Error('No AINS credentials saved. Enter them on the dashboard.')
 
   console.log(`[bot] User: ${user.email}`)
 
   // 2. Fetch settings
-  const { data: settings, error: settingsErr } = await supabase
+  const { data: settings } = await supabase
     .from('settings')
     .select('*')
     .eq('user_id', userId)
@@ -43,34 +43,14 @@ async function startBot(userId, directCookie, directSsUser, directSsProfile, dir
 
   console.log(`[bot] Settings: ${userSettings.books_per_month} books/month, language=${userSettings.language}`)
 
-  // 3. Get session token + cookies
-  let cookie, ssUser, ssProfile, sessionCookies = []
-  if (directCookie) {
-    cookie = directCookie
-    ssUser = directSsUser || null
-    ssProfile = directSsProfile || null
-    sessionCookies = directCookies || []
-    console.log(`[bot] Using fresh direct session (ssUser=${!!ssUser}, ssProfile=${!!ssProfile}, cookies=${sessionCookies.length})`)
-  } else {
-    try {
-      const decrypted = decrypt(user.cookie_encrypted)
-      try {
-        const parsed = JSON.parse(decrypted)
-        cookie = parsed.token
-        ssUser = parsed.ssUser || null
-        ssProfile = parsed.ssProfile || null
-        sessionCookies = parsed.cookies || []
-        console.log(`[bot] Using stored session (ssUser=${!!ssUser}, ssProfile=${!!ssProfile}, cookies=${sessionCookies.length})`)
-      } catch {
-        cookie = decrypted
-        ssUser = null
-        ssProfile = null
-        sessionCookies = []
-        console.log('[bot] Using stored token (legacy format)')
-      }
-    } catch (err) {
-      throw new Error(`Failed to decrypt session token: ${err.message}`)
-    }
+  // 3. Decrypt AINS credentials
+  let username, password
+  try {
+    username = decrypt(user.ains_username_encrypted)
+    password = decrypt(user.ains_password_encrypted)
+    console.log(`[bot] Credentials decrypted for: ${username.substring(0, 4)}****`)
+  } catch (err) {
+    throw new Error(`Failed to decrypt AINS credentials: ${err.message}`)
   }
 
   // 4. Check how many successful submissions already this month
@@ -145,10 +125,8 @@ async function startBot(userId, directCookie, directSsUser, directSsProfile, dir
   const result = await runBot({
     user,
     settings: userSettings,
-    cookie,
-    ssUser,
-    ssProfile,
-    cookies: sessionCookies,
+    username,
+    password,
     books: shuffled,
     submissions: insertedSubs
   })

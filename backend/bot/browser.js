@@ -2,7 +2,7 @@ const { chromium } = require('playwright')
 const path = require('path')
 const fs = require('fs')
 const supabase = require('../lib/supabase')
-const { injectSession } = require('./login')
+const { loginWithCredentials } = require('./login')
 
 const AINS_BASE = 'https://ains.moe.gov.my'
 const SCREENSHOTS_DIR = path.join(__dirname, '..', 'screenshots')
@@ -35,9 +35,9 @@ async function launchBrowser() {
   return { browser, context }
 }
 
-async function injectSessionAndVerify(context, token, ssUser, ssProfile, cookies) {
+async function loginAndVerify(context, username, password) {
   const page = await context.newPage()
-  const isLoggedIn = await injectSession(context, page, token, ssUser, ssProfile, cookies)
+  const isLoggedIn = await loginWithCredentials(context, page, username, password)
   return { page, isLoggedIn }
 }
 
@@ -53,25 +53,23 @@ async function takeScreenshot(page, label) {
   }
 }
 
-async function runBot({ user, settings, cookie, ssUser, ssProfile, cookies, books, submissions }) {
+async function runBot({ user, settings, username, password, books, submissions }) {
   let browser
   try {
     const launched = await launchBrowser()
     browser = launched.browser
     const context = launched.context
 
-    // Inject session and verify login
-    const { page, isLoggedIn } = await injectSessionAndVerify(context, cookie, ssUser, ssProfile, cookies)
+    // Login with credentials
+    const { page, isLoggedIn } = await loginAndVerify(context, username, password)
 
     if (!isLoggedIn) {
-      console.error('[bot] Session expired — redirected to login')
-      await takeScreenshot(page, 'session-expired')
+      console.error('[bot] Login failed — wrong credentials or AINS issue')
+      await takeScreenshot(page, 'login-failed')
 
-      // Don't wipe the cookie — just log the failure so user can retry
-      // The session token may still be valid on retry (AINS sessions can be flaky)
-      await markSubmissions(submissions.map(s => s.id), 'failed', 'Session expired. Re-capture via Chrome extension.')
+      await markSubmissions(submissions.map(s => s.id), 'failed', 'Login failed. Check your AINS credentials in Settings.')
       await browser.close()
-      return { success: false, reason: 'session_expired' }
+      return { success: false, reason: 'login_failed' }
     }
 
     console.log(`[bot] Logged in. Starting ${books.length} submission(s) for ${user.email}`)
@@ -137,4 +135,4 @@ async function markSubmissions(ids, status, note) {
     .in('id', ids)
 }
 
-module.exports = { runBot, launchBrowser, injectSessionAndVerify, takeScreenshot }
+module.exports = { runBot, launchBrowser, loginAndVerify, takeScreenshot }
