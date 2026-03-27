@@ -142,29 +142,54 @@ async function performLogin(userId, email, password, onStatus) {
 
       console.log(`[login] Clicked: ${clicked || 'nothing found — waiting anyway'}`)
 
-      // Wait up to 30s for Microsoft redirect
-      await page.waitForURL(/login\.microsoftonline\.com|login\.microsoft\.com/, { timeout: 30000 })
+      // Wait up to 30s for Microsoft OR Google redirect
+      await page.waitForURL(
+        /login\.microsoftonline\.com|login\.microsoft\.com|accounts\.google\.com/,
+        { timeout: 30000 }
+      )
     }
-    console.log(`[login] On Microsoft login page: ${page.url()}`)
 
-    // Type email
-    await page.waitForSelector('input[type="email"], #i0116', { timeout: 10000 })
-    await page.locator('input[type="email"], #i0116').first().fill(email)
-    await page.locator('input[type="submit"], #idSIButton9').first().click()
+    const currentUrl = page.url()
+    console.log(`[login] On auth provider page: ${currentUrl}`)
+    const isGoogle = currentUrl.includes('accounts.google.com')
 
-    // Wait for password field
-    await page.waitForSelector('#i0118, input[type="password"]', { timeout: 10000 })
-    await page.locator('#i0118, input[type="password"]').first().fill(password)
+    if (isGoogle) {
+      // Google login flow
+      await page.waitForSelector('input[type="email"], #identifierId', { timeout: 10000 })
+      await page.locator('input[type="email"], #identifierId').first().fill(email)
+      // Click Next (Google uses a button inside #identifierNext)
+      await page.locator('#identifierNext, button[jsname="LgbsSe"]').first().click().catch(async () => {
+        await page.keyboard.press('Enter')
+      })
 
-    // Click sign in
-    await page.locator('input[type="submit"], #idSIButton9').first().click()
-    console.log(`[login] Credentials submitted, waiting for MFA`)
+      // Wait for password field
+      await page.waitForSelector('input[type="password"]', { timeout: 10000 })
+      await page.waitForTimeout(500) // Google animates the field in
+      await page.locator('input[type="password"]').first().fill(password)
+      await page.locator('#passwordNext, button[jsname="LgbsSe"]').first().click().catch(async () => {
+        await page.keyboard.press('Enter')
+      })
+    } else {
+      // Microsoft login flow
+      await page.waitForSelector('input[type="email"], #i0116', { timeout: 10000 })
+      await page.locator('input[type="email"], #i0116').first().fill(email)
+      await page.locator('input[type="submit"], #idSIButton9').first().click()
+
+      await page.waitForSelector('#i0118, input[type="password"]', { timeout: 10000 })
+      await page.locator('#i0118, input[type="password"]').first().fill(password)
+      await page.locator('input[type="submit"], #idSIButton9').first().click()
+    }
+
+    console.log(`[login] Credentials submitted (${isGoogle ? 'Google' : 'Microsoft'}), waiting for MFA`)
 
     if (onStatus) onStatus('waiting_mfa')
 
-    // Wait for MFA approval — URL leaves Microsoft login pages
+    // Wait for MFA approval — URL leaves the auth provider pages
     await page.waitForURL(
-      (url) => !url.includes('login.microsoftonline.com') && !url.includes('login.microsoft.com'),
+      (url) =>
+        !url.includes('login.microsoftonline.com') &&
+        !url.includes('login.microsoft.com') &&
+        !url.includes('accounts.google.com'),
       { timeout: MFA_TIMEOUT_MS }
     )
     console.log(`[login] MFA approved, now on: ${page.url()}`)
