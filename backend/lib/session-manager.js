@@ -109,34 +109,41 @@ async function performLogin(userId, email, password, onStatus) {
     console.log(`[login] Navigating to AINS for user ${userId}`)
     await page.goto(AINS_URL, { waitUntil: 'domcontentloaded', timeout: 30000 })
 
-    // If AINS landing page — find and click the login / DELIMa button
+    // Navigate to the AINS login page directly, then click the DELIMa/Microsoft button
     const onMicrosoft = () => /login\.microsoftonline\.com|login\.microsoft\.com/.test(page.url())
+
     if (!onMicrosoft()) {
-      console.log(`[login] On AINS landing page (${page.url()}), looking for login button`)
-
-      // Try common login entry points in order of likelihood
-      const loginClicked = await page.evaluate(() => {
-        const candidates = [
-          ...document.querySelectorAll('a, button'),
-        ]
-        const login = candidates.find(el => {
-          const t = (el.textContent || '').toLowerCase()
-          const h = (el.getAttribute('href') || '').toLowerCase()
-          return t.includes('delima') || t.includes('log masuk') || t.includes('login') ||
-                 t.includes('sign in') || h.includes('login') || h.includes('auth')
-        })
-        if (login) { login.click(); return true }
-        return false
-      })
-
-      if (!loginClicked) {
-        // Fall back to navigating directly to the login path
-        console.log('[login] No login button found, trying /login path')
-        await page.goto(`${AINS_URL}/login`, { waitUntil: 'domcontentloaded', timeout: 15000 }).catch(() => {})
+      // Go straight to /login — skip any landing page
+      if (!page.url().includes('/login')) {
+        console.log(`[login] Navigating directly to /login`)
+        await page.goto(`${AINS_URL}/login`, { waitUntil: 'domcontentloaded', timeout: 20000 })
       }
 
-      // Wait up to 20s for redirect to Microsoft
-      await page.waitForURL(/login\.microsoftonline\.com|login\.microsoft\.com/, { timeout: 20000 })
+      console.log(`[login] On login page (${page.url()}), clicking DELIMa button`)
+
+      // Give the Vue app time to hydrate
+      await page.waitForTimeout(2000)
+
+      // Click whichever button/link triggers the Microsoft OAuth redirect
+      const clicked = await page.evaluate(() => {
+        const all = [...document.querySelectorAll('a, button, [role="button"]')]
+        const target = all.find(el => {
+          const t = (el.textContent || '').toLowerCase().trim()
+          const h = (el.getAttribute('href') || '').toLowerCase()
+          const cls = (el.className || '').toLowerCase()
+          return t.includes('delima') || t.includes('microsoft') ||
+                 t.includes('log masuk') || t.includes('sign in') ||
+                 h.includes('microsoft') || h.includes('oauth') ||
+                 cls.includes('microsoft') || cls.includes('delima')
+        })
+        if (target) { target.click(); return target.textContent?.trim() }
+        return null
+      })
+
+      console.log(`[login] Clicked: ${clicked || 'nothing found — waiting anyway'}`)
+
+      // Wait up to 30s for Microsoft redirect
+      await page.waitForURL(/login\.microsoftonline\.com|login\.microsoft\.com/, { timeout: 30000 })
     }
     console.log(`[login] On Microsoft login page: ${page.url()}`)
 
