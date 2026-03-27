@@ -90,6 +90,10 @@ export default function Dashboard() {
     } catch (err) {
       setTriggerMsg(err.message)
       setIsError(true)
+      // If session expired, flip status so the button becomes "Connect & Submit"
+      if (/session expired|reconnect/i.test(err.message)) {
+        setCredsStatus('none')
+      }
     } finally {
       setTriggering(false)
     }
@@ -154,12 +158,16 @@ export default function Dashboard() {
                 : 'No records submitted this month yet.'}
             </p>
           </div>
-          <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full flex-shrink-0 ${credsStatus === 'saved' ? 'bg-white/15' : 'bg-warn-500/80'}`}>
+          <button
+            onClick={() => setShowAINSModal(true)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full flex-shrink-0 transition-opacity hover:opacity-80 ${credsStatus === 'saved' ? 'bg-white/15' : 'bg-warn-500/80'}`}
+            title={credsStatus === 'saved' ? 'Click to reconnect AINS' : 'Click to connect AINS'}
+          >
             <span className={`w-1.5 h-1.5 rounded-full ${credsStatus === 'saved' ? 'bg-ok-400 animate-pulse' : 'bg-white'}`} />
             <span className="text-white text-xs font-bold">
               {credsStatus === 'saved' ? 'AINS Connected' : 'AINS Not Set'}
             </span>
-          </div>
+          </button>
         </div>
 
         {/* Horizontal progress bar */}
