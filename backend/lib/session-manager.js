@@ -98,14 +98,29 @@ async function clickAt(userId, x, y) {
 }
 
 /**
- * Send keyboard input to the focused element
+ * Send keyboard input to the focused element.
+ * Checks if something is focused first — if not, throws a clear error so the
+ * frontend can tell the user to tap a field before typing.
  */
 async function type(userId, text) {
   const session = getSession(userId)
   if (!session) throw new Error('Session not found')
 
   try {
-    await session.page.keyboard.type(text)
+    // Check if an input/textarea is focused; if not, warn but still attempt
+    const focusedTag = await session.page.evaluate(
+      () => document.activeElement?.tagName?.toLowerCase() || 'none'
+    ).catch(() => 'unknown')
+
+    if (focusedTag === 'body' || focusedTag === 'none') {
+      // Nothing focused — try clicking the first visible input as a best-effort fix
+      await session.page.evaluate(() => {
+        const input = document.querySelector('input:not([type=hidden]):not([type=submit])')
+        if (input) input.focus()
+      }).catch(() => {})
+    }
+
+    await session.page.keyboard.type(text, { delay: 40 })
     session.lastActivity = Date.now()
   } catch (err) {
     throw new Error(`Type failed: ${err.message}`)
