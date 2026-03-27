@@ -20,8 +20,9 @@ router.post('/', requireAuth, async (req, res) => {
   if (!user.is_active) return res.status(403).json({ error: 'Account not activated. Please subscribe.' })
   if (!user.ains_cookie_encrypted) return res.status(400).json({ error: 'No AINS session saved. Use "Connect AINS Account" on the dashboard.' })
 
-  // Rate limit: 5 runs per user per hour
-  if (!checkRateLimit(userId)) {
+  // Rate limit: 5 runs per user per hour (skip for admin)
+  const isAdmin = req.authUser?.email === process.env.ADMIN_EMAIL
+  if (!isAdmin && !checkRateLimit(userId)) {
     return res.status(429).json({ error: 'Too many requests. Maximum 5 submissions per hour.' })
   }
 
