@@ -68,7 +68,7 @@ function getSession(userId) {
 }
 
 /**
- * Send a click to the page
+ * Send a click to the page by CSS selector
  */
 async function click(userId, selector) {
   const session = getSession(userId)
@@ -79,6 +79,21 @@ async function click(userId, selector) {
     session.lastActivity = Date.now()
   } catch (err) {
     throw new Error(`Click failed: ${err.message}`)
+  }
+}
+
+/**
+ * Send a click to the page by x,y coordinates
+ */
+async function clickAt(userId, x, y) {
+  const session = getSession(userId)
+  if (!session) throw new Error('Session not found')
+
+  try {
+    await session.page.mouse.click(x, y)
+    session.lastActivity = Date.now()
+  } catch (err) {
+    throw new Error(`ClickAt failed: ${err.message}`)
   }
 }
 
@@ -203,6 +218,7 @@ module.exports = {
   createSession,
   getSession,
   click,
+  clickAt,
   type,
   pressKey,
   getScreenshot,

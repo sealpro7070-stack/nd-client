@@ -43,7 +43,11 @@ router.post('/send-input', async (req, res) => {
   if (!userId || !type) return res.status(400).json({ error: 'userId and type required' })
 
   try {
-    if (type === 'click') {
+    if (type === 'clickAt') {
+      const { x, y } = req.body
+      if (x == null || y == null) return res.status(400).json({ error: 'x and y required for clickAt' })
+      await sm.clickAt(userId, x, y)
+    } else if (type === 'click') {
       if (!target) return res.status(400).json({ error: 'target selector required for click' })
       await sm.click(userId, target)
     } else if (type === 'type') {

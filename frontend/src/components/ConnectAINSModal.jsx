@@ -98,21 +98,16 @@ export default function ConnectAINSModal({ userId, isOpen, onClose, onSuccess })
       if (!canvas) return
 
       const rect = canvas.getBoundingClientRect()
-      const scaleX = 1280 / rect.width // Canvas is 1280px wide
-      const scaleY = 800 / rect.height // Canvas is 800px tall
-      const x = (clientX - rect.left) * scaleX
-      const y = (clientY - rect.top) * scaleY
-
-      // Find element at coordinates and click it
-      // For now, just send a generic click selector based on position
-      // In a real implementation, this would use playwright's locateBy coordinates
-      const selector = `[data-x="${Math.round(x)}"][data-y="${Math.round(y)}"]`
+      const scaleX = 1280 / rect.width
+      const scaleY = 800 / rect.height
+      const x = Math.round((clientX - rect.left) * scaleX)
+      const y = Math.round((clientY - rect.top) * scaleY)
 
       setStatus('Clicking...')
       const res = await fetch(`${BACKEND}/api/auth/send-input`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, type: 'click', target: 'body' })
+        body: JSON.stringify({ userId, type: 'clickAt', x, y })
       })
       const data = await res.json()
       if (data.screenshot) setScreenshot(data.screenshot)
