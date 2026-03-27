@@ -1,20 +1,22 @@
 /**
- * session-manager.js — Manages Playwright browser sessions for interactive AINS login
- * Sessions are stored in memory per user. Timeout cleanup after 15 minutes of inactivity.
+ * session-manager.js — Manages Playwright browser sessions for silent AINS login
+ * Launches a headless browser, performs the full Microsoft login flow server-side,
+ * waits for MFA approval, then captures and returns the AINS session tokens + cookies.
  */
 
 const { chromium } = require('playwright')
 
-const sessions = {} // { userId: { browser, context, page, createdAt, lastActivity } }
-const TIMEOUT_MS = 15 * 60 * 1000 // 15 minutes
+const sessions = {} // { userId: { browser, context, page } }
+
+const AINS_URL = 'https://ains.moe.gov.my'
+const MFA_TIMEOUT_MS = 3 * 60 * 1000 // 3 minutes for user to approve MFA
 
 /**
- * Create a new Playwright session for interactive AINS login
+ * Launch a headless Chromium browser with anti-bot masking
  */
 async function createSession(userId) {
   console.log(`[session] Creating session for user ${userId}`)
 
-  // Clean up any existing session
   if (sessions[userId]) {
     await destroySession(userId).catch(() => {})
   }
@@ -54,182 +56,15 @@ async function createSession(userId) {
         : originalQuery(params)
   })
 
-  sessions[userId] = {
-    browser,
-    context,
-    page,
-    createdAt: Date.now(),
-    lastActivity: Date.now(),
-  }
-
-  // Auto-cleanup on timeout
-  setTimeout(() => {
-    if (sessions[userId] && Date.now() - sessions[userId].lastActivity > TIMEOUT_MS) {
-      console.log(`[session] Timeout cleanup for ${userId}`)
-      destroySession(userId).catch(() => {})
-    }
-  }, TIMEOUT_MS + 5000) // Check 5 seconds after timeout
-
+  sessions[userId] = { browser, context, page }
   return sessions[userId]
 }
 
 /**
- * Get an existing session, refresh its activity timer
+ * Get an existing session
  */
 function getSession(userId) {
-  const session = sessions[userId]
-  if (!session) return null
-  session.lastActivity = Date.now()
-  return session
-}
-
-/**
- * Send a click to the page by CSS selector
- */
-async function click(userId, selector) {
-  const session = getSession(userId)
-  if (!session) throw new Error('Session not found')
-
-  try {
-    await session.page.locator(selector).first().click()
-    session.lastActivity = Date.now()
-  } catch (err) {
-    throw new Error(`Click failed: ${err.message}`)
-  }
-}
-
-/**
- * Send a click to the page by x,y coordinates
- */
-async function clickAt(userId, x, y) {
-  const session = getSession(userId)
-  if (!session) throw new Error('Session not found')
-
-  try {
-    await session.page.mouse.click(x, y)
-    session.lastActivity = Date.now()
-  } catch (err) {
-    throw new Error(`ClickAt failed: ${err.message}`)
-  }
-}
-
-/**
- * Send keyboard input to the focused element.
- * Checks if something is focused first — if not, throws a clear error so the
- * frontend can tell the user to tap a field before typing.
- */
-async function type(userId, text) {
-  const session = getSession(userId)
-  if (!session) throw new Error('Session not found')
-
-  try {
-    // Check if an input/textarea is focused; if not, warn but still attempt
-    const focusedTag = await session.page.evaluate(
-      () => document.activeElement?.tagName?.toLowerCase() || 'none'
-    ).catch(() => 'unknown')
-
-    if (focusedTag === 'body' || focusedTag === 'none') {
-      // Nothing focused — try clicking the first visible input as a best-effort fix
-      await session.page.evaluate(() => {
-        const input = document.querySelector('input:not([type=hidden]):not([type=submit])')
-        if (input) input.focus()
-      }).catch(() => {})
-    }
-
-    await session.page.keyboard.type(text, { delay: 40 })
-    session.lastActivity = Date.now()
-  } catch (err) {
-    throw new Error(`Type failed: ${err.message}`)
-  }
-}
-
-/**
- * Press a key (Enter, Tab, etc.)
- */
-async function pressKey(userId, key) {
-  const session = getSession(userId)
-  if (!session) throw new Error('Session not found')
-
-  try {
-    await session.page.keyboard.press(key)
-    session.lastActivity = Date.now()
-  } catch (err) {
-    throw new Error(`Key press failed: ${err.message}`)
-  }
-}
-
-/**
- * Get current page screenshot as base64 PNG
- */
-async function getScreenshot(userId) {
-  const session = getSession(userId)
-  if (!session) throw new Error('Session not found')
-
-  try {
-    // Wait for page to settle after navigation before capturing
-    await session.page.waitForLoadState('domcontentloaded', { timeout: 3000 }).catch(() => {})
-    const buffer = await session.page.screenshot({ type: 'png' })
-    session.lastActivity = Date.now()
-    return buffer.toString('base64')
-  } catch (err) {
-    throw new Error(`Screenshot failed: ${err.message}`)
-  }
-}
-
-/**
- * Get current page URL
- */
-function getUrl(userId) {
-  const session = getSession(userId)
-  if (!session) throw new Error('Session not found')
-  return session.page.url()
-}
-
-/**
- * Get page text content for status checking
- */
-async function getPageText(userId) {
-  const session = getSession(userId)
-  if (!session) throw new Error('Session not found')
-
-  try {
-    const text = await session.page.textContent('body')
-    session.lastActivity = Date.now()
-    return text || ''
-  } catch {
-    return ''
-  }
-}
-
-/**
- * Navigate to a URL
- */
-async function navigate(userId, url) {
-  const session = getSession(userId)
-  if (!session) throw new Error('Session not found')
-
-  try {
-    await session.page.goto(url, { waitUntil: 'networkidle', timeout: 30000 })
-    session.lastActivity = Date.now()
-  } catch (err) {
-    throw new Error(`Navigation failed: ${err.message}`)
-  }
-}
-
-/**
- * Get all cookies from the context
- */
-async function getCookies(userId) {
-  const session = getSession(userId)
-  if (!session) throw new Error('Session not found')
-
-  try {
-    const cookies = await session.context.cookies()
-    session.lastActivity = Date.now()
-    return cookies
-  } catch (err) {
-    throw new Error(`Get cookies failed: ${err.message}`)
-  }
+  return sessions[userId] || null
 }
 
 /**
@@ -247,17 +82,97 @@ async function destroySession(userId) {
   console.log(`[session] Destroyed session for ${userId}`)
 }
 
+/**
+ * Get all cookies from the context
+ */
+async function getCookies(userId) {
+  const session = getSession(userId)
+  if (!session) throw new Error('Session not found')
+  return session.context.cookies()
+}
+
+/**
+ * Perform the full silent Microsoft login flow for AINS.
+ * Types credentials server-side, waits for MFA approval, returns session data.
+ *
+ * @param {string} userId
+ * @param {string} email
+ * @param {string} password
+ * @param {function} onStatus - called with 'waiting_mfa' once password is submitted
+ * @returns {{ ssToken, ssUser, ssProfile, cookies }}
+ */
+async function performLogin(userId, email, password, onStatus) {
+  await createSession(userId)
+  const { page } = sessions[userId]
+
+  try {
+    console.log(`[login] Navigating to AINS for user ${userId}`)
+    await page.goto(AINS_URL, { waitUntil: 'networkidle', timeout: 30000 })
+
+    // Wait for Microsoft login page
+    await page.waitForURL(/login\.microsoftonline\.com|login\.microsoft\.com/, { timeout: 15000 })
+    console.log(`[login] On Microsoft login page`)
+
+    // Type email
+    await page.locator('input[type="email"], #i0116').first().fill(email)
+    await page.locator('input[type="submit"], #idSIButton9').first().click()
+
+    // Wait for password field
+    await page.waitForSelector('#i0118, input[type="password"]', { timeout: 10000 })
+    await page.locator('#i0118, input[type="password"]').first().fill(password)
+
+    // Click sign in
+    await page.locator('input[type="submit"], #idSIButton9').first().click()
+    console.log(`[login] Credentials submitted, waiting for MFA`)
+
+    if (onStatus) onStatus('waiting_mfa')
+
+    // Wait for MFA approval — URL leaves Microsoft login pages
+    await page.waitForURL(
+      (url) => !url.includes('login.microsoftonline.com') && !url.includes('login.microsoft.com'),
+      { timeout: MFA_TIMEOUT_MS }
+    )
+    console.log(`[login] MFA approved, now on: ${page.url()}`)
+
+    // Wait for AINS Vue app to set jb-app-token in sessionStorage
+    await page.waitForFunction(
+      () => sessionStorage.getItem('jb-app-token') !== null,
+      { timeout: 8000 }
+    ).catch(() => {
+      console.warn('[login] Timed out waiting for jb-app-token — capturing whatever is available')
+    })
+
+    const storageKeys = await page.evaluate(() => ({
+      ss: Object.keys(sessionStorage),
+      ls: Object.keys(localStorage),
+    })).catch(() => ({ ss: [], ls: [] }))
+    console.log('[login] Storage keys after login:', JSON.stringify(storageKeys))
+
+    const getAny = (key) => page.evaluate(
+      (k) => sessionStorage.getItem(k) || localStorage.getItem(k), key
+    ).catch(() => null)
+
+    const [ssToken, ssUser, ssProfile] = await Promise.all([
+      getAny('jb-app-token'),
+      getAny('jb-app-user'),
+      getAny('jb-app-profile'),
+    ])
+
+    const cookies = await getCookies(userId)
+    console.log(`[login] Session captured: ssToken=${!!ssToken}, ssUser=${!!ssUser}, cookies=${cookies.length}`)
+
+    await destroySession(userId)
+    return { ssToken, ssUser, ssProfile, cookies }
+  } catch (err) {
+    await destroySession(userId).catch(() => {})
+    throw err
+  }
+}
+
 module.exports = {
   createSession,
   getSession,
-  click,
-  clickAt,
-  type,
-  pressKey,
-  getScreenshot,
-  getUrl,
-  getPageText,
-  navigate,
-  getCookies,
   destroySession,
+  getCookies,
+  performLogin,
 }
