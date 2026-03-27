@@ -103,13 +103,17 @@ export default function ConnectAINSModal({ userId, isOpen, onClose, onSuccess })
       const x = Math.round((clientX - rect.left) * scaleX)
       const y = Math.round((clientY - rect.top) * scaleY)
 
-      setStatus('Clicking...')
+      setStatus(`Clicking at (${x}, ${y})...`)
       const res = await fetch(`${BACKEND}/api/auth/send-input`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId, type: 'clickAt', x, y })
       })
       const data = await res.json()
+      if (!res.ok) {
+        setStatus(`Click failed: ${data.error || 'Unknown error'}`)
+        return
+      }
       if (data.screenshot) setScreenshot(data.screenshot)
       if (data.url) setUrl(data.url)
       setStatus('Ready. Continue logging in.')

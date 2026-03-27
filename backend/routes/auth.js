@@ -47,6 +47,8 @@ router.post('/send-input', async (req, res) => {
       const { x, y } = req.body
       if (x == null || y == null) return res.status(400).json({ error: 'x and y required for clickAt' })
       await sm.clickAt(userId, x, y)
+      // Wait for page to respond to click before screenshot
+      await new Promise(r => setTimeout(r, 500))
     } else if (type === 'click') {
       if (!target) return res.status(400).json({ error: 'target selector required for click' })
       await sm.click(userId, target)
@@ -61,7 +63,8 @@ router.post('/send-input', async (req, res) => {
     }
 
     const screenshot = await sm.getScreenshot(userId)
-    const url = sm.getUrl(userId)
+    let url = ''
+    try { url = sm.getUrl(userId) } catch { /* ok */ }
     res.json({ success: true, screenshot, url })
   } catch (err) {
     res.status(500).json({ error: err.message })
@@ -75,7 +78,13 @@ router.get('/check-login-status', async (req, res) => {
   if (!userId) return res.status(400).json({ error: 'userId required' })
 
   try {
-    const url = sm.getUrl(userId) || ''
+    const session = sm.getSession(userId)
+    if (!session) {
+      return res.json({ loggedIn: false, message: 'Session expired or not started. Please try again.' })
+    }
+
+    let url = ''
+    try { url = sm.getUrl(userId) || '' } catch { /* session gone */ }
     const pageText = await sm.getPageText(userId).catch(() => '')
 
     // Check login success: on dashboard (ains.moe.gov.my) and no login page
@@ -110,7 +119,8 @@ router.get('/check-login-status', async (req, res) => {
     }
 
     // Still waiting or error
-    const screenshot = await sm.getScreenshot(userId)
+    let screenshot = null
+    try { screenshot = await sm.getScreenshot(userId) } catch { /* session gone */ }
     res.json({
       loggedIn: false,
       message: isLoggedIn ? 'Login detected, saving...' : hasError ? 'Login error detected' : 'Waiting for login...',
