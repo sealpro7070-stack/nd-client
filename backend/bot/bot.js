@@ -21,7 +21,7 @@ async function startBot(userId, directCookie, directSsUser, directSsProfile, dir
 
   if (userErr || !user) throw new Error(`User not found: ${userId}`)
   if (!user.is_active) throw new Error('Account not activated')
-  if (!user.ains_username_encrypted) throw new Error('No AINS credentials saved. Enter them on the dashboard.')
+  if (!user.ains_cookie_encrypted) throw new Error('No AINS session saved. Use "Connect AINS Account" on the dashboard to log in.')
 
   console.log(`[bot] User: ${user.email}`)
 
@@ -43,14 +43,13 @@ async function startBot(userId, directCookie, directSsUser, directSsProfile, dir
 
   console.log(`[bot] Settings: ${userSettings.books_per_month} books/month, language=${userSettings.language}`)
 
-  // 3. Decrypt AINS credentials
-  let username, password
+  // 3. Decrypt AINS session cookie
+  let cookie
   try {
-    username = decrypt(user.ains_username_encrypted)
-    password = decrypt(user.ains_password_encrypted)
-    console.log(`[bot] Credentials decrypted for: ${username.substring(0, 4)}****`)
+    cookie = decrypt(user.ains_cookie_encrypted)
+    console.log(`[bot] Cookie decrypted: ${cookie.substring(0, 30)}...`)
   } catch (err) {
-    throw new Error(`Failed to decrypt AINS credentials: ${err.message}`)
+    throw new Error(`Failed to decrypt AINS cookie: ${err.message}`)
   }
 
   // 4. Check how many successful submissions already this month
@@ -121,12 +120,21 @@ async function startBot(userId, directCookie, directSsUser, directSsProfile, dir
 
   if (insertErr) throw new Error(`Failed to create submission records: ${insertErr.message}`)
 
-  // 7. Run the browser bot
+  // 7. Run the browser bot with injected cookie
+  // Parse cookie string back to object
+  const cookieObj = {}
+  cookie.split(';').forEach(part => {
+    const [name, value] = part.trim().split('=')
+    if (name && value) cookieObj[name] = value
+  })
+
   const result = await runBot({
     user,
     settings: userSettings,
-    username,
-    password,
+    cookie,
+    ssUser: null,
+    ssProfile: null,
+    cookies: Object.entries(cookieObj).map(([name, value]) => ({ name, value, domain: '.ains.moe.gov.my', path: '/' })),
     books: shuffled,
     submissions: insertedSubs
   })

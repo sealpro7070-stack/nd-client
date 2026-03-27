@@ -2,7 +2,7 @@ const { chromium } = require('playwright')
 const path = require('path')
 const fs = require('fs')
 const supabase = require('../lib/supabase')
-const { loginWithCredentials } = require('./login')
+const { injectSession } = require('./login')
 
 const AINS_BASE = 'https://ains.moe.gov.my'
 const SCREENSHOTS_DIR = path.join(__dirname, '..', 'screenshots')
@@ -35,9 +35,9 @@ async function launchBrowser() {
   return { browser, context }
 }
 
-async function loginAndVerify(context, username, password) {
+async function loginAndVerify(context, cookie, ssUser, ssProfile, cookies) {
   const page = await context.newPage()
-  const isLoggedIn = await loginWithCredentials(context, page, username, password)
+  const isLoggedIn = await injectSession(context, page, cookie, ssUser, ssProfile, cookies)
   return { page, isLoggedIn }
 }
 
@@ -53,23 +53,23 @@ async function takeScreenshot(page, label) {
   }
 }
 
-async function runBot({ user, settings, username, password, books, submissions }) {
+async function runBot({ user, settings, cookie, ssUser, ssProfile, cookies, books, submissions }) {
   let browser
   try {
     const launched = await launchBrowser()
     browser = launched.browser
     const context = launched.context
 
-    // Login with credentials
-    const { page, isLoggedIn } = await loginAndVerify(context, username, password)
+    // Inject session (use captured cookie)
+    const { page, isLoggedIn } = await loginAndVerify(context, cookie, ssUser, ssProfile, cookies)
 
     if (!isLoggedIn) {
-      console.error('[bot] Login failed — wrong credentials or AINS issue')
-      await takeScreenshot(page, 'login-failed')
+      console.error('[bot] Session injection failed — cookie may have expired')
+      await takeScreenshot(page, 'session-failed')
 
-      await markSubmissions(submissions.map(s => s.id), 'failed', 'Login failed. Check your AINS credentials in Settings.')
+      await markSubmissions(submissions.map(s => s.id), 'failed', 'AINS session expired. Please reconnect in Settings.')
       await browser.close()
-      return { success: false, reason: 'login_failed' }
+      return { success: false, reason: 'session_expired' }
     }
 
     console.log(`[bot] Logged in. Starting ${books.length} submission(s) for ${user.email}`)

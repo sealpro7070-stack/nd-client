@@ -14,10 +14,10 @@ router.post('/', async (req, res) => {
   }
 
   // Quick pre-checks before launching browser
-  const { data: user } = await supabase.from('users').select('is_active, ains_username_encrypted, email').eq('id', userId).single()
+  const { data: user } = await supabase.from('users').select('is_active, ains_cookie_encrypted, email').eq('id', userId).single()
   if (!user) return res.status(404).json({ error: 'User not found' })
   if (!user.is_active) return res.status(403).json({ error: 'Account not activated. Please subscribe.' })
-  if (!user.ains_username_encrypted) return res.status(400).json({ error: 'No AINS credentials saved. Enter them on the dashboard first.' })
+  if (!user.ains_cookie_encrypted) return res.status(400).json({ error: 'No AINS session saved. Use "Connect AINS Account" on the dashboard.' })
 
   const countNum = count ? parseInt(count) : null
 
@@ -35,8 +35,8 @@ router.post('/', async (req, res) => {
   try {
     const result = await startBot(userId, null, null, null, null, countNum)
     clearTimeout(timeout)
-    if (result?.success === false && result?.reason === 'login_failed') {
-      respond({ success: false, error: 'AINS login failed. Your IC number or DELIMa password is incorrect. Update them in Settings.' })
+    if (result?.success === false && result?.reason === 'session_expired') {
+      respond({ success: false, error: 'AINS session expired. Please reconnect using "Connect AINS Account" on the dashboard.' })
     } else if (result?.skipped) {
       respond({ success: true, message: `Already submitted this month's quota. Nothing to do!` })
     } else {
