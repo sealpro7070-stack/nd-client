@@ -83,22 +83,51 @@ async function injectSession(context, page, token, ssUser, ssProfile, cookies = 
     ).catch(() => console.warn('[login] AINS did not auto-set token — checking page state anyway'))
   }
 
-  await page.waitForTimeout(2000)
+  // 5. Wait for Vue SPA to fully mount and render.
+  //    2s was too short — Vue needs time to: read sessionStorage → validate token →
+  //    call refresh API if expired → re-render dashboard. 5s covers slow Railway cold starts.
+  await page.waitForTimeout(5000)
 
-  // 5. Debug screenshot
+  // 5a. Also try to wait for Vue router to navigate away from the base URL.
+  //     Logged-in users land at /home (or similar). This resolves faster than a fixed wait
+  //     when the session is healthy, without racing against a slow render.
+  await page.waitForFunction(
+    () => window.location.pathname !== '/',
+    { timeout: 8000 }
+  ).catch(() => {
+    // Timed out — page stayed at '/'. Could be login redirect or just slow Vue boot.
+    // Fall through to text check.
+  })
+
+  // 6. Debug screenshot
   await page.screenshot({ path: path.join(SCREENSHOTS_DIR, `debug-login-${Date.now()}.png`), fullPage: true }).catch(() => {})
 
-  // 6. Check login status
-  const url = page.url()
-  const pageText = await page.textContent('body').catch(() => '')
-  const onLoginPage = /Log masuk dengan akaun DELIMa|Sign in with DELIMa/i.test(pageText)
-  const hasAuthError = /No Authorization|Tiada Kebenaran/i.test(pageText)
-  const isLoggedIn = !onLoginPage && !hasAuthError
+  // 7. Check login status
+  const checkStatus = async () => {
+    const url = page.url()
+    const pageText = await page.textContent('body').catch(() => '')
+    const onLoginPage = /Log masuk dengan akaun DELIMa|Sign in with DELIMa/i.test(pageText)
+    const hasAuthError = /No Authorization|Tiada Kebenaran/i.test(pageText)
+    // Also treat Microsoft login redirect as not logged in
+    const onMicrosoft = url.includes('login.microsoftonline.com') || url.includes('login.microsoft.com')
+    return { url, onLoginPage, hasAuthError, onMicrosoft, isLoggedIn: !onLoginPage && !hasAuthError && !onMicrosoft }
+  }
 
-  console.log(`[login] URL: ${url}`)
-  console.log(`[login] Result: ${isLoggedIn ? 'LOGGED IN' : 'FAILED'} (loginPage=${onLoginPage}, authError=${hasAuthError})`)
+  let status = await checkStatus()
+  console.log(`[login] URL: ${status.url}`)
+  console.log(`[login] First check: ${status.isLoggedIn ? 'LOGGED IN' : 'FAILED'} (loginPage=${status.onLoginPage}, authError=${status.hasAuthError}, ms=${status.onMicrosoft})`)
 
-  return isLoggedIn
+  // 8. Retry once — if still failing, wait another 5s and check again.
+  //    This handles the case where the token was injected but the refresh API call
+  //    hasn't completed yet (common on first run after Railway restart).
+  if (!status.isLoggedIn) {
+    console.log('[login] Retrying after 5s...')
+    await page.waitForTimeout(5000)
+    status = await checkStatus()
+    console.log(`[login] Retry check: ${status.isLoggedIn ? 'LOGGED IN' : 'FAILED'} (loginPage=${status.onLoginPage}, authError=${status.hasAuthError}, ms=${status.onMicrosoft})`)
+  }
+
+  return status.isLoggedIn
 }
 
 /**
