@@ -121,8 +121,8 @@ async function performLogin(userId, email, password, onStatus) {
 
       console.log(`[login] On login page (${page.url()}), clicking DELIMa button`)
 
-      // Give the Vue app time to hydrate
-      await page.waitForTimeout(2000)
+      // Wait for the Vue app to render the login button instead of a fixed sleep
+      await page.waitForSelector('a, button', { timeout: 8000 }).catch(() => {})
 
       // Click whichever button/link triggers the Microsoft OAuth redirect
       const clicked = await page.evaluate(() => {
@@ -184,8 +184,8 @@ async function performLogin(userId, email, password, onStatus) {
 
     console.log(`[login] Credentials submitted (${isGoogle ? 'Google' : 'Microsoft'}), checking for MFA challenge`)
 
-    // Wait for the MFA challenge page to fully render (number matching needs DOM ready)
-    await page.waitForTimeout(5000)
+    // Wait for MFA page to render — use a short fixed wait then check URL
+    await page.waitForTimeout(2000)
 
     // Detect number-matching challenge — both Google and Microsoft can show a
     // 2-digit number on screen that the user must tap on their phone to confirm.
@@ -239,32 +239,35 @@ async function performLogin(userId, email, password, onStatus) {
       console.log(`[login] Landed on AINS: ${page.url()}`)
     }
 
-    // Wait for page to fully load so the Vue app can initialise sessionStorage
-    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {})
-
-    // Retry loop: Google OAuth sometimes takes extra redirects and API calls before
-    // the Vue app finishes setting jb-app-token in sessionStorage. Retry up to 6×5s.
+    // Wait for the Vue app to set jb-app-token in sessionStorage.
+    // Use waitForFunction (polls every 300ms) instead of a fixed sleep loop — fires
+    // the instant the token appears, saving up to 25 seconds in the worst case.
     const getAny = (key) => page.evaluate(
       (k) => sessionStorage.getItem(k) || localStorage.getItem(k), key
     ).catch(() => null)
 
-    let ssToken = null
-    for (let attempt = 1; attempt <= 6; attempt++) {
-      ssToken = await getAny('jb-app-token')
-      const storageKeys = await page.evaluate(() => ({
-        url: window.location.href,
-        ss: Object.keys(sessionStorage),
-      })).catch(() => ({ url: 'unknown', ss: [] }))
-      console.log(`[login] Attempt ${attempt}: ssToken=${!!ssToken}, url=${storageKeys.url}, ssKeys=${storageKeys.ss.join(',')}`)
-      if (ssToken) break
-      if (attempt < 6) await page.waitForTimeout(5000)
-    }
+    console.log('[login] Waiting for jb-app-token in sessionStorage...')
+    await page.waitForFunction(
+      () => !!(sessionStorage.getItem('jb-app-token') || localStorage.getItem('jb-app-token')),
+      { timeout: 20000, polling: 300 }
+    ).catch(() => {})
 
-    // If still nothing, try navigating to root to re-trigger Vue router initialisation
+    let ssToken = await getAny('jb-app-token')
+    const storageInfo = await page.evaluate(() => ({
+      url: window.location.href,
+      ss: Object.keys(sessionStorage),
+    })).catch(() => ({ url: 'unknown', ss: [] }))
+    console.log(`[login] After token wait: ssToken=${!!ssToken}, url=${storageInfo.url}, ssKeys=${storageInfo.ss.join(',')}`)
+
+    // If still nothing, re-navigate to AINS root to re-trigger Vue router
     if (!ssToken) {
-      console.warn('[login] jb-app-token still null — re-navigating to AINS root to trigger router')
-      await page.goto(AINS_URL, { waitUntil: 'networkidle', timeout: 20000 }).catch(() => {})
-      await page.waitForTimeout(5000)
+      console.warn('[login] jb-app-token still null — re-navigating to AINS root')
+      await page.goto(AINS_URL, { waitUntil: 'domcontentloaded', timeout: 20000 }).catch(() => {})
+      // Wait up to 8s for the token after re-navigation
+      await page.waitForFunction(
+        () => !!(sessionStorage.getItem('jb-app-token') || localStorage.getItem('jb-app-token')),
+        { timeout: 8000, polling: 300 }
+      ).catch(() => {})
       ssToken = await getAny('jb-app-token')
       console.log(`[login] After re-navigate: ssToken=${!!ssToken}`)
     }
