@@ -32,7 +32,7 @@ function decrypt(ciphertext) {
   const encrypted = Buffer.from(encryptedHex, 'hex')
   const decipher = crypto.createDecipheriv(ALGORITHM, key, iv)
   decipher.setAuthTag(tag)
-  return decipher.update(encrypted) + decipher.final('utf8')
+  return decipher.update(encrypted, undefined, 'utf8') + decipher.final('utf8')
 }
 
 module.exports = { encrypt, decrypt }

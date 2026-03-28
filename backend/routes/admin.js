@@ -14,15 +14,8 @@ async function requireAdmin(req, res, next) {
   if (!token) return res.status(401).json({ error: 'No token provided' })
 
   try {
-    // Decode JWT payload (middle segment, base64url)
-    const payload = JSON.parse(
-      Buffer.from(token.split('.')[1], 'base64url').toString('utf8')
-    )
-    const userId = payload.sub
-    if (!userId) return res.status(401).json({ error: 'Invalid token' })
-
-    // Look up the real user via service role admin API
-    const { data: { user }, error } = await supabase.auth.admin.getUserById(userId)
+    // Verify the JWT signature via Supabase — same pattern as requireAuth
+    const { data: { user }, error } = await supabase.auth.getUser(token)
     if (error || !user) return res.status(401).json({ error: 'Invalid token' })
     if (user.email !== ADMIN_EMAIL) return res.status(403).json({ error: 'Access denied' })
 

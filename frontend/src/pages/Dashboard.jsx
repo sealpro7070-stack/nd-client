@@ -42,18 +42,20 @@ export default function Dashboard() {
         if (!user) { setLoading(false); return }
         setUser(user)
 
+        const token = await getToken()
+
         // Ensure user row exists in backend — handles Google OAuth logins
         // that bypass Landing.jsx's register call. Safe to call every time (upsert).
         fetch(`${BACKEND}/api/auth/register`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
           body: JSON.stringify({ id: user.id, email: user.email }),
         }).catch(() => {})
 
         const [sRes, stRes, rRes] = await Promise.allSettled([
-          fetch(`${BACKEND}/api/settings?userId=${user.id}`),
-          fetch(`${BACKEND}/api/history/stats?userId=${user.id}`),
-          fetch(`${BACKEND}/api/history?userId=${user.id}&limit=5`),
+          fetch(`${BACKEND}/api/settings`, { headers: { 'Authorization': `Bearer ${token}` } }),
+          fetch(`${BACKEND}/api/history/stats`, { headers: { 'Authorization': `Bearer ${token}` } }),
+          fetch(`${BACKEND}/api/history?limit=5`, { headers: { 'Authorization': `Bearer ${token}` } }),
         ])
 
         if (sRes.status === 'fulfilled' && sRes.value.ok) {
@@ -118,8 +120,8 @@ export default function Dashboard() {
       const token = await getToken()
       await fetch(`${BACKEND}/api/settings`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, language: apiLang, books_per_month: count }),
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ language: apiLang, books_per_month: count }),
       })
       const res  = await fetch(`${BACKEND}/api/trigger`, {
         method: 'POST',
@@ -149,9 +151,7 @@ export default function Dashboard() {
     const { data: ud } = await supabase
       .from('users').select('ains_cookie_encrypted').eq('id', user.id).single()
     setCredsStatus(ud?.ains_cookie_encrypted ? 'saved' : 'none')
-    if (ud?.ains_cookie_encrypted) {
-      await doTrigger(user.id, LANG_MAP[lang] || lang, bookCount)
-    }
+    // Don't auto-trigger after connect — user should initiate submission explicitly
   }
 
   // ── Family slot helpers ─────────────────────────

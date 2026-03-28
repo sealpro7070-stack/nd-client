@@ -71,6 +71,7 @@ export default function UpgradeModal({ isOpen, onClose, currentPlan }) {
     setError('')
     try {
       const { data: { session } } = await supabase.auth.getSession()
+      if (!session) throw new Error('You must be logged in to upgrade.')
       const res = await fetch(`${BACKEND}/api/payments/request`, {
         method: 'POST',
         headers: {

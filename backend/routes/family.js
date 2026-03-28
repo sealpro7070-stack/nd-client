@@ -11,11 +11,16 @@ const router   = express.Router()
 const crypto   = require('crypto')
 const supabase = require('../lib/supabase')
 const { encrypt, decrypt } = require('../lib/crypto')
-const { requireAuth } = require('../lib/auth-middleware')
+const { requireAuth, checkRateLimit } = require('../lib/auth-middleware')
 const sm       = require('../lib/session-manager')
 const { startBotForSlot } = require('../bot/bot')
 
-const MAX_SLOTS = 3
+const MAX_SLOTS       = 3
+const MAX_SLOT_NAME   = 100
+const VALID_LANGUAGES = ['Melayu', 'Inggeris', 'Cina', 'Tamil']
+
+// In-memory status store for slot connection flows (mirrors auth.js loginState pattern)
+const slotConnectState = {}
 
 // Guard: must have an active family plan
 async function requireFamily(req, res, next) {
@@ -33,7 +38,6 @@ async function requireFamily(req, res, next) {
 }
 
 // ── GET /api/family/slots
-// List all family slots for the current user
 router.get('/slots', requireAuth, requireFamily, async (req, res) => {
   const { data, error } = await supabase
     .from('family_slots')
@@ -43,7 +47,6 @@ router.get('/slots', requireAuth, requireFamily, async (req, res) => {
 
   if (error) return res.status(500).json({ error: error.message })
 
-  // Decrypt email for display (masked)
   const slots = (data || []).map(s => {
     let email = null
     if (s.ains_email_encrypted) {
@@ -64,15 +67,14 @@ router.get('/slots', requireAuth, requireFamily, async (req, res) => {
 })
 
 // ── POST /api/family/slots
-// Add a new slot (max 3)
 // Body: { slot_name }
 router.post('/slots', requireAuth, requireFamily, async (req, res) => {
   const userId = req.authUser.id
   const { slot_name } = req.body
 
   if (!slot_name?.trim()) return res.status(400).json({ error: 'slot_name is required' })
+  if (slot_name.trim().length > MAX_SLOT_NAME) return res.status(400).json({ error: `slot_name must be ${MAX_SLOT_NAME} characters or fewer` })
 
-  // Count existing slots
   const { count } = await supabase
     .from('family_slots')
     .select('id', { count: 'exact', head: true })
@@ -109,12 +111,19 @@ router.delete('/slots/:slotId', requireAuth, requireFamily, async (req, res) => 
 })
 
 // ── PATCH /api/family/slots/:slotId/settings
-// Update slot language + books_per_month
 router.patch('/slots/:slotId/settings', requireAuth, requireFamily, async (req, res) => {
   const { language, books_per_month } = req.body
   const updates = {}
-  if (language) updates.language = language
-  if (books_per_month) updates.books_per_month = Math.min(15, Math.max(1, parseInt(books_per_month)))
+
+  if (language !== undefined) {
+    if (!VALID_LANGUAGES.includes(language)) {
+      return res.status(400).json({ error: `language must be one of: ${VALID_LANGUAGES.join(', ')}` })
+    }
+    updates.language = language
+  }
+  if (books_per_month !== undefined) {
+    updates.books_per_month = Math.min(15, Math.max(1, parseInt(books_per_month) || 1))
+  }
 
   const { error } = await supabase
     .from('family_slots')
@@ -136,6 +145,11 @@ router.post('/slots/:slotId/connect', requireAuth, requireFamily, async (req, re
 
   if (!email || !password) return res.status(400).json({ error: 'email and password required' })
 
+  // Rate limit: max 5 connection attempts per user per hour
+  if (!checkRateLimit(`slot-connect:${userId}`)) {
+    return res.status(429).json({ error: 'Too many connection attempts. Please wait before trying again.' })
+  }
+
   // Verify slot belongs to user
   const { data: slot } = await supabase
     .from('family_slots')
@@ -146,15 +160,20 @@ router.post('/slots/:slotId/connect', requireAuth, requireFamily, async (req, re
 
   if (!slot) return res.status(404).json({ error: 'Slot not found' })
 
+  const stateKey = `${userId}:${slotId}`
+
   // Use a composite key for session manager so it doesn't conflict with parent session
   const sessionKey = `${userId}__slot__${slotId}`
 
+  slotConnectState[stateKey] = { status: 'connecting' }
   res.json({ status: 'connecting' })
 
   ;(async () => {
     try {
       const { ssToken, ssUser, ssProfile, cookies } = await sm.performLogin(
-        sessionKey, email, password, () => {}
+        sessionKey, email, password, (status) => {
+          slotConnectState[stateKey] = { status }
+        }
       )
 
       // Check uniqueness: this AINS account must not be linked elsewhere
@@ -165,7 +184,6 @@ router.post('/slots/:slotId/connect', requireAuth, requireFamily, async (req, re
           if (ainsId) {
             const hash = crypto.createHash('sha256').update(String(ainsId)).digest('hex')
 
-            // Check against main users table
             const { data: userConflict } = await supabase
               .from('users')
               .select('id')
@@ -173,7 +191,6 @@ router.post('/slots/:slotId/connect', requireAuth, requireFamily, async (req, re
               .neq('id', userId)
               .maybeSingle()
 
-            // Check against other family slots
             const { data: slotConflict } = await supabase
               .from('family_slots')
               .select('id')
@@ -182,7 +199,10 @@ router.post('/slots/:slotId/connect', requireAuth, requireFamily, async (req, re
               .maybeSingle()
 
             if (userConflict || slotConflict) {
-              console.error('[family] AINS account already linked elsewhere')
+              slotConnectState[stateKey] = {
+                status: 'error',
+                message: 'This AINS account is already linked to another Nilam Auto account or slot.'
+              }
               return
             }
 
@@ -194,22 +214,34 @@ router.post('/slots/:slotId/connect', requireAuth, requireFamily, async (req, re
       }
 
       const sessionData = JSON.stringify({ ssToken, ssUser, ssProfile, cookies })
-      const { encrypt: enc } = require('../lib/crypto')
       await supabase.from('family_slots').update({
-        ains_cookie_encrypted: enc(sessionData),
-        ains_email_encrypted:  enc(email),
+        ains_cookie_encrypted: encrypt(sessionData),
+        ains_email_encrypted:  encrypt(email),
       }).eq('id', slotId)
 
+      slotConnectState[stateKey] = { status: 'success' }
       console.log(`[family] Slot ${slotId} connected successfully`)
     } catch (err) {
       console.error(`[family] Slot connect failed: ${err.message}`)
+      slotConnectState[stateKey] = { status: 'error', message: err.message }
     }
   })()
 })
 
 // ── GET /api/family/slots/:slotId/connect-status
-// Polls session cookie presence (simple: connected = has encrypted cookie)
 router.get('/slots/:slotId/connect-status', requireAuth, requireFamily, async (req, res) => {
+  const stateKey = `${req.authUser.id}:${req.params.slotId}`
+  const state = slotConnectState[stateKey]
+
+  if (state) {
+    // Clear terminal states so they're only returned once
+    if (state.status === 'success' || state.status === 'error') {
+      delete slotConnectState[stateKey]
+    }
+    return res.json(state)
+  }
+
+  // Fallback: check DB cookie presence
   const { data } = await supabase
     .from('family_slots')
     .select('ains_cookie_encrypted')
@@ -217,11 +249,10 @@ router.get('/slots/:slotId/connect-status', requireAuth, requireFamily, async (r
     .eq('user_id', req.authUser.id)
     .single()
 
-  res.json({ connected: !!data?.ains_cookie_encrypted })
+  res.json({ status: data?.ains_cookie_encrypted ? 'success' : 'idle' })
 })
 
 // ── POST /api/family/slots/:slotId/trigger
-// Trigger book submission for a specific family slot
 router.post('/slots/:slotId/trigger', requireAuth, requireFamily, async (req, res) => {
   const { slotId } = req.params
   const userId = req.authUser.id

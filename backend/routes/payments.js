@@ -31,17 +31,16 @@ function requireAdmin(req, res, next) {
 router.get('/my-plan', requireAuth, async (req, res) => {
   const { data, error } = await supabase
     .from('users')
-    .select('plan, plan_expires_at')
+    .select('plan, plan_expires_at, is_active')
     .eq('id', req.authUser.id)
     .single()
 
   if (error) return res.status(500).json({ error: error.message })
+  const planExpired = data.plan_expires_at && new Date(data.plan_expires_at) < new Date()
   res.json({
     plan: data.plan || 'free',
     plan_expires_at: data.plan_expires_at || null,
-    is_active: data.plan !== 'free'
-      ? (!data.plan_expires_at || new Date(data.plan_expires_at) > new Date())
-      : null,
+    is_active: data.is_active && data.plan !== 'free' && !planExpired,
   })
 })
 
@@ -139,7 +138,7 @@ router.post('/admin/review', requireAuth, requireAdmin, async (req, res) => {
     return res.status(400).json({ error: 'requestId and action (approve|reject) required' })
   }
 
-  // Fetch the request
+  // Fetch the request (verify it exists)
   const { data: pr, error: prErr } = await supabase
     .from('payment_requests')
     .select('*')
@@ -147,12 +146,9 @@ router.post('/admin/review', requireAuth, requireAdmin, async (req, res) => {
     .single()
 
   if (prErr || !pr) return res.status(404).json({ error: 'Payment request not found' })
-  if (pr.status !== 'pending') {
-    return res.status(409).json({ error: `Request is already ${pr.status}` })
-  }
 
-  // Update request status
-  const { error: updateErr } = await supabase
+  // Atomic update: only succeeds if status is still 'pending' — prevents double-approval
+  const { data: updated, error: updateErr } = await supabase
     .from('payment_requests')
     .update({
       status:      action === 'approve' ? 'approved' : 'rejected',
@@ -160,8 +156,11 @@ router.post('/admin/review', requireAuth, requireAdmin, async (req, res) => {
       reviewed_by: req.authUser.email,
     })
     .eq('id', requestId)
+    .eq('status', 'pending')
+    .select()
 
   if (updateErr) return res.status(500).json({ error: updateErr.message })
+  if (!updated?.length) return res.status(409).json({ error: `Request has already been processed` })
 
   // If approved: update user's plan
   if (action === 'approve') {
@@ -186,11 +185,9 @@ router.post('/admin/review', requireAuth, requireAdmin, async (req, res) => {
 // ── POST /api/payments/webhook
 // Placeholder for future Lemon Squeezy webhook integration
 // Set LEMONSQUEEZY_WEBHOOK_SECRET in Railway env when ready
-router.post('/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
-  // TODO: verify X-Signature-256 header with LEMONSQUEEZY_WEBHOOK_SECRET
-  // TODO: parse event type and update user plan on 'order_created' / 'subscription_created'
-  console.log('[payments] Webhook received (not yet configured)')
-  res.json({ received: true })
+// NOTE: returns 501 until signature verification is implemented — prevents unauthorized plan grants
+router.post('/webhook', express.raw({ type: 'application/json' }), (req, res) => {
+  res.status(501).json({ error: 'Webhook not yet configured. Set LEMONSQUEEZY_WEBHOOK_SECRET to enable.' })
 })
 
 module.exports = router

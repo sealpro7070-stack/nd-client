@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import ConnectAINSModal from '../components/ConnectAINSModal'
 
-const ADMIN_EMAIL = 'm-10603978@moe-dl.edu.my'
+const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL || ''
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001'
 
 export default function Admin() {
@@ -33,8 +33,9 @@ export default function Admin() {
   async function fetchUsers(tok) {
     setLoading(true); setError(null)
     try {
+      const freshToken = tok || (await supabase.auth.getSession()).data.session?.access_token || token
       const res = await fetch(`${BACKEND_URL}/api/admin/users`, {
-        headers: { Authorization: `Bearer ${tok || token}` }
+        headers: { Authorization: `Bearer ${freshToken}` }
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)

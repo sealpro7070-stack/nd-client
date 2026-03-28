@@ -9,7 +9,53 @@ const supabase = require('../lib/supabase')
 const { decrypt } = require('../lib/crypto')
 const { runBot } = require('./browser')
 
+// Plan limits — single source of truth
+const PLAN_MAX = { free: 1, plus: 15, family: 15 }
+
+// Per-user/slot lock: prevents simultaneous bot runs for the same user
+const activeBotRuns = new Map()
+
+async function withLock(key, fn) {
+  // Wait for any existing run on this key to finish
+  while (activeBotRuns.has(key)) {
+    try { await activeBotRuns.get(key) } catch { /* ignore errors from previous run */ }
+  }
+  let resolve
+  const promise = new Promise(r => { resolve = r })
+  activeBotRuns.set(key, promise)
+  try {
+    return await fn()
+  } finally {
+    activeBotRuns.delete(key)
+    resolve()
+  }
+}
+
+// Returns Monday 00:00:00.000 of the current ISO week (Malaysia is UTC+8)
+function getWeekStart() {
+  const now = new Date()
+  const day = now.getDay()           // 0 = Sunday, 1 = Monday … 6 = Saturday
+  const monday = new Date(now)
+  monday.setDate(now.getDate() - ((day + 6) % 7))
+  monday.setHours(0, 0, 0, 0)
+  return monday
+}
+
+// Fisher-Yates shuffle — unbiased, unlike sort(() => Math.random() - 0.5)
+function fisherYates(arr) {
+  const a = [...arr]
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]]
+  }
+  return a
+}
+
 async function startBot(userId, directCookie, directSsUser, directSsProfile, directCookies, overrideCount) {
+  return withLock(userId, () => _startBot(userId, directCookie, directSsUser, directSsProfile, directCookies, overrideCount))
+}
+
+async function _startBot(userId, directCookie, directSsUser, directSsProfile, directCookies, overrideCount) {
   console.log(`\n[bot] Starting for userId: ${userId}${directCookie ? ' (direct cookie)' : ''}`)
 
   // 1. Fetch user
@@ -25,14 +71,18 @@ async function startBot(userId, directCookie, directSsUser, directSsProfile, dir
 
   console.log(`[bot] User: ${user.email}`)
 
+  // Derive plan limits from the user row (bot is the final authority — not the route layer)
+  const planExpired = user.plan_expires_at && new Date(user.plan_expires_at) < new Date()
+  const activePlan  = planExpired ? 'free' : (user.plan || 'free')
+  const maxAllowed  = PLAN_MAX[activePlan] ?? 1
+
   // 2. Fetch settings
   const { data: settings } = await supabase
     .from('settings')
     .select('*')
     .eq('user_id', userId)
-    .single()
+    .maybeSingle()
 
-  // Use defaults if no settings row yet
   const userSettings = settings || {
     books_per_month: 4,
     language: 'Melayu',
@@ -41,7 +91,7 @@ async function startBot(userId, directCookie, directSsUser, directSsProfile, dir
     schedule_day: 15
   }
 
-  console.log(`[bot] Settings: ${userSettings.books_per_month} books/month, language=${userSettings.language}`)
+  console.log(`[bot] Settings: ${userSettings.books_per_month} books/month, language=${userSettings.language}, plan=${activePlan} (max=${maxAllowed})`)
 
   // 3. Decrypt and parse AINS session data
   let ssToken = null, ssUser = null, ssProfile = null, cookiesToInject = []
@@ -73,43 +123,59 @@ async function startBot(userId, directCookie, directSsUser, directSsProfile, dir
   }
 
   if (!ssToken) {
-    // ssToken may be null if AINS hadn't set sessionStorage yet at capture time.
-    // Proceed with cookies only — AINS may auto-refresh via its refresh-token cookie.
     console.warn('[bot] ssToken is null — attempting cookie-only session injection')
   }
 
-  // 4. Check how many successful submissions already this month
-  const now = new Date()
+  // 4. Check submissions for the current period
+  // Free plan  → 1 book per WEEK  (Monday 00:00 – Sunday 23:59 MYT)
+  // Plus/Family → 15 books per MONTH
+  const now   = new Date()
   const month = now.getMonth() + 1
-  const year = now.getFullYear()
+  const year  = now.getFullYear()
+  const isFree = activePlan === 'free'
+  const periodLabel = isFree ? 'this week' : 'this month'
 
-  const { data: existing } = await supabase
+  let existingQuery = supabase
     .from('submissions')
     .select('book_id')
     .eq('user_id', userId)
-    .eq('month', month)
-    .eq('year', year)
-    .eq('status', 'success')
+    .in('status', ['success', 'pending'])
 
-  const alreadySubmitted = existing || []
-  const alreadyBookIds = alreadySubmitted.map(s => s.book_id)
-
-  // overrideCount = user explicitly chose "submit N books now" from the dashboard
-  // Without override, use quota logic
-  let needed
-  if (overrideCount && overrideCount > 0) {
-    needed = overrideCount
-    console.log(`[bot] Manual override: submitting ${needed} book(s) now (${alreadySubmitted.length} already done this month)`)
+  if (isFree) {
+    // Weekly window: Monday 00:00:00 to now
+    existingQuery = existingQuery.gte('created_at', getWeekStart().toISOString())
   } else {
-    needed = userSettings.books_per_month - alreadySubmitted.length
-    if (needed <= 0) {
-      console.log(`[bot] Already submitted ${alreadySubmitted.length}/${userSettings.books_per_month} books this month. Nothing to do.`)
-      return { success: true, skipped: true, reason: 'already_complete' }
-    }
-    console.log(`[bot] Need ${needed} more book(s) to reach monthly quota`)
+    existingQuery = existingQuery.eq('month', month).eq('year', year)
   }
 
-  // 5. Pick books: matching language, not previously submitted this month
+  const { data: existing } = await existingQuery
+
+  const alreadySubmitted = existing || []
+  const alreadyBookIds   = alreadySubmitted.map(s => s.book_id)
+
+  // 5. Determine how many books to submit — enforce plan limit in the bot itself
+  let needed
+  if (overrideCount && overrideCount > 0) {
+    // overrideCount must not allow exceeding the remaining period allowance
+    needed = Math.min(overrideCount, maxAllowed - alreadySubmitted.length)
+    console.log(`[bot] Manual override: requested ${overrideCount}, allowed ${needed} (${alreadySubmitted.length}/${maxAllowed} already done ${periodLabel})`)
+  } else {
+    // Quota mode: free uses weekly max (1), paid uses books_per_month capped at plan max
+    const periodTarget = isFree ? maxAllowed : Math.min(userSettings.books_per_month, maxAllowed)
+    needed = periodTarget - alreadySubmitted.length
+    if (needed <= 0) {
+      console.log(`[bot] Already submitted ${alreadySubmitted.length}/${maxAllowed} books ${periodLabel}. Nothing to do.`)
+      return { success: true, skipped: true, reason: 'already_complete' }
+    }
+    console.log(`[bot] Need ${needed} more book(s) to reach ${isFree ? 'weekly' : 'monthly'} quota (${alreadySubmitted.length}/${periodTarget} done)`)
+  }
+
+  if (needed <= 0) {
+    console.log(`[bot] ${isFree ? 'Weekly' : 'Monthly'} quota already met. Nothing to do.`)
+    return { success: true, skipped: true, reason: 'already_complete' }
+  }
+
+  // 6. Pick books: matching language, excluding already submitted this month
   let booksQuery = supabase
     .from('books')
     .select('*')
@@ -119,18 +185,17 @@ async function startBot(userId, directCookie, directSsUser, directSsProfile, dir
     booksQuery = booksQuery.not('id', 'in', `(${alreadyBookIds.join(',')})`)
   }
 
-  const { data: availableBooks, error: booksErr } = await booksQuery.limit(100)
+  const { data: availableBooks, error: booksErr } = await booksQuery.limit(200)
 
   if (booksErr) throw new Error(`Failed to fetch books: ${booksErr.message}`)
   if (!availableBooks || availableBooks.length === 0) {
     throw new Error(`No ${userSettings.language} books available. Please add more books to the seed data.`)
   }
 
-  // Shuffle and pick needed count
-  const shuffled = availableBooks.sort(() => 0.5 - Math.random()).slice(0, needed)
+  const shuffled = fisherYates(availableBooks).slice(0, needed)
   console.log(`[bot] Selected ${shuffled.length} book(s):`, shuffled.map(b => b.title))
 
-  // 6. Create pending submission records
+  // 7. Create pending submission records
   const submissionRows = shuffled.map(book => ({
     user_id: userId,
     book_id: book.id,
@@ -145,8 +210,9 @@ async function startBot(userId, directCookie, directSsUser, directSsProfile, dir
     .select()
 
   if (insertErr) throw new Error(`Failed to create submission records: ${insertErr.message}`)
+  if (!insertedSubs) throw new Error('Failed to create submission records: no data returned')
 
-  // 7. Run the browser bot with injected session
+  // 8. Run the browser bot with injected session
   const result = await runBot({
     user,
     settings: userSettings,
@@ -165,16 +231,41 @@ async function startBot(userId, directCookie, directSsUser, directSsProfile, dir
  * startBotForSlot — Run the bot for a family plan slot
  */
 async function startBotForSlot(userId, slotId, slot) {
+  return withLock(`${userId}:${slotId}`, () => _startBotForSlot(userId, slotId, slot))
+}
+
+async function _startBotForSlot(userId, slotId, slot) {
   console.log(`\n[bot] Starting for family slot ${slotId}`)
 
+  // Verify parent user is active and plan is still valid
+  const { data: user } = await supabase.from('users').select('*').eq('id', userId).single()
+  if (!user) throw new Error('Parent user not found for slot execution.')
+  if (!user.is_active) throw new Error('Parent account is not active.')
+
+  const planExpired = user.plan_expires_at && new Date(user.plan_expires_at) < new Date()
+  if (user.plan !== 'family' || planExpired) throw new Error('Family plan required or has expired.')
+
+  // Decrypt slot session — supports both new JSON format and legacy plain-cookie
   let ssToken = null, ssUser = null, ssProfile = null, cookiesToInject = []
   try {
     const raw = decrypt(slot.ains_cookie_encrypted)
-    const sessionData = JSON.parse(raw)
-    ssToken = sessionData.ssToken
-    ssUser  = sessionData.ssUser
-    ssProfile = sessionData.ssProfile
-    cookiesToInject = sessionData.cookies || []
+    try {
+      const sessionData = JSON.parse(raw)
+      ssToken = sessionData.ssToken
+      ssUser  = sessionData.ssUser
+      ssProfile = sessionData.ssProfile
+      cookiesToInject = sessionData.cookies || []
+    } catch {
+      // Legacy format
+      console.log('[bot] Slot session: legacy cookie string format detected')
+      ssToken = raw
+      cookiesToInject = raw.split(';').map(part => {
+        const trimmed = part.trim()
+        const idx = trimmed.indexOf('=')
+        if (idx === -1) return null
+        return { name: trimmed.substring(0, idx), value: trimmed.substring(idx + 1), domain: '.ains.moe.gov.my', path: '/' }
+      }).filter(Boolean)
+    }
   } catch (err) {
     throw new Error(`Failed to decrypt slot session: ${err.message}`)
   }
@@ -183,6 +274,7 @@ async function startBotForSlot(userId, slotId, slot) {
   const month = now.getMonth() + 1
   const year  = now.getFullYear()
 
+  // Include pending to prevent race condition duplicates
   const { data: existing } = await supabase
     .from('submissions')
     .select('book_id')
@@ -190,10 +282,12 @@ async function startBotForSlot(userId, slotId, slot) {
     .eq('family_slot_id', slotId)
     .eq('month', month)
     .eq('year', year)
-    .eq('status', 'success')
+    .in('status', ['success', 'pending'])
 
   const alreadyBookIds = (existing || []).map(s => s.book_id)
-  const needed = Math.min(slot.books_per_month || 4, 15) - alreadyBookIds.length
+  // Cap at plan limit (15), not a magic number
+  const slotMax  = PLAN_MAX.family
+  const needed   = Math.min(slot.books_per_month || 4, slotMax) - alreadyBookIds.length
   if (needed <= 0) return { success: true, skipped: true, reason: 'already_complete' }
 
   let booksQuery = supabase.from('books').select('*').eq('language', slot.language || 'Melayu')
@@ -201,12 +295,12 @@ async function startBotForSlot(userId, slotId, slot) {
     booksQuery = booksQuery.not('id', 'in', `(${alreadyBookIds.join(',')})`)
   }
 
-  const { data: availableBooks } = await booksQuery.limit(100)
+  const { data: availableBooks } = await booksQuery.limit(200)
   if (!availableBooks?.length) throw new Error('No books available for this slot.')
 
-  const shuffled = availableBooks.sort(() => 0.5 - Math.random()).slice(0, needed)
+  const shuffled = fisherYates(availableBooks).slice(0, needed)
 
-  const { data: insertedSubs } = await supabase
+  const { data: insertedSubs, error: insertErr } = await supabase
     .from('submissions')
     .insert(shuffled.map(book => ({
       user_id: userId, book_id: book.id, month, year,
@@ -214,21 +308,21 @@ async function startBotForSlot(userId, slotId, slot) {
     })))
     .select()
 
-  // Fetch parent user for runBot
-  const { data: user } = await supabase.from('users').select('*').eq('id', userId).single()
+  if (insertErr) throw new Error(`Failed to create slot submission records: ${insertErr.message}`)
+  if (!insertedSubs) throw new Error('Failed to create slot submission records: no data returned')
 
   const result = await runBot({
     user,
-    settings: { language: slot.language, books_per_month: slot.books_per_month },
+    settings: { language: slot.language || 'Melayu', books_per_month: slot.books_per_month || 4 },
     cookie: ssToken,
     ssUser,
     ssProfile,
     cookies: cookiesToInject,
     books: shuffled,
-    submissions: insertedSubs || [],
+    submissions: insertedSubs,
   })
 
   return result
 }
 
-module.exports = { startBot, startBotForSlot }
+module.exports = { startBot, startBotForSlot, PLAN_MAX }

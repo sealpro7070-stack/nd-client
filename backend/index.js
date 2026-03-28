@@ -16,14 +16,20 @@ require('./scheduler/cron')
 const app = express()
 const PORT = process.env.PORT || 3001
 
+const ALLOWED_ORIGINS = [
+  process.env.FRONTEND_URL,
+  'https://nilam-auto.vercel.app',
+  'http://localhost:5173',
+  'http://localhost:3000',
+].filter(Boolean)
+
 app.use(cors({
-  origin: [
-    process.env.FRONTEND_URL || 'https://nilam-auto.vercel.app',
-    'https://nilam-auto.vercel.app',
-    /\.vercel\.app$/,
-    'http://localhost:5173',
-    'http://localhost:3000',
-  ],
+  origin: (origin, callback) => {
+    // Allow requests with no origin (e.g. server-to-server, curl)
+    if (!origin) return callback(null, true)
+    if (ALLOWED_ORIGINS.includes(origin)) return callback(null, true)
+    callback(new Error('Not allowed by CORS'))
+  },
   credentials: true
 }))
 app.use(express.json())

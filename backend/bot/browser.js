@@ -128,10 +128,12 @@ async function runBot({ user, settings, cookie, ssUser, ssProfile, cookies, book
 }
 
 async function markSubmissions(ids, status, note) {
-  if (!ids.length) return
+  if (!ids || !ids.length) return
+  const update = { status }
+  if (note) update.error_message = note
   await supabase
     .from('submissions')
-    .update({ status })
+    .update(update)
     .in('id', ids)
 }
 

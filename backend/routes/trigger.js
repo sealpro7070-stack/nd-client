@@ -17,33 +17,50 @@ router.post('/', requireAuth, async (req, res) => {
   const isAdmin = req.authUser?.email === process.env.ADMIN_EMAIL
 
   // Quick pre-checks before launching browser
-  let { data: user } = await supabase
+  // Use maybeSingle() so a missing row returns null (not an error)
+  let { data: user, error: userQueryErr } = await supabase
     .from('users')
     .select('is_active, ains_cookie_encrypted, email, plan, plan_expires_at')
     .eq('id', userId)
-    .single()
+    .maybeSingle()
+
+  // Fallback: if the full select fails (e.g. migration-v2 columns not yet added),
+  // try a minimal select so we can still proceed with basic checks
+  if (userQueryErr) {
+    console.error('[trigger] DB user query error (full select):', userQueryErr.message)
+    const { data: basicUser } = await supabase
+      .from('users')
+      .select('is_active, email')
+      .eq('id', userId)
+      .maybeSingle()
+    if (basicUser) {
+      user = { ...basicUser, ains_cookie_encrypted: null, plan: null, plan_expires_at: null }
+      console.warn('[trigger] Using basic user data — run migration-v2.sql in Supabase to unlock full features')
+    }
+  }
 
   // Auto-create the user row if missing (handles Google OAuth users who bypassed registration)
+  // Use req.authUser (already JWT-verified) — no admin SDK call needed
   if (!user) {
-    const { data: authUser } = await supabase.auth.admin.getUserById(userId)
-    if (!authUser?.user) return res.status(404).json({ error: 'User not found' })
-
+    console.log(`[trigger] No public.users row for ${userId}, auto-creating...`)
     await supabase.from('users').upsert({
-      id: userId,
-      email: authUser.user.email,
-      is_active: isAdmin, // admin is active immediately, others need approval
+      id:        userId,
+      email:     req.authUser.email,
+      is_active: isAdmin,
     }, { onConflict: 'id' })
 
-    // Re-fetch after upsert
-    const { data: refetched } = await supabase
+    // Re-fetch after upsert — use maybeSingle() again
+    const { data: refetched, error: refetchErr } = await supabase
       .from('users')
       .select('is_active, ains_cookie_encrypted, email, plan, plan_expires_at')
       .eq('id', userId)
-      .single()
+      .maybeSingle()
+
+    if (refetchErr) console.error('[trigger] Re-fetch error:', refetchErr.message)
     user = refetched
   }
 
-  if (!user) return res.status(404).json({ error: 'User not found' })
+  if (!user) return res.status(500).json({ error: 'Could not load your account. Please try again or contact support.' })
   if (!user.is_active && !isAdmin) return res.status(403).json({ error: 'Account not activated. Please subscribe.' })
   if (!user.ains_cookie_encrypted) return res.status(400).json({ error: 'No AINS session saved. Use "Connect AINS Account" on the dashboard.' })
 
@@ -77,7 +94,10 @@ router.post('/', requireAuth, async (req, res) => {
     if (result?.success === false && result?.reason === 'session_expired') {
       respond({ success: false, error: 'AINS session expired. Please reconnect using "Connect AINS Account" on the dashboard.' })
     } else if (result?.skipped) {
-      respond({ success: true, message: `Already submitted this month's quota. Nothing to do!` })
+      const skipMsg = activePlan === 'free'
+        ? `Already submitted your 1 book this week. Your quota resets every Monday!`
+        : `Already submitted this month's quota. Nothing to do!`
+      respond({ success: true, message: skipMsg })
     } else {
       const done = result?.results?.filter(r => r.status === 'success').length ?? 0
       const total = result?.results?.length ?? countNum ?? '?'

@@ -107,7 +107,7 @@ router.post('/connect', requireAuth, async (req, res) => {
 
       if (error) {
         console.error('[auth] Failed to save session:', error.message)
-        loginState[userId] = { status: 'error', message: `Failed to save credentials: ${error.message}` }
+        loginState[userId] = { status: 'error', message: 'Failed to save credentials. Please try again.' }
         return
       }
 
@@ -166,29 +166,32 @@ router.get('/saved-email', requireAuth, async (req, res) => {
 
 // POST /api/auth/register
 // Body: { id, email, delima_id }
-router.post('/register', async (req, res) => {
+router.post('/register', requireAuth, async (req, res) => {
   const { id, email, delima_id } = req.body
 
   if (!id || !email) {
     return res.status(400).json({ error: 'id and email are required' })
   }
 
+  // Users can only register themselves
+  if (id !== req.authUser.id) {
+    return res.status(403).json({ error: 'Access denied' })
+  }
+
   try {
     const isAdmin = email === process.env.ADMIN_EMAIL
-    const row = { id, email, delima_id }
-    if (isAdmin) row.is_active = true // admin is always active
 
     const { data, error } = await supabase
       .from('users')
-      .upsert({ id, email, delima_id, is_active: true }, { onConflict: 'id' })
+      .upsert({ id, email, delima_id, is_active: isAdmin }, { onConflict: 'id' })
       .select()
       .single()
 
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) return res.status(500).json({ error: 'Registration failed. Please try again.' })
 
     res.json({ success: true, user: data })
-  } catch (err) {
-    res.status(500).json({ error: err.message })
+  } catch {
+    res.status(500).json({ error: 'Registration failed. Please try again.' })
   }
 })
 
