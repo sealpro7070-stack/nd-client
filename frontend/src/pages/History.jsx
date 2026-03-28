@@ -31,13 +31,22 @@ export default function History() {
     supabase.auth.getUser().then(({ data: { user } }) => setUser(user))
   }, [])
 
+  async function getToken() {
+    const { data: { session } } = await supabase.auth.getSession()
+    return session?.access_token || ''
+  }
+
   useEffect(() => {
     if (!user) return
     setLoading(true)
-    fetch(`${BACKEND}/api/history?userId=${user.id}&limit=${PAGE_SIZE}&offset=${page * PAGE_SIZE}`)
-      .then(r => r.json())
-      .then(data => { setSubmissions(data.submissions || []); setTotal(data.total || 0); setLoading(false) })
-      .catch(() => setLoading(false))
+    getToken().then(token => {
+      fetch(`${BACKEND}/api/history?userId=${user.id}&limit=${PAGE_SIZE}&offset=${page * PAGE_SIZE}`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      })
+        .then(r => r.json())
+        .then(data => { setSubmissions(data.submissions || []); setTotal(data.total || 0); setLoading(false) })
+        .catch(() => setLoading(false))
+    })
   }, [user, page])
 
   const filtered   = filterStatus === 'all' ? submissions : submissions.filter(s => s.status === filterStatus)
@@ -61,7 +70,7 @@ export default function History() {
         {FILTERS.map(f => (
           <button
             key={f.key}
-            onClick={() => setFilterStatus(f.key)}
+            onClick={() => { setFilterStatus(f.key); setPage(0) }}
             className={`px-4 py-2 rounded-xl text-sm font-bold border transition-all duration-150 ${
               filterStatus === f.key
                 ? 'bg-brand-600 text-white border-brand-600 shadow-sm'

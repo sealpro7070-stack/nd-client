@@ -24,11 +24,13 @@ const slotConnectState = {}
 
 // Guard: must have an active family plan
 async function requireFamily(req, res, next) {
-  const { data: user } = await supabase
+  const { data: user, error: dbError } = await supabase
     .from('users')
     .select('plan, plan_expires_at')
     .eq('id', req.authUser.id)
     .single()
+
+  if (dbError) return res.status(500).json({ error: 'Could not verify plan' })
 
   const expired = user?.plan_expires_at && new Date(user.plan_expires_at) < new Date()
   if (user?.plan !== 'family' || expired) {
@@ -100,13 +102,15 @@ router.post('/slots', requireAuth, requireFamily, async (req, res) => {
 
 // ── DELETE /api/family/slots/:slotId
 router.delete('/slots/:slotId', requireAuth, requireFamily, async (req, res) => {
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('family_slots')
     .delete()
     .eq('id', req.params.slotId)
     .eq('user_id', req.authUser.id)
+    .select()
 
   if (error) return res.status(500).json({ error: error.message })
+  if (!data || data.length === 0) return res.status(404).json({ error: 'Slot not found' })
   res.json({ success: true })
 })
 

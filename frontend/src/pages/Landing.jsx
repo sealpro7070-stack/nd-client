@@ -118,8 +118,10 @@ export default function Landing() {
   // with a session in the URL hash. Detect it and send them to the dashboard.
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_IN') {
-        if (session?.user) syncUserToBackend(session.user)
+      if (event === 'SIGNED_IN' && session?.user) {
+        if (session.user.app_metadata?.provider) {
+          syncUserToBackend(session)
+        }
         navigate('/dashboard')
       }
     })

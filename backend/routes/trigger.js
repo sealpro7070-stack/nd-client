@@ -17,6 +17,11 @@ router.post('/', requireAuth, async (req, res) => {
   const isAdmin = req.authUser?.email === process.env.ADMIN_EMAIL
   const ADMIN_EMAIL = process.env.ADMIN_EMAIL
 
+  // Only admin can trigger for other users
+  if (userId !== req.authUser.id && !isAdmin) {
+    return res.status(403).json({ error: 'Access denied' })
+  }
+
   // Quick pre-checks before launching browser
   // Use maybeSingle() so a missing row returns null (not an error)
   let { data: user, error: userQueryErr } = await supabase

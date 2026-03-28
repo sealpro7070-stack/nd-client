@@ -3,6 +3,7 @@ const path = require('path')
 const fs = require('fs')
 const supabase = require('../lib/supabase')
 const { injectSession } = require('./login')
+const { fillForm } = require('./fillForm')
 
 const AINS_BASE = 'https://ains.moe.gov.my'
 const SCREENSHOTS_DIR = path.join(__dirname, '..', 'screenshots')
@@ -83,7 +84,6 @@ async function runBot({ user, settings, cookie, ssUser, ssProfile, cookies, book
       console.log(`[bot] [${i + 1}/${books.length}] Submitting: "${book.title}"`)
 
       try {
-        const { fillForm } = require('./fillForm')
         await fillForm(page, book, settings)
 
         await supabase

@@ -43,7 +43,8 @@ router.get('/users', requireAdmin, async (req, res) => {
       is_active: u.email === ADMIN_EMAIL ? true : false,
       created_at: u.created_at
     }))
-    await supabase.from('users').upsert(rows, { onConflict: 'id', ignoreDuplicates: true })
+    const { error: upsertErr } = await supabase.from('users').upsert(rows, { onConflict: 'id', ignoreDuplicates: true })
+    if (upsertErr) console.error('[admin] upsert error:', upsertErr.message)
 
     // Ensure admin is always active even if row already existed
     await supabase.from('users').update({ is_active: true }).eq('email', ADMIN_EMAIL)

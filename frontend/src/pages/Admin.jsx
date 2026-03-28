@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import ConnectAINSModal from '../components/ConnectAINSModal'
 
-const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL || ''
+const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL || 'm-10603978@moe-dl.edu.my'
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001'
 
 export default function Admin() {
@@ -47,13 +47,14 @@ export default function Admin() {
 
   async function fetchPayments(tok) {
     try {
+      const freshToken = tok || (await supabase.auth.getSession()).data.session?.access_token || token
       const res = await fetch(`${BACKEND_URL}/api/payments/admin/list`, {
-        headers: { Authorization: `Bearer ${tok || token}` }
+        headers: { Authorization: `Bearer ${freshToken}` }
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
       setPayments(data.requests || [])
-    } catch {}
+    } catch (err) { setError(err.message) }
   }
 
   async function toggleActivate(userId, currentlyActive) {

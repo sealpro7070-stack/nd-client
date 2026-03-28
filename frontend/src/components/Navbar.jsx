@@ -11,10 +11,11 @@ export default function Navbar() {
   const [userEmail, setUserEmail] = useState('')
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setIsAdmin(session?.user?.email === ADMIN_EMAIL)
       setUserEmail(session?.user?.email || '')
     })
+    return () => subscription.unsubscribe()
   }, [])
 
   async function handleLogout() {

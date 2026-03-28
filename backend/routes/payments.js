@@ -176,7 +176,11 @@ router.post('/admin/review', requireAuth, requireAdmin, async (req, res) => {
       })
       .eq('id', pr.user_id)
 
-    if (planErr) return res.status(500).json({ error: `Request approved but plan update failed: ${planErr.message}` })
+    if (planErr) {
+      // Revert the payment request back to pending
+      await supabase.from('payment_requests').update({ status: 'pending' }).eq('id', requestId)
+      return res.status(500).json({ error: 'Payment approved but plan update failed. Please retry.' })
+    }
   }
 
   res.json({ success: true, action })

@@ -49,7 +49,7 @@ export default function ConnectAINSModal({ isOpen, onClose, onSuccess, targetUse
       } else if (data.status === 'success') {
         stopPolling()
         setPhase('success')
-        setTimeout(() => { onSuccess(); onClose() }, 1500)
+        setTimeout(() => { onSuccess?.(); onClose?.() }, 1500)
       } else if (data.status === 'error') {
         stopPolling()
         setPhase('error')

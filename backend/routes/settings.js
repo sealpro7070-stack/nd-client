@@ -52,8 +52,7 @@ router.post('/', requireAuth, async (req, res) => {
 
   const { data, error } = await supabase
     .from('settings')
-    .update(updates)
-    .eq('user_id', userId)
+    .upsert({ user_id: userId, ...updates }, { onConflict: 'user_id' })
     .select()
     .maybeSingle()
 

@@ -7,6 +7,8 @@ const { requireAuth } = require('../lib/auth-middleware')
 router.get('/', requireAuth, async (req, res) => {
   const userId = req.authUser.id
   const { limit = 20, offset = 0 } = req.query
+  const limitNum = Math.min(Math.max(parseInt(limit) || 20, 1), 100)
+  const offsetNum = Math.max(parseInt(offset) || 0, 0)
 
   const { data, error, count } = await supabase
     .from('submissions')
@@ -20,7 +22,7 @@ router.get('/', requireAuth, async (req, res) => {
     `, { count: 'exact' })
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
-    .range(Number(offset), Number(offset) + Number(limit) - 1)
+    .range(offsetNum, offsetNum + limitNum - 1)
 
   if (error) return res.status(500).json({ error: 'Failed to load history' })
 

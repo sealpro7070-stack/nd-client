@@ -72,7 +72,7 @@ export default function Dashboard() {
         }
 
         const { data: ud } = await supabase
-          .from('users').select('ains_cookie_encrypted, plan').eq('id', user.id).single()
+          .from('users').select('ains_cookie_encrypted, plan').eq('id', user.id).maybeSingle()
         const connected = !!ud?.ains_cookie_encrypted
         setCredsStatus(connected ? 'saved' : 'none')
         const userPlan = ud?.plan || 'free'
@@ -187,10 +187,11 @@ export default function Dashboard() {
 
   async function handleRemoveSlot(slotId) {
     const token = await getToken()
-    await fetch(`${BACKEND}/api/family/slots/${slotId}`, {
+    const res = await fetch(`${BACKEND}/api/family/slots/${slotId}`, {
       method: 'DELETE',
       headers: { 'Authorization': `Bearer ${token}` },
     })
+    if (!res.ok) return
     clearInterval(pollRefs.current[slotId])
     setFamilySlots(prev => prev.filter(s => s.id !== slotId))
     setSlotStates(prev => { const n = { ...prev }; delete n[slotId]; return n })
@@ -214,6 +215,7 @@ export default function Dashboard() {
     }
 
     // Poll connect-status every 2s (max 3 min)
+    clearInterval(pollRefs.current[slotId])
     let attempts = 0
     const poll = setInterval(async () => {
       attempts++

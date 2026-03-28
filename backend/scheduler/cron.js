@@ -15,7 +15,7 @@ cron.schedule('0 1 * * *', async () => {
     // Find all active users whose schedule_day matches today
     const { data: settingsList, error } = await supabase
       .from('settings')
-      .select('user_id, schedule_day, auto_schedule, users!inner(id, is_active, ains_username_encrypted, email)')
+      .select('user_id, schedule_day, auto_schedule, users!inner(id, is_active, ains_cookie_encrypted, email)')
       .eq('auto_schedule', true)
       .eq('schedule_day', dayOfMonth)
       .eq('users.is_active', true)

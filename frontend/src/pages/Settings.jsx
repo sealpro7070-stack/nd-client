@@ -8,7 +8,7 @@ const BACKEND    = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001'
 const LANGUAGES  = ['Malay', 'English', 'Chinese', 'Tamil']
 const LANG_MAP   = { Malay: 'Melayu', English: 'Inggeris', Chinese: 'Cina', Tamil: 'Tamil' }
 const BOOK_TYPES = ['Physical', 'E-Book']
-const TYPE_MAP   = { Physical: 'Fizikal', 'E-Book': 'E-Buku' }
+const TYPE_MAP   = { Physical: 'Fizikal', 'E-Book': 'Digital' }
 
 function Stepper({ value, min, max, onChange }) {
   return (
@@ -63,7 +63,12 @@ export default function Settings() {
       if (!user) return
       setUser(user)
 
-      const res = await fetch(`${BACKEND}/api/settings?userId=${user.id}`)
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token || ''
+
+      const res = await fetch(`${BACKEND}/api/settings?userId=${user.id}`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      })
       if (res.ok) {
         const data = await res.json()
         setForm({
@@ -94,9 +99,11 @@ export default function Settings() {
     if (!user) return
     setSaving(true)
     setSaved(false)
+    const { data: { session } } = await supabase.auth.getSession()
+    const token = session?.access_token || ''
     const res = await fetch(`${BACKEND}/api/settings`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
       body: JSON.stringify({ userId: user.id, ...form }),
     })
     setSaving(false)
@@ -197,7 +204,7 @@ export default function Settings() {
 
       {/* ── AINS Connection Modal ─────────────────── */}
       <ConnectAINSModal
-        userId={user?.id}
+        targetUserId={user?.id}
         isOpen={showAINSModal}
         onClose={() => setShowAINSModal(false)}
         onSuccess={handleAINSConnected}
