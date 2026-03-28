@@ -14,13 +14,35 @@ router.post('/', requireAuth, async (req, res) => {
     return res.status(400).json({ error: 'userId is required' })
   }
 
+  const isAdmin = req.authUser?.email === process.env.ADMIN_EMAIL
+
   // Quick pre-checks before launching browser
-  const { data: user } = await supabase
+  let { data: user } = await supabase
     .from('users')
     .select('is_active, ains_cookie_encrypted, email, plan, plan_expires_at')
     .eq('id', userId)
     .single()
-  const isAdmin = req.authUser?.email === process.env.ADMIN_EMAIL
+
+  // Auto-create the user row if missing (handles Google OAuth users who bypassed registration)
+  if (!user) {
+    const { data: authUser } = await supabase.auth.admin.getUserById(userId)
+    if (!authUser?.user) return res.status(404).json({ error: 'User not found' })
+
+    await supabase.from('users').upsert({
+      id: userId,
+      email: authUser.user.email,
+      is_active: isAdmin, // admin is active immediately, others need approval
+    }, { onConflict: 'id' })
+
+    // Re-fetch after upsert
+    const { data: refetched } = await supabase
+      .from('users')
+      .select('is_active, ains_cookie_encrypted, email, plan, plan_expires_at')
+      .eq('id', userId)
+      .single()
+    user = refetched
+  }
+
   if (!user) return res.status(404).json({ error: 'User not found' })
   if (!user.is_active && !isAdmin) return res.status(403).json({ error: 'Account not activated. Please subscribe.' })
   if (!user.ains_cookie_encrypted) return res.status(400).json({ error: 'No AINS session saved. Use "Connect AINS Account" on the dashboard.' })
