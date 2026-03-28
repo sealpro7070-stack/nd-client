@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import ConnectAINSModal from '../components/ConnectAINSModal'
 
 const ADMIN_EMAIL = 'm-10603978@moe-dl.edu.my'
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001'
@@ -17,6 +18,7 @@ export default function Admin() {
   const [payFilter, setPayFilter] = useState('pending')
   const [toasting, setToasting] = useState(null)
   const [token, setToken]       = useState('')
+  const [connectTarget, setConnectTarget] = useState(null) // { id, email } of user to connect AINS for
 
   useEffect(() => { checkAdminAndLoad() }, [])
 
@@ -268,6 +270,12 @@ export default function Admin() {
                             >
                               {user.is_active ? 'Deactivate' : 'Approve'}
                             </button>
+                            <button
+                              onClick={() => setConnectTarget({ id: user.id, email: user.email })}
+                              className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-brand-50 text-brand-700 hover:bg-brand-100 transition"
+                            >
+                              {user.has_cookie ? 'Reconnect AINS' : 'Connect AINS'}
+                            </button>
                           </div>
                         </td>
                       </tr>
@@ -354,6 +362,20 @@ export default function Admin() {
         }`}>
           {toasting.msg}
         </div>
+      )}
+
+      {/* Admin AINS connect modal — can connect for any user */}
+      {connectTarget && (
+        <ConnectAINSModal
+          targetUserId={connectTarget.id}
+          isOpen={true}
+          onClose={() => setConnectTarget(null)}
+          onSuccess={() => {
+            showToast(`AINS connected for ${connectTarget.email}`)
+            setConnectTarget(null)
+            fetchUsers()
+          }}
+        />
       )}
     </div>
   )

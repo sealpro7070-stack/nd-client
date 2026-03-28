@@ -12,10 +12,18 @@ const loginState = {}
 
 // POST /api/auth/connect
 // Starts a silent Playwright login flow server-side. Returns immediately; poll /connect-status for progress.
-// Body: { email, password }
+// Body: { email, password, targetUserId? } — targetUserId is admin-only: connect AINS for another user.
 router.post('/connect', requireAuth, async (req, res) => {
-  const userId = req.authUser.id
-  const { email, password } = req.body
+  const { email, password, targetUserId } = req.body
+
+  // Admin can pass targetUserId to connect AINS on behalf of another user
+  let userId = req.authUser.id
+  if (targetUserId && targetUserId !== userId) {
+    if (req.authUser.email !== process.env.ADMIN_EMAIL) {
+      return res.status(403).json({ error: 'Only admins can connect AINS for other users' })
+    }
+    userId = targetUserId
+  }
 
   if (!email || !password) {
     return res.status(400).json({ error: 'email and password are required' })

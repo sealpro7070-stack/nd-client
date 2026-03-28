@@ -4,7 +4,8 @@ import { supabase } from '../lib/supabase'
 
 const BACKEND = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001'
 
-export default function ConnectAINSModal({ isOpen, onClose, onSuccess }) {
+// targetUserId — admin-only prop to connect AINS on behalf of another user
+export default function ConnectAINSModal({ isOpen, onClose, onSuccess, targetUserId }) {
   const [phase, setPhase] = useState('form') // 'form' | 'connecting' | 'waiting_mfa' | 'success' | 'error'
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -98,10 +99,12 @@ export default function ConnectAINSModal({ isOpen, onClose, onSuccess }) {
     const token = await getToken()
 
     // Fire the silent login
+    const body = { email: email.trim(), password }
+    if (targetUserId) body.targetUserId = targetUserId
     const res = await fetch(`${BACKEND}/api/auth/connect`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-      body: JSON.stringify({ email: email.trim(), password }),
+      body: JSON.stringify(body),
     }).catch(() => null)
 
     if (!res?.ok) {

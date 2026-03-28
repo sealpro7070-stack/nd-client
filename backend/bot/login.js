@@ -217,8 +217,12 @@ async function loginWithCredentials(context, page, username, password) {
       } catch {}
     }
     try {
-      await page.locator('input[type="password"]').first().fill(password)
-      console.log('[login] Filled password (fallback)')
+      // Google's login page has a hidden password field (aria-hidden, tabindex=-1, name="hiddenPassword")
+      // and a separate visible one — must target only the visible one
+      const passwordLocator = page.locator('input[type="password"]').filter({ visible: true }).first()
+      await passwordLocator.waitFor({ state: 'visible', timeout: 10000 })
+      await passwordLocator.fill(password)
+      console.log('[login] Filled password (fallback, visible filter)')
     } catch { console.warn('[login] Could not fill password field') }
     await page.waitForTimeout(500)
     const submitSelectors = ['button[type="submit"]', 'input[type="submit"]', 'button:has-text("Log masuk")', 'button:has-text("Login")']

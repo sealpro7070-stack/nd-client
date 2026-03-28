@@ -162,10 +162,12 @@ async function performLogin(userId, email, password, onStatus) {
         await page.keyboard.press('Enter')
       })
 
-      // Wait for password field
-      await page.waitForSelector('input[type="password"]', { timeout: 10000 })
-      await page.waitForTimeout(500) // Google animates the field in
-      await page.locator('input[type="password"]').first().fill(password)
+      // Google has a permanently-hidden password input (name="hiddenPassword", aria-hidden="true")
+      // alongside the real visible one. We must target ONLY the visible field.
+      await page.waitForTimeout(1000) // Google animates the password field in after clicking Next
+      const pwLocator = page.locator('input[type="password"]').filter({ visible: true })
+      await pwLocator.waitFor({ state: 'visible', timeout: 10000 })
+      await pwLocator.fill(password)
       await page.locator('#passwordNext, button[jsname="LgbsSe"]').first().click().catch(async () => {
         await page.keyboard.press('Enter')
       })
