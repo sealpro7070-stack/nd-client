@@ -182,32 +182,37 @@ async function performLogin(userId, email, password, onStatus) {
 
     console.log(`[login] Credentials submitted (${isGoogle ? 'Google' : 'Microsoft'}), checking for MFA challenge`)
 
-    // Wait briefly for the MFA challenge page to fully render
-    await page.waitForTimeout(3000)
+    // Wait for the MFA challenge page to fully render (number matching needs DOM ready)
+    await page.waitForTimeout(5000)
 
-    // Detect Google number-matching challenge (a 2-digit number is shown on screen;
-    // user must tap the matching number on their phone)
+    // Detect number-matching challenge — both Google and Microsoft can show a
+    // 2-digit number on screen that the user must tap on their phone to confirm.
     let mfaNumber = null
-    if (page.url().includes('accounts.google.com')) {
+    const urlAfterCreds = page.url()
+    const onAuthProvider = urlAfterCreds.includes('accounts.google.com') ||
+                           urlAfterCreds.includes('login.microsoftonline.com') ||
+                           urlAfterCreds.includes('login.microsoft.com')
+
+    if (onAuthProvider) {
       mfaNumber = await page.evaluate(() => {
-        // Walk text nodes looking for a standalone 2-digit number in a visible element
-        const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT)
-        let node
-        while ((node = walker.nextNode())) {
-          const txt = (node.textContent || '').trim()
-          if (/^\d{2}$/.test(txt)) {
-            const el = node.parentElement
-            if (el && el.offsetParent !== null) return txt
-          }
+        // Find visible leaf elements whose entire text content is a 2-digit number.
+        // Pick the most prominent one (largest font size, then largest area).
+        const candidates = []
+        for (const el of document.querySelectorAll('*')) {
+          if (el.children.length > 0) continue          // skip non-leaf nodes
+          const txt = (el.textContent || '').trim()
+          if (!/^\d{2}$/.test(txt)) continue            // must be exactly 2 digits
+          const rect = el.getBoundingClientRect()
+          if (rect.width <= 0 || rect.height <= 0) continue  // must be visible
+          const fs = parseFloat(window.getComputedStyle(el).fontSize) || 0
+          candidates.push({ txt, fs, area: rect.width * rect.height })
         }
-        return null
+        if (candidates.length === 0) return null
+        candidates.sort((a, b) => b.fs - a.fs || b.area - a.area)
+        return candidates[0].txt
       }).catch(() => null)
 
-      if (mfaNumber) {
-        console.log(`[login] Number-matching challenge detected: ${mfaNumber}`)
-      } else {
-        console.log('[login] No number challenge — simple push approval')
-      }
+      console.log(`[login] MFA challenge: ${mfaNumber ? `number-matching (${mfaNumber})` : 'simple push approval'}`)
     }
 
     if (onStatus) onStatus('waiting_mfa', { mfaNumber })
