@@ -174,9 +174,13 @@ router.post('/register', async (req, res) => {
   }
 
   try {
+    const isAdmin = email === process.env.ADMIN_EMAIL
+    const row = { id, email, delima_id }
+    if (isAdmin) row.is_active = true // admin is always active
+
     const { data, error } = await supabase
       .from('users')
-      .upsert({ id, email, delima_id }, { onConflict: 'id' })
+      .upsert(row, { onConflict: 'id' })
       .select()
       .single()
 

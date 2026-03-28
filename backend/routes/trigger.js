@@ -20,12 +20,12 @@ router.post('/', requireAuth, async (req, res) => {
     .select('is_active, ains_cookie_encrypted, email, plan, plan_expires_at')
     .eq('id', userId)
     .single()
+  const isAdmin = req.authUser?.email === process.env.ADMIN_EMAIL
   if (!user) return res.status(404).json({ error: 'User not found' })
-  if (!user.is_active) return res.status(403).json({ error: 'Account not activated. Please subscribe.' })
+  if (!user.is_active && !isAdmin) return res.status(403).json({ error: 'Account not activated. Please subscribe.' })
   if (!user.ains_cookie_encrypted) return res.status(400).json({ error: 'No AINS session saved. Use "Connect AINS Account" on the dashboard.' })
 
   // Plan limit enforcement
-  const isAdmin = req.authUser?.email === process.env.ADMIN_EMAIL
   const planExpired = user.plan_expires_at && new Date(user.plan_expires_at) < new Date()
   const activePlan  = planExpired ? 'free' : (user.plan || 'free')
   const PLAN_MAX    = { free: 1, plus: 15, family: 15 }

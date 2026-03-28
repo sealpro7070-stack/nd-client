@@ -117,8 +117,11 @@ export default function Landing() {
   // When the user clicks the verification link, Supabase redirects back here
   // with a session in the URL hash. Detect it and send them to the dashboard.
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'SIGNED_IN') navigate('/dashboard')
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN') {
+        if (session?.user) syncUserToBackend(session.user)
+        navigate('/dashboard')
+      }
     })
     return () => subscription.unsubscribe()
   }, [navigate])

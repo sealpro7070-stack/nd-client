@@ -42,6 +42,14 @@ export default function Dashboard() {
         if (!user) { setLoading(false); return }
         setUser(user)
 
+        // Ensure user row exists in backend — handles Google OAuth logins
+        // that bypass Landing.jsx's register call. Safe to call every time (upsert).
+        fetch(`${BACKEND}/api/auth/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: user.id, email: user.email }),
+        }).catch(() => {})
+
         const [sRes, stRes, rRes] = await Promise.allSettled([
           fetch(`${BACKEND}/api/settings?userId=${user.id}`),
           fetch(`${BACKEND}/api/history/stats?userId=${user.id}`),
