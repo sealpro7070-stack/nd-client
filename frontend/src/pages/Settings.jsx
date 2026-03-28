@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { supabase } from '../lib/supabase'
 import ConnectAINSModal from '../components/ConnectAINSModal'
+import UpgradeModal from '../components/UpgradeModal'
 
 const BACKEND    = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001'
 const LANGUAGES  = ['Malay', 'English', 'Chinese', 'Tamil']
@@ -50,6 +51,8 @@ export default function Settings() {
   const [loading, setLoading]   = useState(true)
   const [credsStatus, setCredsStatus] = useState(null) // null | 'saved' | 'none'
   const [showAINSModal, setShowAINSModal] = useState(false)
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false)
+  const [planInfo, setPlanInfo] = useState({ plan: 'free', plan_expires_at: null })
 
   const [displayLang, setDisplayLang] = useState('Malay')
   const [displayType, setDisplayType] = useState('Physical')
@@ -77,8 +80,9 @@ export default function Settings() {
       }
 
       const { data: ud } = await supabase
-        .from('users').select('ains_cookie_encrypted').eq('id', user.id).single()
+        .from('users').select('ains_cookie_encrypted, plan, plan_expires_at').eq('id', user.id).single()
       setCredsStatus(ud?.ains_cookie_encrypted ? 'saved' : 'none')
+      if (ud) setPlanInfo({ plan: ud.plan || 'free', plan_expires_at: ud.plan_expires_at })
 
       setLoading(false)
     }
@@ -123,6 +127,44 @@ export default function Settings() {
         <h1 className="font-display text-2xl font-extrabold text-heading">Settings</h1>
         <p className="text-muted text-sm mt-1">Configure your NILAM automation preferences.</p>
       </div>
+
+      {/* ── Plan Banner ─────────────────────────────── */}
+      <div className={`rounded-2xl p-4 flex items-center justify-between gap-4 ${
+        planInfo.plan === 'family' ? 'bg-ok-50 border border-ok-200' :
+        planInfo.plan === 'plus'   ? 'bg-brand-50 border border-brand-200' :
+                                     'bg-gray-50 border border-line'
+      }`}>
+        <div>
+          <p className="text-xs text-muted font-medium uppercase tracking-wide">Current Plan</p>
+          <p className="font-display text-lg font-extrabold text-heading capitalize mt-0.5">
+            {planInfo.plan === 'free' ? 'Free' : planInfo.plan === 'plus' ? 'Plus' : 'Family'}
+            {planInfo.plan !== 'free' && planInfo.plan_expires_at && (
+              <span className="text-xs text-muted font-normal ml-2">
+                expires {new Date(planInfo.plan_expires_at).toLocaleDateString('en-MY', { day: 'numeric', month: 'short', year: 'numeric' })}
+              </span>
+            )}
+          </p>
+          <p className="text-xs text-muted mt-0.5">
+            {planInfo.plan === 'free'   && '1 book/month · Upgrade to submit more'}
+            {planInfo.plan === 'plus'   && '15 books/month · 1 AINS account'}
+            {planInfo.plan === 'family' && '15 books/month · Up to 3 AINS accounts'}
+          </p>
+        </div>
+        {planInfo.plan !== 'family' && (
+          <button
+            onClick={() => setShowUpgradeModal(true)}
+            className="flex-shrink-0 text-xs font-bold px-4 py-2 rounded-xl bg-brand-600 text-white hover:bg-brand-700 transition-colors"
+          >
+            Upgrade
+          </button>
+        )}
+      </div>
+
+      <UpgradeModal
+        isOpen={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        currentPlan={planInfo.plan}
+      />
 
       {/* ── AINS Account ─────────────────────────────── */}
       <div>
@@ -174,11 +216,14 @@ export default function Settings() {
               <div className="mt-4 mb-2">
                 <Stepper
                   value={form.books_per_month}
-                  min={1} max={8}
+                  min={1}
+                  max={planInfo.plan === 'free' ? 1 : 15}
                   onChange={v => setForm(f => ({ ...f, books_per_month: v }))}
                 />
               </div>
-              <p className="text-xs text-subtle text-center mt-2">Maximum 8 books per month (Pro)</p>
+              <p className="text-xs text-subtle text-center mt-2">
+                {planInfo.plan === 'free' ? 'Free plan: 1 book/month. Upgrade for up to 15.' : 'Maximum 15 books per month'}
+              </p>
             </div>
 
             {/* Language */}

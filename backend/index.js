@@ -2,11 +2,13 @@ require('dotenv').config()
 const express = require('express')
 const cors = require('cors')
 
-const authRoutes = require('./routes/auth')
+const authRoutes     = require('./routes/auth')
 const settingsRoutes = require('./routes/settings')
-const triggerRoutes = require('./routes/trigger')
-const historyRoutes = require('./routes/history')
-const adminRoutes = require('./routes/admin')
+const triggerRoutes  = require('./routes/trigger')
+const historyRoutes  = require('./routes/history')
+const adminRoutes    = require('./routes/admin')
+const paymentsRoutes = require('./routes/payments')
+const familyRoutes   = require('./routes/family')
 
 // Start cron scheduler
 require('./scheduler/cron')
@@ -37,6 +39,8 @@ app.use('/api/settings', settingsRoutes)
 app.use('/api/trigger', triggerRoutes)
 app.use('/api/history', historyRoutes)
 app.use('/api/admin', adminRoutes)
+app.use('/api/payments', paymentsRoutes)
+app.use('/api/family', familyRoutes)
 
 // 404 handler
 app.use((req, res) => {

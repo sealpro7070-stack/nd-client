@@ -161,4 +161,76 @@ async function startBot(userId, directCookie, directSsUser, directSsProfile, dir
   return result
 }
 
-module.exports = { startBot }
+/**
+ * startBotForSlot — Run the bot for a family plan slot
+ */
+async function startBotForSlot(userId, slotId, slot) {
+  console.log(`\n[bot] Starting for family slot ${slotId}`)
+
+  const { decrypt } = require('../lib/crypto')
+
+  let ssToken = null, ssUser = null, ssProfile = null, cookiesToInject = []
+  try {
+    const raw = decrypt(slot.ains_cookie_encrypted)
+    const sessionData = JSON.parse(raw)
+    ssToken = sessionData.ssToken
+    ssUser  = sessionData.ssUser
+    ssProfile = sessionData.ssProfile
+    cookiesToInject = sessionData.cookies || []
+  } catch (err) {
+    throw new Error(`Failed to decrypt slot session: ${err.message}`)
+  }
+
+  const now   = new Date()
+  const month = now.getMonth() + 1
+  const year  = now.getFullYear()
+
+  const { data: existing } = await supabase
+    .from('submissions')
+    .select('book_id')
+    .eq('user_id', userId)
+    .eq('family_slot_id', slotId)
+    .eq('month', month)
+    .eq('year', year)
+    .eq('status', 'success')
+
+  const alreadyBookIds = (existing || []).map(s => s.book_id)
+  const needed = Math.min(slot.books_per_month || 4, 15) - alreadyBookIds.length
+  if (needed <= 0) return { success: true, skipped: true, reason: 'already_complete' }
+
+  let booksQuery = supabase.from('books').select('*').eq('language', slot.language || 'Melayu')
+  if (alreadyBookIds.length > 0) {
+    booksQuery = booksQuery.not('id', 'in', `(${alreadyBookIds.join(',')})`)
+  }
+
+  const { data: availableBooks } = await booksQuery.limit(100)
+  if (!availableBooks?.length) throw new Error('No books available for this slot.')
+
+  const shuffled = availableBooks.sort(() => 0.5 - Math.random()).slice(0, needed)
+
+  const { data: insertedSubs } = await supabase
+    .from('submissions')
+    .insert(shuffled.map(book => ({
+      user_id: userId, book_id: book.id, month, year,
+      status: 'pending', family_slot_id: slotId,
+    })))
+    .select()
+
+  // Fetch parent user for runBot
+  const { data: user } = await supabase.from('users').select('*').eq('id', userId).single()
+
+  const result = await require('./browser').runBot({
+    user,
+    settings: { language: slot.language, books_per_month: slot.books_per_month },
+    cookie: ssToken,
+    ssUser,
+    ssProfile,
+    cookies: cookiesToInject,
+    books: shuffled,
+    submissions: insertedSubs || [],
+  })
+
+  return result
+}
+
+module.exports = { startBot, startBotForSlot }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { supabase } from '../lib/supabase'
@@ -8,6 +8,7 @@ import ConnectAINSModal from '../components/ConnectAINSModal'
 const BACKEND   = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001'
 const LANGUAGES = ['Malay', 'English', 'Chinese', 'Tamil']
 const LANG_MAP  = { Malay: 'Melayu', English: 'Inggeris', Chinese: 'Cina', Tamil: 'Tamil' }
+const LANG_DISPLAY = { Melayu: 'Malay', Inggeris: 'English', Cina: 'Chinese', Tamil: 'Tamil' }
 
 export default function Dashboard() {
   const navigate = useNavigate()
@@ -21,10 +22,18 @@ export default function Dashboard() {
   const [triggering, setTriggering] = useState(false)
   const [triggerMsg, setTriggerMsg] = useState('')
   const [isError, setIsError]       = useState(false)
-  const [credsStatus, setCredsStatus] = useState(null) // null | 'saved' | 'none'
-
-  // AINS connection modal state
+  const [credsStatus, setCredsStatus] = useState(null)
+  const [plan, setPlan]             = useState('free')
   const [showAINSModal, setShowAINSModal] = useState(false)
+
+  // Family plan state
+  const [familySlots, setFamilySlots]   = useState([])
+  const [newSlotName, setNewSlotName]   = useState('')
+  const [addingSlot, setAddingSlot]     = useState(false)
+  const [addSlotErr, setAddSlotErr]     = useState('')
+  // Per-slot UI state: { [slotId]: { phase, email, password, showForm, trigMsg, trigErr } }
+  const [slotStates, setSlotStates]     = useState({})
+  const pollRefs = useRef({})
 
   useEffect(() => {
     async function load() {
@@ -52,30 +61,53 @@ export default function Dashboard() {
           setRecent(d.submissions || [])
         }
 
-        // Check if AINS session is saved
         const { data: ud } = await supabase
-          .from('users').select('ains_cookie_encrypted').eq('id', user.id).single()
+          .from('users').select('ains_cookie_encrypted, plan').eq('id', user.id).single()
         const connected = !!ud?.ains_cookie_encrypted
         setCredsStatus(connected ? 'saved' : 'none')
-        // Auto-prompt to connect AINS if not yet linked
+        const userPlan = ud?.plan || 'free'
+        setPlan(userPlan)
         if (!connected) setShowAINSModal(true)
+
+        // Load family slots if on family plan
+        if (userPlan === 'family') {
+          await loadFamilySlots(user)
+        }
       } catch {
-        // Supabase unreachable — still show the dashboard
+        // Supabase unreachable
       } finally {
         setLoading(false)
       }
     }
     load()
+    return () => {
+      // Cleanup any slot polling on unmount
+      Object.values(pollRefs.current).forEach(clearInterval)
+    }
   }, [])
+
+  async function getToken() {
+    const { data: { session } } = await supabase.auth.getSession()
+    return session?.access_token || ''
+  }
+
+  async function loadFamilySlots(u) {
+    const token = await getToken()
+    const res = await fetch(`${BACKEND}/api/family/slots`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    })
+    if (res.ok) {
+      const d = await res.json()
+      setFamilySlots(d.slots || [])
+    }
+  }
 
   async function doTrigger(userId, apiLang, count) {
     setTriggering(true)
     setTriggerMsg('')
     setIsError(false)
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      const token = session?.access_token || ''
-
+      const token = await getToken()
       await fetch(`${BACKEND}/api/settings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -93,10 +125,7 @@ export default function Dashboard() {
     } catch (err) {
       setTriggerMsg(err.message)
       setIsError(true)
-      // If session expired, flip status so the button becomes "Connect & Submit"
-      if (/session expired|reconnect/i.test(err.message)) {
-        setCredsStatus('none')
-      }
+      if (/session expired|reconnect/i.test(err.message)) setCredsStatus('none')
     } finally {
       setTriggering(false)
     }
@@ -104,21 +133,113 @@ export default function Dashboard() {
 
   async function handleSubmit() {
     if (!user) return
-    if (credsStatus !== 'saved') {
-      setShowAINSModal(true)
-      return
-    }
+    if (credsStatus !== 'saved') { setShowAINSModal(true); return }
     await doTrigger(user.id, LANG_MAP[lang] || lang, bookCount)
   }
 
   const handleAINSConnected = async () => {
-    // After user connects, refresh session status and auto-trigger submission
     const { data: ud } = await supabase
       .from('users').select('ains_cookie_encrypted').eq('id', user.id).single()
     setCredsStatus(ud?.ains_cookie_encrypted ? 'saved' : 'none')
-    // Auto-trigger
     if (ud?.ains_cookie_encrypted) {
       await doTrigger(user.id, LANG_MAP[lang] || lang, bookCount)
+    }
+  }
+
+  // ── Family slot helpers ─────────────────────────
+
+  function setSlot(slotId, patch) {
+    setSlotStates(prev => ({ ...prev, [slotId]: { ...prev[slotId], ...patch } }))
+  }
+
+  async function handleAddSlot() {
+    if (!newSlotName.trim()) return
+    setAddingSlot(true)
+    setAddSlotErr('')
+    try {
+      const token = await getToken()
+      const res = await fetch(`${BACKEND}/api/family/slots`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ slot_name: newSlotName.trim() }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to add slot')
+      setNewSlotName('')
+      await loadFamilySlots(user)
+    } catch (err) {
+      setAddSlotErr(err.message)
+    } finally {
+      setAddingSlot(false)
+    }
+  }
+
+  async function handleRemoveSlot(slotId) {
+    const token = await getToken()
+    await fetch(`${BACKEND}/api/family/slots/${slotId}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${token}` },
+    })
+    clearInterval(pollRefs.current[slotId])
+    setFamilySlots(prev => prev.filter(s => s.id !== slotId))
+    setSlotStates(prev => { const n = { ...prev }; delete n[slotId]; return n })
+  }
+
+  async function handleConnectSlot(slotId) {
+    const ss = slotStates[slotId] || {}
+    if (!ss.email?.trim() || !ss.password?.trim()) return
+    setSlot(slotId, { phase: 'connecting' })
+
+    const token = await getToken()
+    const res = await fetch(`${BACKEND}/api/family/slots/${slotId}/connect`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ email: ss.email.trim(), password: ss.password }),
+    })
+    if (!res.ok) {
+      const d = await res.json()
+      setSlot(slotId, { phase: 'error', connectErr: d.error || 'Failed to start' })
+      return
+    }
+
+    // Poll connect-status every 2s (max 3 min)
+    let attempts = 0
+    const poll = setInterval(async () => {
+      attempts++
+      if (attempts > 90) { // 90 × 2s = 3 min
+        clearInterval(poll)
+        setSlot(slotId, { phase: 'error', connectErr: 'Timed out. Please try again.' })
+        return
+      }
+      try {
+        const t = await getToken()
+        const r = await fetch(`${BACKEND}/api/family/slots/${slotId}/connect-status`, {
+          headers: { 'Authorization': `Bearer ${t}` },
+        })
+        const d = await r.json()
+        if (d.connected) {
+          clearInterval(poll)
+          setSlot(slotId, { phase: 'done', showForm: false, email: '', password: '' })
+          await loadFamilySlots(user)
+        }
+      } catch {}
+    }, 2000)
+    pollRefs.current[slotId] = poll
+  }
+
+  async function handleTriggerSlot(slotId) {
+    setSlot(slotId, { trigMsg: '', trigErr: false, triggering: true })
+    try {
+      const token = await getToken()
+      const res = await fetch(`${BACKEND}/api/family/slots/${slotId}/trigger`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      })
+      const data = await res.json()
+      if (!res.ok || data.success === false) throw new Error(data.error || 'Failed to submit')
+      setSlot(slotId, { trigMsg: data.message, trigErr: false, triggering: false })
+    } catch (err) {
+      setSlot(slotId, { trigMsg: err.message, trigErr: true, triggering: false })
     }
   }
 
@@ -173,7 +294,6 @@ export default function Dashboard() {
           </button>
         </div>
 
-        {/* Horizontal progress bar */}
         <div className="relative mt-5">
           <div className="flex justify-between text-xs mb-1.5">
             <span className="text-brand-200 font-semibold">This Month's Progress</span>
@@ -230,7 +350,6 @@ export default function Dashboard() {
         </h2>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-5">
-          {/* Language pills */}
           <div>
             <label className="label">Language</label>
             <div className="flex flex-wrap gap-2">
@@ -250,7 +369,6 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Book count stepper */}
           <div>
             <label className="label">Number of Books</label>
             <div className="flex items-center gap-3">
@@ -268,8 +386,8 @@ export default function Dashboard() {
               </div>
               <button
                 type="button"
-                onClick={() => setBookCount(v => Math.min(8, v + 1))}
-                disabled={bookCount >= 8}
+                onClick={() => setBookCount(v => Math.min(plan === 'free' ? 1 : 15, v + 1))}
+                disabled={bookCount >= (plan === 'free' ? 1 : 15)}
                 className="w-10 h-10 rounded-xl bg-white border border-line text-heading text-xl font-bold hover:border-brand-300 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
               >
                 +
@@ -294,10 +412,7 @@ export default function Dashboard() {
           </button>
           {triggerMsg && (
             <span className={`text-sm font-bold flex items-center gap-1.5 ${isError ? 'text-danger-600' : 'text-ok-600'}`}>
-              {isError
-                ? <XCircleIcon className="w-4 h-4" />
-                : <CheckCircleIcon className="w-4 h-4" />
-              }
+              {isError ? <XCircleIcon className="w-4 h-4" /> : <CheckCircleIcon className="w-4 h-4" />}
               {triggerMsg}
             </span>
           )}
@@ -306,9 +421,196 @@ export default function Dashboard() {
         <p className="text-xs text-subtle mt-3">
           {credsStatus === 'saved'
             ? 'Your AINS session is active. The bot will use it for monthly submissions.'
-            : 'Click "Connect & Submit" to log in to your AINS account. You\'ll complete the login yourself, and we\'ll capture the session.'}
+            : 'Click "Connect & Submit" to log in to your AINS account.'}
         </p>
       </motion.div>
+
+      {/* ── Family Slots Panel ─────────────────────── */}
+      {plan === 'family' && (
+        <motion.div
+          initial={{ opacity: 0, y: 14 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.45, delay: 0.15 }}
+          className="card-p border-l-4 border-l-ok-500"
+        >
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-display text-lg font-bold text-heading flex items-center gap-2">
+              <span className="w-8 h-8 bg-ok-50 rounded-lg flex items-center justify-center">
+                <UsersIcon className="w-4 h-4 text-ok-600" />
+              </span>
+              Family Slots
+            </h2>
+            <span className="text-xs text-muted font-semibold">{familySlots.length} / 3 slots</span>
+          </div>
+
+          {/* Slot cards */}
+          <div className="space-y-4">
+            {familySlots.map(slot => {
+              const ss = slotStates[slot.id] || {}
+              return (
+                <div key={slot.id} className="border border-line rounded-xl p-4 space-y-3">
+                  {/* Header row */}
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className={`w-2 h-2 rounded-full flex-shrink-0 ${slot.ains_connected ? 'bg-ok-500' : 'bg-danger-400 animate-pulse'}`} />
+                      <span className="font-bold text-sm text-heading truncate">{slot.slot_name}</span>
+                      {slot.ains_email && (
+                        <span className="text-xs text-muted truncate hidden sm:block">{slot.ains_email}</span>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => handleRemoveSlot(slot.id)}
+                      className="text-xs text-danger-500 hover:text-danger-700 font-bold flex-shrink-0"
+                      title="Remove slot"
+                    >
+                      Remove
+                    </button>
+                  </div>
+
+                  {/* Settings row */}
+                  <div className="flex items-center gap-3 text-xs text-muted flex-wrap">
+                    <span className="bg-gray-100 px-2 py-0.5 rounded-md font-medium">
+                      {LANG_DISPLAY[slot.language] || slot.language || 'Malay'}
+                    </span>
+                    <span className="bg-gray-100 px-2 py-0.5 rounded-md font-medium">
+                      {slot.books_per_month || 4} books/month
+                    </span>
+                    <span className={`px-2 py-0.5 rounded-md font-medium ${slot.ains_connected ? 'bg-ok-50 text-ok-700' : 'bg-danger-50 text-danger-600'}`}>
+                      {slot.ains_connected ? 'Connected' : 'Not connected'}
+                    </span>
+                  </div>
+
+                  {/* Connect form */}
+                  {!slot.ains_connected && ss.phase !== 'connecting' && ss.phase !== 'done' && (
+                    <>
+                      {ss.showForm ? (
+                        <div className="space-y-2 pt-1">
+                          <input
+                            type="email"
+                            placeholder="AINS email"
+                            value={ss.email || ''}
+                            onChange={e => setSlot(slot.id, { email: e.target.value })}
+                            className="w-full border border-line rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400"
+                          />
+                          <input
+                            type="password"
+                            placeholder="Password"
+                            value={ss.password || ''}
+                            onChange={e => setSlot(slot.id, { password: e.target.value })}
+                            className="w-full border border-line rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400"
+                          />
+                          {ss.connectErr && (
+                            <p className="text-xs text-danger-600 font-semibold">{ss.connectErr}</p>
+                          )}
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => handleConnectSlot(slot.id)}
+                              disabled={!ss.email || !ss.password}
+                              className="flex-1 py-2 bg-brand-600 text-white text-sm font-bold rounded-lg hover:bg-brand-700 disabled:opacity-50 transition-colors"
+                            >
+                              Connect
+                            </button>
+                            <button
+                              onClick={() => setSlot(slot.id, { showForm: false, email: '', password: '' })}
+                              className="px-3 py-2 border border-line text-muted text-sm font-bold rounded-lg hover:bg-gray-50"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setSlot(slot.id, { showForm: true, phase: null })}
+                          className="text-xs font-bold px-3 py-1.5 rounded-lg bg-brand-50 text-brand-600 hover:bg-brand-100 transition-colors"
+                        >
+                          Connect AINS
+                        </button>
+                      )}
+                    </>
+                  )}
+
+                  {/* Connecting state */}
+                  {ss.phase === 'connecting' && (
+                    <div className="flex items-center gap-2 text-sm text-muted">
+                      <span className="w-4 h-4 border-2 border-brand-200 border-t-brand-600 rounded-full animate-spin flex-shrink-0" />
+                      <span>Signing in… approve the MFA notification on your phone.</span>
+                    </div>
+                  )}
+
+                  {/* Error state */}
+                  {ss.phase === 'error' && (
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-xs text-danger-600 font-semibold">{ss.connectErr}</p>
+                      <button
+                        onClick={() => setSlot(slot.id, { phase: null, showForm: true })}
+                        className="text-xs font-bold px-3 py-1 rounded-lg bg-danger-50 text-danger-600 hover:bg-danger-100"
+                      >
+                        Try Again
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Trigger row (only when connected) */}
+                  {slot.ains_connected && (
+                    <div className="flex items-center gap-3 flex-wrap pt-1">
+                      <button
+                        onClick={() => handleTriggerSlot(slot.id)}
+                        disabled={ss.triggering}
+                        className="btn-primary text-xs px-4 py-2 flex items-center gap-1.5"
+                      >
+                        {ss.triggering
+                          ? <><span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />Submitting…</>
+                          : <><BoltIcon className="w-3 h-3" />Submit Books</>
+                        }
+                      </button>
+                      <button
+                        onClick={() => setSlot(slot.id, { showForm: true, phase: 'reconnect' })}
+                        className="text-xs font-bold px-3 py-2 rounded-lg bg-gray-100 text-muted hover:bg-gray-200"
+                      >
+                        Reconnect
+                      </button>
+                      {ss.trigMsg && (
+                        <span className={`text-xs font-bold ${ss.trigErr ? 'text-danger-600' : 'text-ok-600'}`}>
+                          {ss.trigMsg}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+
+            {familySlots.length === 0 && (
+              <p className="text-sm text-muted text-center py-4">No slots yet. Add up to 3 family members below.</p>
+            )}
+          </div>
+
+          {/* Add slot form */}
+          {familySlots.length < 3 && (
+            <div className="mt-4 pt-4 border-t border-line">
+              <p className="text-xs font-bold text-muted uppercase tracking-wide mb-2">Add Slot</p>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="e.g. Ahmad, Sara, Aini…"
+                  value={newSlotName}
+                  onChange={e => setNewSlotName(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleAddSlot()}
+                  className="flex-1 border border-line rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400"
+                />
+                <button
+                  onClick={handleAddSlot}
+                  disabled={addingSlot || !newSlotName.trim()}
+                  className="px-4 py-2 bg-ok-600 text-white text-sm font-bold rounded-lg hover:bg-ok-700 disabled:opacity-50 transition-colors"
+                >
+                  {addingSlot ? '…' : 'Add'}
+                </button>
+              </div>
+              {addSlotErr && <p className="text-xs text-danger-600 font-semibold mt-1">{addSlotErr}</p>}
+            </div>
+          )}
+        </motion.div>
+      )}
 
       {/* ── Recent submissions ─────────────────────── */}
       <motion.div
@@ -369,4 +671,7 @@ function CheckCircleIcon({ className }) {
 }
 function XCircleIcon({ className }) {
   return <svg className={className} fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd"/></svg>
+}
+function UsersIcon({ className }) {
+  return <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path strokeLinecap="round" strokeLinejoin="round" d="M23 21v-2a4 4 0 0 0-3-3.87"/><path strokeLinecap="round" strokeLinejoin="round" d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
 }

@@ -15,18 +15,28 @@ router.post('/', requireAuth, async (req, res) => {
   }
 
   // Quick pre-checks before launching browser
-  const { data: user } = await supabase.from('users').select('is_active, ains_cookie_encrypted, email').eq('id', userId).single()
+  const { data: user } = await supabase
+    .from('users')
+    .select('is_active, ains_cookie_encrypted, email, plan, plan_expires_at')
+    .eq('id', userId)
+    .single()
   if (!user) return res.status(404).json({ error: 'User not found' })
   if (!user.is_active) return res.status(403).json({ error: 'Account not activated. Please subscribe.' })
   if (!user.ains_cookie_encrypted) return res.status(400).json({ error: 'No AINS session saved. Use "Connect AINS Account" on the dashboard.' })
 
-  // Rate limit: 5 runs per user per hour (skip for admin)
+  // Plan limit enforcement
   const isAdmin = req.authUser?.email === process.env.ADMIN_EMAIL
+  const planExpired = user.plan_expires_at && new Date(user.plan_expires_at) < new Date()
+  const activePlan  = planExpired ? 'free' : (user.plan || 'free')
+  const PLAN_MAX    = { free: 1, plus: 15, family: 15 }
+  const maxAllowed  = isAdmin ? 100 : (PLAN_MAX[activePlan] ?? 1)
+
+  // Rate limit: 5 runs per user per hour (skip for admin)
   if (!isAdmin && !checkRateLimit(userId)) {
     return res.status(429).json({ error: 'Too many requests. Maximum 5 submissions per hour.' })
   }
 
-  const countNum = count ? parseInt(count) : null
+  const countNum = count ? Math.min(parseInt(count), maxAllowed) : null
 
   // Wait up to 3 minutes for bot to complete. If it takes longer, respond mid-flight.
   let responded = false
