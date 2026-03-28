@@ -58,22 +58,32 @@ async function injectSession(context, page, token, ssUser, ssProfile, cookies = 
   // 2. Navigate to AINS to establish origin
   await page.goto(AINS_BASE, { waitUntil: 'domcontentloaded', timeout: 30000 })
 
-  // 3. Inject all 3 sessionStorage keys AINS needs to authenticate
+  // 3. Inject sessionStorage keys — only inject non-null values.
+  //    If token is null (Google OAuth captured before Vue set it), skip injecting "null"
+  //    so AINS can auto-refresh from its HttpOnly refresh-token cookie instead.
   await page.evaluate(([t, u, p]) => {
-    sessionStorage.setItem('jb-app-token', t)
+    if (t) sessionStorage.setItem('jb-app-token', t)
     if (u) sessionStorage.setItem('jb-app-user', u)
     if (p) sessionStorage.setItem('jb-app-profile', p)
   }, [token, ssUser, ssProfile])
 
   const tokenSet = await page.evaluate(() => !!sessionStorage.getItem('jb-app-token'))
-  const userSet  = await page.evaluate(() => !!sessionStorage.getItem('jb-app-user'))
-  const profSet  = await page.evaluate(() => !!sessionStorage.getItem('jb-app-profile'))
-  console.log(`[login] sessionStorage injected: token=${tokenSet}, user=${userSet}, profile=${profSet}`)
+  console.log(`[login] sessionStorage injected: token=${tokenSet}`)
 
-  // 4. Navigate to root — this triggers Vue Router guard which reads sessionStorage
-  //    (use goto not reload, so router re-evaluates the route)
+  // 4. Navigate to root — triggers Vue Router guard which reads sessionStorage.
+  //    If no token was injected, AINS will use its refresh cookie to get a fresh one.
   await page.goto(AINS_BASE, { waitUntil: 'networkidle', timeout: 45000 })
-  await page.waitForTimeout(3000)
+
+  // If token was null, wait up to 10s for AINS to auto-set it via cookie refresh
+  if (!token) {
+    console.log('[login] No token injected — waiting for AINS to set it via cookie refresh...')
+    await page.waitForFunction(
+      () => !!sessionStorage.getItem('jb-app-token'),
+      { timeout: 10000 }
+    ).catch(() => console.warn('[login] AINS did not auto-set token — checking page state anyway'))
+  }
+
+  await page.waitForTimeout(2000)
 
   // 5. Debug screenshot
   await page.screenshot({ path: path.join(SCREENSHOTS_DIR, `debug-login-${Date.now()}.png`), fullPage: true }).catch(() => {})

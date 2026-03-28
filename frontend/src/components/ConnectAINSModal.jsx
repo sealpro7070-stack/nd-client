@@ -15,6 +15,7 @@ export default function ConnectAINSModal({ isOpen, onClose, onSuccess }) {
 
   const stopPolling = () => {
     if (pollRef.current) {
+      if (pollRef.current._visCleanup) pollRef.current._visCleanup()
       clearInterval(pollRef.current)
       pollRef.current = null
     }
@@ -32,6 +33,33 @@ export default function ConnectAINSModal({ isOpen, onClose, onSuccess }) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
     }).catch(() => {})
+  }
+
+  const checkStatus = async () => {
+    if (!activeRef.current) return
+    try {
+      const pollToken = await getToken()
+      const statusRes = await fetch(`${BACKEND}/api/auth/connect-status`, {
+        headers: { 'Authorization': `Bearer ${pollToken}` },
+      })
+      const data = await statusRes.json()
+      if (!activeRef.current) return
+
+      if (data.status === 'waiting_mfa') {
+        setMfaNumber(data.mfaNumber || null)
+        setPhase('waiting_mfa')
+      } else if (data.status === 'success') {
+        stopPolling()
+        setPhase('success')
+        setTimeout(() => { onSuccess(); onClose() }, 1500)
+      } else if (data.status === 'error') {
+        stopPolling()
+        setPhase('error')
+        setErrorMsg(data.message || 'Login failed. Please try again.')
+      }
+    } catch {
+      // network hiccup — keep polling
+    }
   }
 
   // Load saved email on open
@@ -83,33 +111,18 @@ export default function ConnectAINSModal({ isOpen, onClose, onSuccess }) {
       return
     }
 
-    // Poll for status
-    pollRef.current = setInterval(async () => {
-      if (!activeRef.current) return
-      try {
-        const pollToken = await getToken()
-        const statusRes = await fetch(`${BACKEND}/api/auth/connect-status`, {
-          headers: { 'Authorization': `Bearer ${pollToken}` },
-        })
-        const data = await statusRes.json()
-        if (!activeRef.current) return
+    // Poll for status every 2s
+    pollRef.current = setInterval(checkStatus, 2000)
 
-        if (data.status === 'waiting_mfa') {
-          setMfaNumber(data.mfaNumber || null)
-          setPhase('waiting_mfa')
-        } else if (data.status === 'success') {
-          stopPolling()
-          setPhase('success')
-          setTimeout(() => { onSuccess(); onClose() }, 1500)
-        } else if (data.status === 'error') {
-          stopPolling()
-          setPhase('error')
-          setErrorMsg(data.message || 'Login failed. Please try again.')
-        }
-      } catch {
-        // network hiccup — keep polling
-      }
-    }, 2000)
+    // On mobile (iOS), setInterval freezes when the tab goes to background.
+    // When the user switches to their authenticator app and comes back,
+    // fire an immediate check so they don't wait for the next interval tick.
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') checkStatus()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    // Store cleanup ref so we can remove the listener when modal closes
+    pollRef._visCleanup = () => document.removeEventListener('visibilitychange', onVisible)
   }
 
   const handleTryAgain = () => {
@@ -147,8 +160,8 @@ export default function ConnectAINSModal({ isOpen, onClose, onSuccess }) {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="bg-brand-50 border border-brand-200 rounded-lg p-3">
                 <p className="text-sm text-brand-800">
-                  Enter your AINS login details. After clicking Connect, approve the
-                  Microsoft Authenticator notification on your phone.
+                  Enter your AINS (DELIMa) login details. After clicking Connect,
+                  approve the notification on your phone, then switch back here.
                 </p>
               </div>
 
