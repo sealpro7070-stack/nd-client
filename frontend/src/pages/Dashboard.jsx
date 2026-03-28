@@ -135,7 +135,10 @@ export default function Dashboard() {
     } catch (err) {
       setTriggerMsg(err.message)
       setIsError(true)
-      if (/session expired|reconnect/i.test(err.message)) setCredsStatus('none')
+      if (/session expired|reconnect/i.test(err.message)) {
+        setCredsStatus('none')
+        setShowAINSModal(true)  // auto-open reconnect modal so user doesn't have to hunt for it
+      }
     } finally {
       setTriggering(false)
     }
@@ -225,10 +228,13 @@ export default function Dashboard() {
           headers: { 'Authorization': `Bearer ${t}` },
         })
         const d = await r.json()
-        if (d.connected) {
+        if (d.status === 'success') {
           clearInterval(poll)
           setSlot(slotId, { phase: 'done', showForm: false, email: '', password: '' })
           await loadFamilySlots(user)
+        } else if (d.status === 'error') {
+          clearInterval(poll)
+          setSlot(slotId, { phase: 'error', connectErr: d.message || 'Connection failed. Please try again.' })
         }
       } catch {}
     }, 2000)
@@ -394,8 +400,8 @@ export default function Dashboard() {
               </div>
               <button
                 type="button"
-                onClick={() => setBookCount(v => Math.min(plan === 'free' ? 1 : 15, v + 1))}
-                disabled={bookCount >= (plan === 'free' ? 1 : 15)}
+                onClick={() => setBookCount(v => Math.min(plan === 'free' ? 1 : plan === 'noob' ? 999 : 15, v + 1))}
+                disabled={bookCount >= (plan === 'free' ? 1 : plan === 'noob' ? 999 : 15)}
                 className="w-10 h-10 rounded-xl bg-white border border-line text-heading text-xl font-bold hover:border-brand-300 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
               >
                 +
