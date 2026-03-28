@@ -49,10 +49,10 @@ router.get('/users', requireAdmin, async (req, res) => {
     await supabase.from('users').update({ is_active: true }).eq('email', ADMIN_EMAIL)
   }
 
-  // 3. Fetch public.users for activation + cookie status
+  // 3. Fetch public.users for activation + cookie status + plan/role
   const { data: publicUsers } = await supabase
     .from('users')
-    .select('id, is_active, delima_id, cookie_updated_at')
+    .select('id, is_active, delima_id, cookie_updated_at, plan, plan_expires_at, ains_cookie_encrypted')
 
   const publicMap = {}
   for (const u of (publicUsers || [])) publicMap[u.id] = u
@@ -73,20 +73,66 @@ router.get('/users', requireAdmin, async (req, res) => {
   // 5. Merge everything
   const users = authUsers
     .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-    .map(u => ({
-      id: u.id,
-      email: u.email,
-      delima_id:           publicMap[u.id]?.delima_id || null,
-      is_active:           publicMap[u.id]?.is_active || false,
-      has_cookie:          !!publicMap[u.id]?.cookie_updated_at,
-      cookie_updated_at:   publicMap[u.id]?.cookie_updated_at || null,
-      created_at:          u.created_at,
-      last_sign_in:        u.last_sign_in_at,
-      submissions_total:   countMap[u.id]?.total   || 0,
-      submissions_success: countMap[u.id]?.success || 0,
-    }))
+    .map(u => {
+      const pub = publicMap[u.id] || {}
+      const planExpired = pub.plan_expires_at && new Date(pub.plan_expires_at) < new Date()
+      const effectivePlan = (pub.plan === 'noob') ? 'noob' : (planExpired ? 'free' : (pub.plan || 'free'))
+      return {
+        id: u.id,
+        email: u.email,
+        delima_id:           pub.delima_id || null,
+        is_active:           pub.is_active || false,
+        has_cookie:          !!(pub.cookie_updated_at || pub.ains_cookie_encrypted),
+        cookie_updated_at:   pub.cookie_updated_at || null,
+        plan:                effectivePlan,
+        plan_raw:            pub.plan || 'free',
+        plan_expires_at:     pub.plan_expires_at || null,
+        created_at:          u.created_at,
+        last_sign_in:        u.last_sign_in_at,
+        submissions_total:   countMap[u.id]?.total   || 0,
+        submissions_success: countMap[u.id]?.success || 0,
+      }
+    })
 
   res.json({ users })
+})
+
+const VALID_ROLES = ['free', 'plus', 'family', 'noob']
+
+// POST /api/admin/set-role — assign a plan/role to any user
+router.post('/set-role', requireAdmin, async (req, res) => {
+  const { userId, role } = req.body
+
+  if (!userId) return res.status(400).json({ error: 'userId is required' })
+  if (!VALID_ROLES.includes(role)) {
+    return res.status(400).json({ error: `role must be one of: ${VALID_ROLES.join(', ')}` })
+  }
+
+  // noob role: no expiry, stays until admin changes it
+  // paid plans: set expiry 1 year from now when granted manually
+  const updates = { plan: role }
+  if (role === 'plus' || role === 'family') {
+    const expires = new Date()
+    expires.setFullYear(expires.getFullYear() + 1)
+    updates.plan_expires_at = expires.toISOString()
+    updates.is_active = true
+  } else if (role === 'noob') {
+    updates.plan_expires_at = null  // noob never expires
+    updates.is_active = true
+  } else if (role === 'free') {
+    updates.plan_expires_at = null
+    // don't change is_active on downgrade — admin controls that separately
+  }
+
+  const { data, error } = await supabase
+    .from('users')
+    .update(updates)
+    .eq('id', userId)
+    .select('id, email, plan, is_active')
+    .single()
+
+  if (error) return res.status(500).json({ error: error.message })
+  res.json({ success: true, user: data })
 })
 
 // POST /api/admin/activate — toggle is_active for a user

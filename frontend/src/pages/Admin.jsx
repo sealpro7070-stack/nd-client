@@ -19,6 +19,7 @@ export default function Admin() {
   const [toasting, setToasting] = useState(null)
   const [token, setToken]       = useState('')
   const [connectTarget, setConnectTarget] = useState(null) // { id, email } of user to connect AINS for
+  const [roleTarget, setRoleTarget]       = useState(null) // userId being role-changed
 
   useEffect(() => { checkAdminAndLoad() }, [])
 
@@ -67,6 +68,22 @@ export default function Admin() {
       setUsers(prev => prev.map(u => u.id === userId ? { ...u, is_active: !currentlyActive } : u))
       showToast(!currentlyActive ? 'User activated!' : 'User deactivated.')
     } catch (err) { showToast(err.message, 'error') }
+  }
+
+  async function setRole(userId, role) {
+    setRoleTarget(userId)
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/admin/set-role`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ userId, role })
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, plan: role } : u))
+      showToast(`Role set to "${role}" for user`)
+    } catch (err) { showToast(err.message, 'error') }
+    finally { setRoleTarget(null) }
   }
 
   async function reviewPayment(requestId, action) {
@@ -231,8 +248,9 @@ export default function Admin() {
                           <span className={`text-xs font-bold px-2 py-0.5 rounded-full capitalize ${
                             user.plan === 'family' ? 'bg-ok-100 text-ok-700' :
                             user.plan === 'plus'   ? 'bg-brand-100 text-brand-700' :
+                            user.plan === 'noob'   ? 'bg-purple-100 text-purple-700' :
                                                      'bg-gray-100 text-gray-600'
-                          }`}>{user.plan || 'free'}</span>
+                          }`}>{user.plan || 'free'}{user.plan === 'noob' ? ' 🧪' : ''}</span>
                         </td>
                         <td className="px-5 py-4 hidden md:table-cell">
                           {user.has_cookie
@@ -258,22 +276,37 @@ export default function Admin() {
                         </td>
                         <td className="px-5 py-4 text-center">
                           <div className="flex flex-col items-center gap-1">
-                            {user.email === ADMIN_EMAIL && (
-                              <span className="text-xs text-brand-500 font-semibold">Admin</span>
+                            {user.email === ADMIN_EMAIL ? (
+                              <span className="text-xs text-brand-500 font-bold">👑 Admin</span>
+                            ) : (
+                              <>
+                                {/* Role selector */}
+                                <select
+                                  value={user.plan || 'free'}
+                                  disabled={roleTarget === user.id}
+                                  onChange={e => setRole(user.id, e.target.value)}
+                                  className="text-xs font-semibold px-2 py-1 rounded-lg border border-line bg-white text-heading w-full max-w-[110px] cursor-pointer disabled:opacity-50"
+                                >
+                                  <option value="free">Free</option>
+                                  <option value="plus">Plus</option>
+                                  <option value="family">Family</option>
+                                  <option value="noob">Noob 🧪</option>
+                                </select>
+                                <button
+                                  onClick={() => toggleActivate(user.id, user.is_active)}
+                                  className={`text-xs font-semibold px-3 py-1.5 rounded-lg transition w-full max-w-[110px] ${
+                                    user.is_active
+                                      ? 'bg-danger-50 text-danger-600 hover:bg-danger-100'
+                                      : 'bg-brand-600 text-white hover:bg-brand-700'
+                                  }`}
+                                >
+                                  {user.is_active ? 'Deactivate' : 'Approve'}
+                                </button>
+                              </>
                             )}
                             <button
-                              onClick={() => toggleActivate(user.id, user.is_active)}
-                              className={`text-xs font-semibold px-3 py-1.5 rounded-lg transition ${
-                                user.is_active
-                                  ? 'bg-danger-50 text-danger-600 hover:bg-danger-100'
-                                  : 'bg-brand-600 text-white hover:bg-brand-700'
-                              }`}
-                            >
-                              {user.is_active ? 'Deactivate' : 'Approve'}
-                            </button>
-                            <button
                               onClick={() => setConnectTarget({ id: user.id, email: user.email })}
-                              className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-brand-50 text-brand-700 hover:bg-brand-100 transition"
+                              className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-brand-50 text-brand-700 hover:bg-brand-100 transition w-full max-w-[110px]"
                             >
                               {user.has_cookie ? 'Reconnect AINS' : 'Connect AINS'}
                             </button>

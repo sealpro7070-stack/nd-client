@@ -10,7 +10,8 @@ const { decrypt } = require('../lib/crypto')
 const { runBot } = require('./browser')
 
 // Plan limits — single source of truth
-const PLAN_MAX = { free: 1, plus: 15, family: 15 }
+// noob = tester role granted by admin, effectively unlimited
+const PLAN_MAX = { free: 1, plus: 15, family: 15, noob: 999 }
 
 // Per-user/slot lock: prevents simultaneous bot runs for the same user
 const activeBotRuns = new Map()
@@ -72,9 +73,11 @@ async function _startBot(userId, directCookie, directSsUser, directSsProfile, di
   console.log(`[bot] User: ${user.email}`)
 
   // Derive plan limits from the user row (bot is the final authority — not the route layer)
+  const isAdminUser = user.email === process.env.ADMIN_EMAIL
   const planExpired = user.plan_expires_at && new Date(user.plan_expires_at) < new Date()
-  const activePlan  = planExpired ? 'free' : (user.plan || 'free')
-  const maxAllowed  = PLAN_MAX[activePlan] ?? 1
+  // noob plan never expires (admin-granted tester role)
+  const activePlan  = (user.plan === 'noob') ? 'noob' : (planExpired ? 'free' : (user.plan || 'free'))
+  const maxAllowed  = isAdminUser ? 9999 : (PLAN_MAX[activePlan] ?? 1)
 
   // 2. Fetch settings
   const { data: settings } = await supabase

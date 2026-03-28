@@ -15,6 +15,7 @@ router.post('/', requireAuth, async (req, res) => {
   }
 
   const isAdmin = req.authUser?.email === process.env.ADMIN_EMAIL
+  const ADMIN_EMAIL = process.env.ADMIN_EMAIL
 
   // Quick pre-checks before launching browser
   // Use maybeSingle() so a missing row returns null (not an error)
@@ -65,13 +66,15 @@ router.post('/', requireAuth, async (req, res) => {
   if (!user.ains_cookie_encrypted) return res.status(400).json({ error: 'No AINS session saved. Use "Connect AINS Account" on the dashboard.' })
 
   // Plan limit enforcement
+  // noob = admin-granted tester role, never expires, unlimited books
   const planExpired = user.plan_expires_at && new Date(user.plan_expires_at) < new Date()
-  const activePlan  = planExpired ? 'free' : (user.plan || 'free')
-  const PLAN_MAX    = { free: 1, plus: 15, family: 15 }
-  const maxAllowed  = isAdmin ? 100 : (PLAN_MAX[activePlan] ?? 1)
+  const activePlan  = (user.plan === 'noob') ? 'noob' : (planExpired ? 'free' : (user.plan || 'free'))
+  const PLAN_MAX    = { free: 1, plus: 15, family: 15, noob: 999 }
+  const maxAllowed  = isAdmin ? 9999 : (PLAN_MAX[activePlan] ?? 1)
 
-  // Rate limit: 5 runs per user per hour (skip for admin)
-  if (!isAdmin && !checkRateLimit(userId)) {
+  // Rate limit: 5 runs per user per hour (skip for admin and noob testers)
+  const skipRateLimit = isAdmin || activePlan === 'noob'
+  if (!skipRateLimit && !checkRateLimit(userId)) {
     return res.status(429).json({ error: 'Too many requests. Maximum 5 submissions per hour.' })
   }
 
