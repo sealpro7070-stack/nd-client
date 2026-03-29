@@ -37,7 +37,13 @@ export default function Upgrade() {
   const [successMsg, setSuccessMsg] = useState('')
   const [receiptData, setReceiptData] = useState(null)
 
-  const handleSelectPlan = (plan) => {
+  const handleSelectPlan = async (plan) => {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) {
+      alert("Please create an account or sign in first to upgrade.")
+      navigate('/')
+      return
+    }
     setSelectedPlan(plan)
     setShowModal(true)
     setErrorMsg('')
