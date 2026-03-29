@@ -2,7 +2,7 @@ const { chromium } = require('playwright')
 const path = require('path')
 const fs = require('fs')
 const supabase = require('../lib/supabase')
-const { injectSession } = require('./login')
+const { injectSession, loginWithCredentials } = require('./login')
 const { fillForm } = require('./fillForm')
 
 const AINS_BASE = 'https://ains.moe.gov.my'
@@ -28,9 +28,18 @@ async function launchBrowser() {
     timezoneId: 'Asia/Kuala_Lumpur',
   })
 
-  // Mask automation signals
+  // Thorough automation masking — prevents bot detection
   await context.addInitScript(() => {
     Object.defineProperty(navigator, 'webdriver', { get: () => undefined })
+    Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] })
+    Object.defineProperty(navigator, 'languages', { get: () => ['ms-MY', 'ms', 'en-US', 'en'] })
+    Object.defineProperty(navigator, 'platform', { get: () => 'Win32' })
+    window.chrome = { runtime: {}, loadTimes: () => {}, csi: () => {}, app: {} }
+    const originalQuery = window.navigator.permissions.query
+    window.navigator.permissions.query = (params) =>
+      params.name === 'notifications'
+        ? Promise.resolve({ state: Notification.permission })
+        : originalQuery(params)
   })
 
   return { browser, context }
@@ -54,7 +63,7 @@ async function takeScreenshot(page, label) {
   }
 }
 
-async function runBot({ user, settings, cookie, ssUser, ssProfile, cookies, books, submissions }) {
+async function runBot({ user, settings, cookie, ssUser, ssProfile, cookies, books, submissions, ainsEmail, ainsPassword }) {
   let browser
   try {
     const launched = await launchBrowser()
@@ -62,13 +71,21 @@ async function runBot({ user, settings, cookie, ssUser, ssProfile, cookies, book
     const context = launched.context
 
     // Inject session (use captured cookie)
-    const { page, isLoggedIn } = await loginAndVerify(context, cookie, ssUser, ssProfile, cookies)
+    let { page, isLoggedIn } = await loginAndVerify(context, cookie, ssUser, ssProfile, cookies)
+
+    // If session injection failed AND we have saved credentials, do a fresh login
+    if (!isLoggedIn && ainsEmail && ainsPassword) {
+      console.log('[bot] Session injection failed — attempting fresh login with saved credentials')
+      await takeScreenshot(page, 'session-failed-before-relogin')
+      isLoggedIn = await loginWithCredentials(context, page, ainsEmail, ainsPassword)
+      console.log(`[bot] Fresh login result: ${isLoggedIn ? 'SUCCESS' : 'FAILED'}`)
+    }
 
     if (!isLoggedIn) {
-      console.error('[bot] Session injection failed — cookie may have expired')
+      console.error('[bot] All login methods failed')
       await takeScreenshot(page, 'session-failed')
 
-      await markSubmissions(submissions.map(s => s.id), 'failed', 'AINS session expired. Please reconnect in Settings.')
+      await markSubmissions(submissions.map(s => s.id), 'failed', 'AINS session expired. Please reconnect using "Connect AINS Account" on the dashboard.')
       await browser.close()
       return { success: false, reason: 'session_expired' }
     }

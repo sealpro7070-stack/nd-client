@@ -86,22 +86,25 @@ router.post('/connect', requireAuth, async (req, res) => {
           path: c.path || '/',
           httpOnly: c.httpOnly || false,
           secure: c.secure || false,
-          sameSite: c.sameSite === 'no_restriction' ? 'None'
-                  : c.sameSite === 'lax'            ? 'Lax'
-                  : c.sameSite === 'strict'          ? 'Strict'
-                  : 'Lax',
+          sameSite: 
+            (c.sameSite && c.sameSite.toLowerCase() === 'no_restriction') ? 'None'
+          : (c.sameSite && c.sameSite.toLowerCase() === 'none') ? 'None'
+          : (c.sameSite && c.sameSite.toLowerCase() === 'strict') ? 'Strict'
+          : 'Lax',
           expires: c.expirationDate || -1,
         }))
       })
 
       const encrypted = encrypt(sessionData)
       const encryptedEmail = encrypt(email)
+      const encryptedPassword = encrypt(password)
 
       const { error } = await supabase
         .from('users')
         .update({
           ains_cookie_encrypted: encrypted,
           ains_email_encrypted: encryptedEmail,
+          ains_password_encrypted: encryptedPassword,
         })
         .eq('id', userId)
 

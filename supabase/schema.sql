@@ -121,3 +121,6 @@ create index if not exists idx_settings_user_id on settings(user_id);
 -- Run this for uniqueness: CREATE UNIQUE INDEX IF NOT EXISTS idx_users_ains_user_id_hash ON users(ains_user_id_hash) WHERE ains_user_id_hash IS NOT NULL;
 alter table users add column if not exists ains_user_id_hash text;
 create unique index if not exists idx_users_ains_user_id_hash on users(ains_user_id_hash) where ains_user_id_hash is not null;
+
+-- Add encrypted AINS password storage for bot fallback login
+alter table users add column if not exists ains_password_encrypted text;

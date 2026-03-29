@@ -27,19 +27,31 @@ async function injectSession(context, page, token, ssUser, ssProfile, cookies = 
   // 1. Inject all browser cookies into the Playwright context BEFORE any navigation
   //    This gives AINS the refresh token cookie so it can auto-renew the expired JWT
   if (cookies.length > 0) {
-    const playwrightCookies = cookies.map(c => ({
-      name:     c.name,
-      value:    c.value,
-      domain:   c.domain.startsWith('.') ? c.domain : '.' + c.domain,
-      path:     c.path || '/',
-      httpOnly: c.httpOnly || false,
-      secure:   c.secure || false,
-      sameSite: c.sameSite === 'no_restriction' ? 'None'
-               : c.sameSite === 'lax'            ? 'Lax'
-               : c.sameSite === 'strict'          ? 'Strict'
-               : 'Lax',
-      expires:  c.expirationDate || -1,
-    }))
+    const playwrightCookies = cookies
+      .filter(c => c.domain && c.domain.includes('moe.gov.my'))
+      .map(c => {
+        const pc = {
+          name: c.name,
+          value: c.value,
+          domain: c.domain.startsWith('.') ? c.domain : '.' + c.domain,
+          path: c.path || '/',
+          httpOnly: c.httpOnly || false,
+          secure: c.secure || false,
+          sameSite: 
+            (c.sameSite && c.sameSite.toLowerCase() === 'no_restriction') ? 'None'
+            : (c.sameSite && c.sameSite.toLowerCase() === 'none') ? 'None'
+            : (c.sameSite && c.sameSite.toLowerCase() === 'strict') ? 'Strict'
+            : 'Lax',
+        }
+        
+        const expires = c.expires || c.expirationDate || -1
+        if (expires !== -1) {
+          pc.expires = Math.floor(expires)
+        }
+        
+        return pc
+      })
+      
     try {
       await context.addCookies(playwrightCookies)
       console.log(`[login] Cookies injected OK`)
@@ -100,7 +112,7 @@ async function injectSession(context, page, token, ssUser, ssProfile, cookies = 
   })
 
   // 6. Debug screenshot
-  await page.screenshot({ path: path.join(SCREENSHOTS_DIR, `debug-login-${Date.now()}.png`), fullPage: true }).catch(() => {})
+  await page.screenshot({ path: path.join(SCREENSHOTS_DIR, `debug-login-${Date.now()}.png`), fullPage: true }).catch(() => { })
 
   // 7. Check login status
   const checkStatus = async () => {
@@ -148,7 +160,7 @@ async function loginWithCredentials(context, page, username, password) {
   await page.goto(AINS_BASE, { waitUntil: 'networkidle', timeout: 30000 })
   await page.waitForTimeout(2000)
   console.log(`[login] Loaded AINS: ${page.url()}`)
-  await page.screenshot({ path: path.join(SCREENSHOTS_DIR, `step1-ains-${Date.now()}.png`), fullPage: true }).catch(() => {})
+  await page.screenshot({ path: path.join(SCREENSHOTS_DIR, `step1-ains-${Date.now()}.png`), fullPage: true }).catch(() => { })
 
   // 2. Click the DELIMa login button
   const loginBtnSelectors = [
@@ -168,7 +180,7 @@ async function loginWithCredentials(context, page, username, password) {
         clicked = true
         break
       }
-    } catch {}
+    } catch { }
   }
   if (!clicked) console.warn('[login] No login button found on AINS page')
 
@@ -176,9 +188,10 @@ async function loginWithCredentials(context, page, username, password) {
   await page.waitForTimeout(4000)
   const urlAfterClick = page.url()
   console.log(`[login] After click URL: ${urlAfterClick}`)
-  await page.screenshot({ path: path.join(SCREENSHOTS_DIR, `step2-loginform-${Date.now()}.png`), fullPage: true }).catch(() => {})
+  await page.screenshot({ path: path.join(SCREENSHOTS_DIR, `step2-loginform-${Date.now()}.png`), fullPage: true }).catch(() => { })
 
   const isMicrosoft = urlAfterClick.includes('login.microsoftonline.com') || urlAfterClick.includes('login.microsoft.com')
+  const isGoogle = urlAfterClick.includes('accounts.google.com')
 
   if (isMicrosoft) {
     // ── Microsoft Azure AD login ──────────────────────────────────────────
@@ -200,7 +213,7 @@ async function loginWithCredentials(context, page, username, password) {
 
     // Wait for password screen
     await page.waitForTimeout(4000)
-    await page.screenshot({ path: path.join(SCREENSHOTS_DIR, `step3-afterusername-${Date.now()}.png`), fullPage: true }).catch(() => {})
+    await page.screenshot({ path: path.join(SCREENSHOTS_DIR, `step3-afterusername-${Date.now()}.png`), fullPage: true }).catch(() => { })
     console.log('[login] After username URL:', page.url())
 
     // Step B: Enter password
@@ -219,18 +232,61 @@ async function loginWithCredentials(context, page, username, password) {
 
     // Wait for post-login redirect
     await page.waitForTimeout(4000)
-    await page.screenshot({ path: path.join(SCREENSHOTS_DIR, `step4-afterpassword-${Date.now()}.png`), fullPage: true }).catch(() => {})
+    await page.screenshot({ path: path.join(SCREENSHOTS_DIR, `step4-afterpassword-${Date.now()}.png`), fullPage: true }).catch(() => { })
     console.log('[login] After password URL:', page.url())
 
     // Step C: Dismiss "Stay signed in?" if shown
     try {
       const noBtn = page.locator('#idBtn_Back')
-      if (await noBtn.count() > 0) {
-        await noBtn.click()
-        console.log('[login] Dismissed "Stay signed in?" dialog')
-        await page.waitForTimeout(2000)
-      }
-    } catch {}
+      await noBtn.waitFor({ state: 'visible', timeout: 3000 })
+      await noBtn.click()
+      console.log('[login] Dismissed "Stay signed in?" dialog')
+      await page.waitForTimeout(2000)
+    } catch { }
+
+  } else if (isGoogle) {
+    // ── Google Workspace login ────────────────────────────────────────────
+    console.log('[login] Google login page detected')
+
+    // Step A: Enter email
+    try {
+      await page.waitForSelector('input[type="email"]', { timeout: 12000 })
+      await page.fill('input[type="email"]', username)
+      console.log('[login] Filled Google email')
+      await page.waitForTimeout(500)
+      
+      // Click Next
+      const nextBtn = page.locator('button:has-text("Next"), button:has-text("Seterusnya"), #identifierNext button').first()
+      await nextBtn.click()
+      console.log('[login] Clicked Next (email)')
+    } catch (e) {
+      console.warn('[login] Google email step failed:', e.message)
+    }
+
+    // Wait for password screen
+    await page.waitForTimeout(4000)
+    await page.screenshot({ path: path.join(SCREENSHOTS_DIR, `step3-after-google-email-${Date.now()}.png`), fullPage: true }).catch(() => { })
+
+    // Step B: Enter password
+    try {
+      const passwordLocator = page.locator('input[type="password"]').filter({ visible: true }).first()
+      await passwordLocator.waitFor({ state: 'visible', timeout: 12000 })
+      await passwordLocator.fill(password)
+      console.log('[login] Filled Google password')
+      await page.waitForTimeout(500)
+      
+      // Click Next
+      const nextBtn = page.locator('button:has-text("Next"), button:has-text("Seterusnya"), #passwordNext button').first()
+      await nextBtn.click()
+      console.log('[login] Clicked Next (password)')
+    } catch (e) {
+      console.warn('[login] Google password step failed:', e.message)
+    }
+
+    // Wait for post-login redirect
+    await page.waitForTimeout(4000)
+    await page.screenshot({ path: path.join(SCREENSHOTS_DIR, `step4-after-google-pwd-${Date.now()}.png`), fullPage: true }).catch(() => { })
+    console.log('[login] After Google password URL:', page.url())
 
   } else {
     // ── Fallback: non-Microsoft form ──────────────────────────────────────
@@ -243,7 +299,7 @@ async function loginWithCredentials(context, page, username, password) {
       try {
         const el = page.locator(sel).first()
         if (await el.count() > 0) { await el.fill(username); console.log(`[login] Filled username via: ${sel}`); break }
-      } catch {}
+      } catch { }
     }
     try {
       // Google's login page has a hidden password field (aria-hidden, tabindex=-1, name="hiddenPassword")
@@ -259,7 +315,7 @@ async function loginWithCredentials(context, page, username, password) {
       try {
         const btn = page.locator(sel).first()
         if (await btn.count() > 0) { await btn.click(); console.log(`[login] Submitted via: ${sel}`); break }
-      } catch {}
+      } catch { }
     }
   }
 
@@ -271,7 +327,7 @@ async function loginWithCredentials(context, page, username, password) {
     console.warn('[login] Did not redirect to ains.moe.gov.my within 30s, URL:', page.url())
   }
   await page.waitForTimeout(3000)
-  await page.screenshot({ path: path.join(SCREENSHOTS_DIR, `final-${Date.now()}.png`), fullPage: true }).catch(() => {})
+  await page.screenshot({ path: path.join(SCREENSHOTS_DIR, `final-${Date.now()}.png`), fullPage: true }).catch(() => { })
 
   // 5. Check login status
   const url = page.url()

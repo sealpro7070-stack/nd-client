@@ -253,6 +253,16 @@ async function performLogin(userId, email, password, onStatus) {
     ).catch(() => {})
 
     let ssToken = await getAny('jb-app-token')
+    
+    // Fix: Wait a generous amount of time for the Vuex store to finish resolving 
+    // user information asynchronously via the AINS API. If we don't wait, ssUser 
+    // is captured as null, and the bot gets kicked out when it tries to inject it.
+    console.log('[login] Waiting for jb-app-user and profile to populate...');
+    await page.waitForFunction(
+      () => !!(sessionStorage.getItem('jb-app-user') || localStorage.getItem('jb-app-user')),
+      { timeout: 10000, polling: 300 }
+    ).catch(() => console.log('[login] jb-app-user did not populate after 10s'));
+
     const storageInfo = await page.evaluate(() => ({
       url: window.location.href,
       ss: Object.keys(sessionStorage),

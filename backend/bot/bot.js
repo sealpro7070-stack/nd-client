@@ -215,7 +215,16 @@ async function _startBot(userId, directCookie, directSsUser, directSsProfile, di
   if (insertErr) throw new Error(`Failed to create submission records: ${insertErr.message}`)
   if (!insertedSubs) throw new Error('Failed to create submission records: no data returned')
 
-  // 8. Run the browser bot with injected session
+  // Decrypt saved AINS credentials for fallback login
+  let ainsEmail = null, ainsPassword = null
+  try {
+    if (user.ains_email_encrypted) ainsEmail = decrypt(user.ains_email_encrypted)
+    if (user.ains_password_encrypted) ainsPassword = decrypt(user.ains_password_encrypted)
+  } catch (err) {
+    console.warn('[bot] Could not decrypt AINS credentials for fallback:', err.message)
+  }
+
+  // 8. Run the browser bot with injected session (+ fallback credentials)
   const result = await runBot({
     user,
     settings: userSettings,
@@ -224,7 +233,9 @@ async function _startBot(userId, directCookie, directSsUser, directSsProfile, di
     ssProfile,
     cookies: cookiesToInject,
     books: shuffled,
-    submissions: insertedSubs
+    submissions: insertedSubs,
+    ainsEmail,
+    ainsPassword,
   })
 
   return result
