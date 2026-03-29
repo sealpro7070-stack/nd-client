@@ -402,8 +402,8 @@ export default function Dashboard() {
               </div>
               <button
                 type="button"
-                onClick={() => setBookCount(v => Math.min(plan === 'free' ? 1 : plan === 'noob' ? 999 : 15, v + 1))}
-                disabled={bookCount >= (plan === 'free' ? 1 : plan === 'noob' ? 999 : 15)}
+                onClick={() => setBookCount(v => Math.min(plan === 'free' ? 1 : plan === 'noob' ? 999 : 50, v + 1))}
+                disabled={bookCount >= (plan === 'free' ? 1 : plan === 'noob' ? 999 : 50)}
                 className="w-10 h-10 rounded-xl bg-white border border-line text-heading text-xl font-bold hover:border-brand-300 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
               >
                 +

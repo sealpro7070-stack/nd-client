@@ -62,7 +62,7 @@ router.get('/my-request', requireAuth, async (req, res) => {
 // Body: { plan: 'plus'|'family', reference: '...' }
 router.post('/request', requireAuth, async (req, res) => {
   const userId = req.authUser.id
-  const { plan, reference } = req.body
+  const { plan, reference, receipt_data } = req.body
 
   if (!PLAN_PRICES[plan]) {
     return res.status(400).json({ error: 'Invalid plan. Must be "plus" or "family".' })
@@ -101,6 +101,7 @@ router.post('/request', requireAuth, async (req, res) => {
       plan,
       amount:    PLAN_PRICES[plan],
       reference: reference || null,
+      receipt_data: receipt_data || null
     })
     .select()
     .single()

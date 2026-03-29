@@ -3,8 +3,9 @@
 -- Run in Supabase SQL editor AFTER schema.sql
 
 -- ── Users: plan fields ────────────────────────────────────────────────────────
-ALTER TABLE users ADD COLUMN IF NOT EXISTS plan text DEFAULT 'free'
-  CHECK (plan IN ('free','plus','family'));
+ALTER TABLE users ADD COLUMN IF NOT EXISTS plan text DEFAULT 'free';
+ALTER TABLE users DROP CONSTRAINT IF EXISTS users_plan_check;
+ALTER TABLE users ADD CONSTRAINT users_plan_check CHECK (plan IN ('free','plus','family','noob'));
 ALTER TABLE users ADD COLUMN IF NOT EXISTS plan_expires_at timestamptz;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS ains_cookie_encrypted text;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS ains_email_encrypted text;
@@ -23,7 +24,7 @@ CREATE TABLE IF NOT EXISTS family_slots (
   ains_user_id_hash     text,
   language              text DEFAULT 'Melayu'
     CHECK (language IN ('Melayu','Inggeris','Cina','Tamil')),
-  books_per_month       int  DEFAULT 4 CHECK (books_per_month BETWEEN 1 AND 15),
+  books_per_month       int  DEFAULT 4 CHECK (books_per_month BETWEEN 1 AND 50),
   created_at            timestamptz DEFAULT now(),
   UNIQUE (user_id, slot_name)
 );
@@ -42,7 +43,8 @@ CREATE TABLE IF NOT EXISTS payment_requests (
   reference   text,         -- user-supplied TNG reference / note
   created_at  timestamptz DEFAULT now(),
   reviewed_at timestamptz,
-  reviewed_by text
+  reviewed_by text,
+  receipt_data text
 );
 
 CREATE INDEX IF NOT EXISTS idx_payment_requests_user_id ON payment_requests(user_id);
@@ -70,3 +72,10 @@ CREATE POLICY IF NOT EXISTS "Service role full access payment_requests"
 -- ── Submissions: allow family slot submissions ────────────────────────────────
 ALTER TABLE submissions ADD COLUMN IF NOT EXISTS family_slot_id uuid
   REFERENCES family_slots(id) ON DELETE SET NULL;
+
+-- ── Fix constraints to allow up to 50 books/month ─────────────────────────────
+ALTER TABLE settings DROP CONSTRAINT IF EXISTS settings_books_per_month_check;
+ALTER TABLE settings ADD CONSTRAINT settings_books_per_month_check CHECK (books_per_month BETWEEN 1 AND 50);
+
+ALTER TABLE family_slots DROP CONSTRAINT IF EXISTS family_slots_books_per_month_check;
+ALTER TABLE family_slots ADD CONSTRAINT family_slots_books_per_month_check CHECK (books_per_month BETWEEN 1 AND 50);

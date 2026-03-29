@@ -11,7 +11,7 @@ const { runBot } = require('./browser')
 
 // Plan limits — single source of truth
 // noob = tester role granted by admin, effectively unlimited
-const PLAN_MAX = { free: 1, plus: 15, family: 15, noob: 999 }
+const PLAN_MAX = { free: 1, plus: 50, family: 50, noob: 999 }
 
 // Per-user/slot lock: prevents simultaneous bot runs for the same user
 const activeBotRuns = new Map()

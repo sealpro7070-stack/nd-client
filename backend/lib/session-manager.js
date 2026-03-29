@@ -184,8 +184,8 @@ async function performLogin(userId, email, password, onStatus) {
 
     console.log(`[login] Credentials submitted (${isGoogle ? 'Google' : 'Microsoft'}), checking for MFA challenge`)
 
-    // Wait for MFA page to render — use a short fixed wait then check URL
-    await page.waitForTimeout(2000)
+    // Wait for MFA page to render — increase wait to 5s to give the number time to appear
+    await page.waitForTimeout(5000)
 
     // Detect number-matching challenge — both Google and Microsoft can show a
     // 2-digit number on screen that the user must tap on their phone to confirm.
@@ -195,24 +195,31 @@ async function performLogin(userId, email, password, onStatus) {
                            urlAfterCreds.includes('login.microsoftonline.com') ||
                            urlAfterCreds.includes('login.microsoft.com')
 
+    const extractNumber = () => page.evaluate(() => {
+      const candidates = []
+      for (const el of document.querySelectorAll('*')) {
+        if (el.children.length > 0) continue
+        const txt = (el.textContent || '').trim()
+        if (!/^\d{2}$/.test(txt)) continue
+        const rect = el.getBoundingClientRect()
+        if (rect.width <= 0 || rect.height <= 0) continue
+        const fs = parseFloat(window.getComputedStyle(el).fontSize) || 0
+        candidates.push({ txt, fs, area: rect.width * rect.height })
+      }
+      if (candidates.length === 0) return null
+      candidates.sort((a, b) => b.fs - a.fs || b.area - a.area)
+      return candidates[0].txt
+    }).catch(() => null)
+
     if (onAuthProvider) {
-      mfaNumber = await page.evaluate(() => {
-        // Find visible leaf elements whose entire text content is a 2-digit number.
-        // Pick the most prominent one (largest font size, then largest area).
-        const candidates = []
-        for (const el of document.querySelectorAll('*')) {
-          if (el.children.length > 0) continue          // skip non-leaf nodes
-          const txt = (el.textContent || '').trim()
-          if (!/^\d{2}$/.test(txt)) continue            // must be exactly 2 digits
-          const rect = el.getBoundingClientRect()
-          if (rect.width <= 0 || rect.height <= 0) continue  // must be visible
-          const fs = parseFloat(window.getComputedStyle(el).fontSize) || 0
-          candidates.push({ txt, fs, area: rect.width * rect.height })
-        }
-        if (candidates.length === 0) return null
-        candidates.sort((a, b) => b.fs - a.fs || b.area - a.area)
-        return candidates[0].txt
-      }).catch(() => null)
+      mfaNumber = await extractNumber()
+
+      // If first attempt found nothing, wait another 3s and retry once
+      // (number-matching challenges sometimes take a moment to render)
+      if (!mfaNumber) {
+        await page.waitForTimeout(3000)
+        mfaNumber = await extractNumber()
+      }
 
       console.log(`[login] MFA challenge: ${mfaNumber ? `number-matching (${mfaNumber})` : 'simple push approval'}`)
     }

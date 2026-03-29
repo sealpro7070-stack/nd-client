@@ -32,7 +32,7 @@ router.post('/', requireAuth, async (req, res) => {
 
   if (books_per_month !== undefined) {
     const v = parseInt(books_per_month)
-    if (isNaN(v) || v < 1 || v > 15) return res.status(400).json({ error: 'books_per_month must be between 1 and 15' })
+    if (isNaN(v) || v < 1 || v > 50) return res.status(400).json({ error: 'books_per_month must be between 1 and 50' })
     updates.books_per_month = v
   }
   if (language !== undefined) {

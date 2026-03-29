@@ -364,6 +364,11 @@ export default function Admin() {
                         <span>{new Date(pr.created_at).toLocaleString('en-MY')}</span>
                         {pr.reference && <span>Ref: <strong className="text-heading">{pr.reference}</strong></span>}
                         {pr.reviewed_by && <span>Reviewed by: {pr.reviewed_by}</span>}
+                        {pr.receipt_data && (
+                          <a href={pr.receipt_data} target="_blank" rel="noreferrer" className="text-brand-600 hover:underline font-semibold">
+                            View Receipt
+                          </a>
+                        )}
                       </div>
                     </div>
                     {pr.status === 'pending' && (

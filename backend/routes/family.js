@@ -126,7 +126,7 @@ router.patch('/slots/:slotId/settings', requireAuth, requireFamily, async (req, 
     updates.language = language
   }
   if (books_per_month !== undefined) {
-    updates.books_per_month = Math.min(15, Math.max(1, parseInt(books_per_month) || 1))
+    updates.books_per_month = Math.min(50, Math.max(1, parseInt(books_per_month) || 1))
   }
 
   const { error } = await supabase

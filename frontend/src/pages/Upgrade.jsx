@@ -1,5 +1,7 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
+import { supabase } from '../lib/supabase'
 
 const FREE_FEATURES = [
   '1 book / month',
@@ -9,7 +11,7 @@ const FREE_FEATURES = [
 ]
 
 const PRO_FEATURES = [
-  'Up to 8 books / month',
+  'Up to 50 books / month',
   'All 4 languages',
   'Full submission history',
   'Monthly auto-schedule',
@@ -17,8 +19,80 @@ const PRO_FEATURES = [
   'Priority support',
 ]
 
+const FAMILY_FEATURES = [
+  'Up to 3 AINS accounts',
+  '50 books/month per account',
+  'All PRO features included',
+  'Perfect for siblings'
+]
+
+const BACKEND = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001'
+
 export default function Upgrade() {
   const navigate = useNavigate()
+  const [selectedPlan, setSelectedPlan] = useState(null) // 'plus' or 'family'
+  const [showModal, setShowModal] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [errorMsg, setErrorMsg] = useState('')
+  const [successMsg, setSuccessMsg] = useState('')
+  const [receiptData, setReceiptData] = useState(null)
+
+  const handleSelectPlan = (plan) => {
+    setSelectedPlan(plan)
+    setShowModal(true)
+    setErrorMsg('')
+    setSuccessMsg('')
+    setReceiptData(null)
+  }
+
+  const handleFileChange = (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    if (file.size > 2 * 1024 * 1024) {
+      setErrorMsg('File too large. Max 2MB.')
+      return
+    }
+    const reader = new FileReader()
+    reader.onload = (event) => setReceiptData(event.target.result)
+    reader.readAsDataURL(file)
+  }
+
+  const handleSubmitPayment = async () => {
+    if (!receiptData) {
+      setErrorMsg('Please upload your receipt.')
+      return
+    }
+
+    setSubmitting(true)
+    setErrorMsg('')
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token || ''
+
+      const res = await fetch(`${BACKEND}/api/payments/request`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          plan: selectedPlan,
+          receipt_data: receiptData
+        })
+      })
+
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to submit request')
+
+      setSuccessMsg('Receipt uploaded! Admin will approve it shortly.')
+      setTimeout(() => navigate('/dashboard'), 3000)
+    } catch (err) {
+      setErrorMsg(err.message)
+    } finally {
+      setSubmitting(false)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-page flex flex-col items-center justify-center px-5 py-16">
@@ -36,7 +110,7 @@ export default function Upgrade() {
         Back
       </motion.button>
 
-      <div className="w-full max-w-[480px]">
+      <div className="w-full max-w-4xl">
 
         {/* Header */}
         <motion.div
@@ -45,7 +119,6 @@ export default function Upgrade() {
           transition={{ duration: 0.5 }}
           className="text-center mb-10"
         >
-          {/* Lock icon */}
           <div className="w-16 h-16 bg-brand-50 border border-brand-100 rounded-2xl flex items-center justify-center mx-auto mb-5">
             <svg className="w-8 h-8 text-brand-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
               <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
@@ -54,38 +127,16 @@ export default function Upgrade() {
           </div>
 
           <div className="inline-flex items-center gap-2 bg-brand-50 border border-brand-200 text-brand-600 text-xs font-bold px-3 py-1.5 rounded-full mb-4">
-            Nilam Auto Pro
+            Nilam Auto Pro & Family
           </div>
 
           <h1 className="font-display text-3xl sm:text-4xl font-extrabold text-heading leading-tight">
             Unlock NILAM Auto<br />
             <span className="text-brand-600">Fully.</span>
           </h1>
-          <p className="text-muted text-base mt-3 max-w-sm mx-auto">
-            Submit up to 8 books per month in all languages — automatically. Less than the price of a coffee.
+          <p className="text-muted text-base mt-3 max-w-lg mx-auto">
+            Submit up to 50 books per language automatically. Get the Family plan for up to 3 separate AINS accounts.
           </p>
-
-          {/* Price */}
-          <div className="mt-7 bg-white border border-line rounded-2xl px-8 py-5 shadow-card inline-block">
-            <span className="text-muted text-sm">Only</span>
-            <div className="flex items-end justify-center gap-2 mt-1">
-              <span className="font-display text-5xl font-extrabold text-brand-600">RM18</span>
-              <span className="text-muted text-lg mb-1.5 font-semibold">/ year</span>
-            </div>
-            <p className="text-subtle text-xs mt-1">≈ RM1.50 / month · less than coffee</p>
-          </div>
-
-          {/* Trust signals */}
-          <div className="flex flex-wrap justify-center gap-4 mt-5 text-xs text-muted font-semibold">
-            <span className="flex items-center gap-1.5">
-              <svg className="w-3.5 h-3.5 text-ok-500" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
-              1,000+ Malaysian students
-            </span>
-            <span className="flex items-center gap-1.5">
-              <svg className="w-3.5 h-3.5 text-ok-500" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
-              Cancel anytime
-            </span>
-          </div>
         </motion.div>
 
         {/* Comparison */}
@@ -93,13 +144,13 @@ export default function Upgrade() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.1 }}
-          className="grid grid-cols-2 gap-4 mb-6"
+          className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6"
         >
           {/* Free */}
-          <div className="card-p">
+          <div className="card-p flex flex-col">
             <p className="text-muted font-bold text-sm mb-1">Free</p>
             <p className="font-display text-2xl font-extrabold text-heading mb-4">RM0</p>
-            <ul className="space-y-2.5">
+            <ul className="space-y-2.5 mb-8 flex-1">
               {FREE_FEATURES.map(f => (
                 <li key={f} className="flex items-center gap-2 text-sm text-muted">
                   <svg className="w-4 h-4 text-subtle flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
@@ -109,15 +160,16 @@ export default function Upgrade() {
                 </li>
               ))}
             </ul>
+            <button disabled className="btn-ghost w-full py-3 opacity-50 cursor-not-allowed">Current Plan</button>
           </div>
 
           {/* Pro */}
-          <div className="bg-brand-600 rounded-card p-6 relative overflow-hidden">
+          <div className="bg-brand-600 rounded-card p-6 relative overflow-hidden flex flex-col">
             <div className="absolute -right-4 -top-4 w-20 h-20 bg-white/5 rounded-full pointer-events-none" />
-            <div className="relative">
+            <div className="relative flex-1">
               <p className="text-brand-200 font-bold text-sm mb-1">Pro</p>
-              <p className="font-display text-2xl font-extrabold text-white mb-4">RM18 / yr</p>
-              <ul className="space-y-2.5">
+              <p className="font-display text-2xl font-extrabold text-white mb-4">RM18 <span className="text-sm font-medium">/ yr</span></p>
+              <ul className="space-y-2.5 mb-8">
                 {PRO_FEATURES.map(f => (
                   <li key={f} className="flex items-center gap-2 text-sm text-white">
                     <svg className="w-4 h-4 text-brand-200 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
@@ -128,26 +180,82 @@ export default function Upgrade() {
                 ))}
               </ul>
             </div>
+            <button onClick={() => handleSelectPlan('plus')} className="bg-white text-brand-700 font-bold w-full py-3 rounded-xl hover:bg-gray-50 transition-colors mt-auto relative z-10">
+              Unlock Pro
+            </button>
+          </div>
+
+          {/* Family */}
+          <div className="bg-brand-800 rounded-card p-6 relative overflow-hidden flex flex-col">
+            <div className="absolute -left-4 -bottom-4 w-24 h-24 bg-white/5 rounded-full pointer-events-none" />
+            <div className="relative flex-1">
+              <p className="text-brand-300 font-bold text-sm mb-1">Family</p>
+              <p className="font-display text-2xl font-extrabold text-white mb-4">RM48 <span className="text-sm font-medium">/ yr</span></p>
+              <ul className="space-y-2.5 mb-8">
+                {FAMILY_FEATURES.map(f => (
+                  <li key={f} className="flex items-center gap-2 text-sm text-white">
+                    <svg className="w-4 h-4 text-brand-300 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                    {f}
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <button onClick={() => handleSelectPlan('family')} className="bg-brand-500 text-white font-bold w-full py-3 rounded-xl hover:bg-brand-400 transition-colors mt-auto relative z-10">
+              Unlock Family
+            </button>
           </div>
         </motion.div>
-
-        {/* CTA */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.2 }}
-        >
-          <button className="btn-primary w-full py-4 text-base">
-            Unlock Now — RM18 / Year
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
-            </svg>
-          </button>
-          <p className="text-center text-subtle text-xs mt-3">
-            Secure payment via ToyyibPay. Questions? Contact us by email.
-          </p>
-        </motion.div>
       </div>
+
+      {/* Payment Modal */}
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
+          <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl relative">
+            <button onClick={() => setShowModal(false)} className="absolute top-4 right-4 text-muted hover:text-heading">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+
+            <h3 className="font-display text-2xl font-bold mb-4">Complete Payment</h3>
+            <p className="text-sm text-muted mb-4">
+              You selected the <strong>{selectedPlan === 'plus' ? 'Pro (RM18/yr)' : 'Family (RM48/yr)'}</strong> plan.
+              Please scan the QR code to pay, then upload your receipt below.
+            </p>
+
+            <div className="bg-gray-50 p-4 rounded-xl border border-line flex justify-center mb-6">
+              <img src="/qr.png" alt="Touch n Go QR Code" className="max-w-[180px] rounded-lg shadow-sm" />
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-semibold mb-2">Upload Receipt</label>
+                <input 
+                  type="file" 
+                  accept="image/*" 
+                  onChange={handleFileChange}
+                  className="w-full border border-line rounded-lg p-2 text-sm focus:outline-none"
+                />
+              </div>
+
+              {receiptData && (
+                <div className="h-24 w-full bg-cover bg-center rounded-lg border border-line" style={{ backgroundImage: `url(${receiptData})` }} />
+              )}
+
+              {errorMsg && <p className="text-xs font-semibold text-danger-600">{errorMsg}</p>}
+              {successMsg && <p className="text-sm font-bold text-ok-600">{successMsg}</p>}
+
+              <button 
+                onClick={handleSubmitPayment} 
+                disabled={submitting || !receiptData || successMsg} 
+                className="w-full py-3 bg-brand-600 text-white font-bold rounded-xl hover:bg-brand-700 disabled:opacity-50 transition-colors"
+              >
+                {submitting ? 'Submitting...' : 'Submit Receipt'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
