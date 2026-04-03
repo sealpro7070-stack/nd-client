@@ -226,6 +226,14 @@ router.post('/admin/qr-settings', requireAuth, requireAdmin, async (req, res) =>
   const { qr_data } = req.body
   if (!qr_data) return res.status(400).json({ error: 'qr_data required' })
 
+  const ALLOWED_QR_MIME = ['data:image/jpeg;', 'data:image/png;', 'data:image/webp;', 'data:image/gif;']
+  if (!ALLOWED_QR_MIME.some(p => qr_data.startsWith(p))) {
+    return res.status(400).json({ error: 'QR image must be a JPEG, PNG, WebP, or GIF.' })
+  }
+  if (qr_data.length > 200_000) {
+    return res.status(400).json({ error: 'QR image must be under 150KB.' })
+  }
+
   const { error } = await supabase
     .from('admin_settings')
     .upsert({ key: 'tng_qr', value: qr_data, updated_at: new Date().toISOString() }, { onConflict: 'key' })

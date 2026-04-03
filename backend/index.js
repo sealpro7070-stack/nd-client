@@ -1,6 +1,7 @@
 require('dotenv').config()
 const express = require('express')
 const cors = require('cors')
+const helmet = require('helmet')
 
 const authRoutes     = require('./routes/auth')
 const settingsRoutes = require('./routes/settings')
@@ -23,6 +24,7 @@ const ALLOWED_ORIGINS = [
   'http://localhost:3000',
 ].filter(Boolean)
 
+app.use(helmet({ contentSecurityPolicy: false }))
 app.use(cors({
   origin: (origin, callback) => {
     // Allow requests with no origin (e.g. server-to-server, curl)

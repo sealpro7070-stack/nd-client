@@ -120,7 +120,7 @@ export default function Landing() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_IN' && session?.user) {
         if (session.user.app_metadata?.provider) {
-          syncUserToBackend(session)
+          syncUserToBackend(session.user)
         }
         navigate('/dashboard')
       }
@@ -300,7 +300,7 @@ export default function Landing() {
             <motion.div {...up(0.2)} className="flex gap-8 flex-wrap border-t border-line pt-6">
               {[
                 { v: '1,000+', l: 'Malaysian students' },
-                { v: 'Up to 8', l: 'books / month' },
+                { v: 'Up to 50', l: 'books / month' },
                 { v: '< 2 min', l: 'setup time' },
               ].map(s => (
                 <div key={s.l}>

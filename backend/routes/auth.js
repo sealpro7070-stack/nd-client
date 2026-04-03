@@ -119,6 +119,8 @@ router.post('/connect', requireAuth, async (req, res) => {
       console.error('[auth] Login flow failed:', err.message)
       loginState[userId] = { status: 'error', message: err.message }
     }
+    // Auto-cleanup: if client never polls for the result, remove after 10 minutes
+    setTimeout(() => { delete loginState[userId] }, 10 * 60 * 1000)
   })()
 })
 
@@ -182,7 +184,7 @@ router.post('/register', requireAuth, async (req, res) => {
   }
 
   try {
-    const isAdmin = isAdminEmail(email)
+    const isAdmin = isAdminEmail(req.authUser.email)
 
     const { data, error } = await supabase
       .from('users')

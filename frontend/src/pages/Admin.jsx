@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import ConnectAINSModal from '../components/ConnectAINSModal'
 
-const ADMIN_EMAILS = (import.meta.env.VITE_ADMIN_EMAIL || 'nigellim7070@gmail.com').split(',').map(e => e.trim()).filter(Boolean)
+const ADMIN_EMAILS = (import.meta.env.VITE_ADMIN_EMAIL || '').split(',').map(e => e.trim()).filter(Boolean)
 const isAdminEmail = (email) => !!email && ADMIN_EMAILS.includes(email)
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001'
 

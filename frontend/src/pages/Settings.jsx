@@ -8,7 +8,7 @@ const BACKEND    = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001'
 const LANGUAGES  = ['Malay', 'English', 'Chinese', 'Tamil']
 const LANG_MAP   = { Malay: 'Melayu', English: 'Inggeris', Chinese: 'Cina', Tamil: 'Tamil' }
 const BOOK_TYPES = ['Physical', 'E-Book']
-const TYPE_MAP   = { Physical: 'Fizikal', 'E-Book': 'Digital' }
+const TYPE_MAP   = { Physical: 'Fizikal', 'E-Book': 'E-Buku' }
 
 function Stepper({ value, min, max, onChange }) {
   return (
@@ -48,6 +48,7 @@ export default function Settings() {
   })
   const [saving, setSaving]     = useState(false)
   const [saved, setSaved]       = useState(false)
+  const [saveError, setSaveError] = useState('')
   const [loading, setLoading]   = useState(true)
   const [credsStatus, setCredsStatus] = useState(null) // null | 'saved' | 'none'
   const [showAINSModal, setShowAINSModal] = useState(false)
@@ -108,6 +109,7 @@ export default function Settings() {
     })
     setSaving(false)
     if (res.ok) { setSaved(true); setTimeout(() => setSaved(false), 3000) }
+    else { setSaveError('Failed to save settings. Please try again.'); setTimeout(() => setSaveError(''), 4000) }
   }
 
   const handleAINSConnected = async () => {
@@ -224,12 +226,12 @@ export default function Settings() {
                 <Stepper
                   value={form.books_per_month}
                   min={1}
-                  max={planInfo.plan === 'free' ? 1 : 15}
+                  max={planInfo.plan === 'free' ? 1 : 50}
                   onChange={v => setForm(f => ({ ...f, books_per_month: v }))}
                 />
               </div>
               <p className="text-xs text-subtle text-center mt-2">
-                {planInfo.plan === 'free' ? 'Free plan: 1 book/month. Upgrade for up to 15.' : 'Maximum 15 books per month'}
+                {planInfo.plan === 'free' ? 'Free plan: 1 book/week. Upgrade for up to 50.' : 'Maximum 50 books per month'}
               </p>
             </div>
 
@@ -352,6 +354,9 @@ export default function Settings() {
             </span>
           ) : 'Save Settings'}
         </button>
+        {saveError && (
+          <p className="mt-3 text-sm text-danger-600 text-center">{saveError}</p>
+        )}
       </form>
     </motion.div>
   )

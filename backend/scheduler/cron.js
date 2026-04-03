@@ -35,7 +35,7 @@ cron.schedule('0 1 * * *', async () => {
     // Run each user sequentially to avoid overloading the server
     for (const s of settingsList) {
       const user = s.users
-      if (!user?.ains_username_encrypted) {
+      if (!user?.ains_cookie_encrypted) {
         console.log(`[cron] Skipping ${user?.email}: no AINS credentials saved.`)
         continue
       }

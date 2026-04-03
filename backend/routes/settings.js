@@ -4,7 +4,7 @@ const supabase = require('../lib/supabase')
 const { requireAuth } = require('../lib/auth-middleware')
 
 const VALID_LANGUAGES  = ['Melayu', 'Inggeris', 'Cina', 'Tamil']
-const VALID_BOOK_TYPES = ['Fizikal', 'Digital']
+const VALID_BOOK_TYPES = ['Fizikal', 'E-Buku']
 
 // GET /api/settings
 router.get('/', requireAuth, async (req, res) => {

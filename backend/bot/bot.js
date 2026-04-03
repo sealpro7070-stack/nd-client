@@ -33,14 +33,17 @@ async function withLock(key, fn) {
   }
 }
 
-// Returns Monday 00:00:00.000 of the current ISO week (Malaysia is UTC+8)
+// Returns Monday 00:00:00 MYT (UTC+8) of the current ISO week, expressed as UTC
+// Railway servers run UTC — offset by +8h so the week resets at midnight MYT, not midnight UTC
 function getWeekStart() {
-  const now = new Date()
-  const day = now.getDay()           // 0 = Sunday, 1 = Monday … 6 = Saturday
-  const monday = new Date(now)
-  monday.setDate(now.getDate() - ((day + 6) % 7))
-  monday.setHours(0, 0, 0, 0)
-  return monday
+  const MYT_OFFSET_MS = 8 * 60 * 60 * 1000
+  const nowMYT = new Date(Date.now() + MYT_OFFSET_MS)
+  const day = nowMYT.getUTCDay()    // day-of-week in MYT
+  const mondayMYT = new Date(nowMYT)
+  mondayMYT.setUTCDate(nowMYT.getUTCDate() - ((day + 6) % 7))
+  mondayMYT.setUTCHours(0, 0, 0, 0)
+  // Convert back to UTC for Supabase comparison
+  return new Date(mondayMYT.getTime() - MYT_OFFSET_MS)
 }
 
 // Fisher-Yates shuffle — unbiased, unlike sort(() => Math.random() - 0.5)
@@ -101,7 +104,6 @@ async function _startBot(userId, directCookie, directSsUser, directSsProfile, di
   let ssToken = null, ssUser = null, ssProfile = null, cookiesToInject = []
   try {
     const rawDecrypted = decrypt(user.ains_cookie_encrypted)
-    console.log(`[bot] Raw decrypted preview: ${rawDecrypted.substring(0, 40)}...`)
 
     try {
       // New format: JSON with ssToken, ssUser, ssProfile, cookies
@@ -196,7 +198,7 @@ async function _startBot(userId, directCookie, directSsUser, directSsProfile, di
     .eq('language', userSettings.language)
 
   if (alreadyBookIds.length > 0) {
-    booksQuery = booksQuery.not('id', 'in', `(${alreadyBookIds.join(',')})`)
+    booksQuery = booksQuery.not('id', 'in', alreadyBookIds)
   }
 
   const { data: availableBooks, error: booksErr } = await booksQuery.limit(200)
@@ -317,7 +319,7 @@ async function _startBotForSlot(userId, slotId, slot) {
 
   let booksQuery = supabase.from('books').select('*').eq('language', slot.language || 'Melayu')
   if (alreadyBookIds.length > 0) {
-    booksQuery = booksQuery.not('id', 'in', `(${alreadyBookIds.join(',')})`)
+    booksQuery = booksQuery.not('id', 'in', alreadyBookIds)
   }
 
   const { data: availableBooks } = await booksQuery.limit(200)
