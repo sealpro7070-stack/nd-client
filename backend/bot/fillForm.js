@@ -118,13 +118,22 @@ async function fillForm(page, book, settings) {
   const hantarBtn = page.locator('button:has-text("Hantar")').first()
   await hantarBtn.waitFor({ state: 'visible', timeout: 10000 })
   await hantarBtn.click()
-  await page.waitForTimeout(1500)
 
-  // Confirm SweetAlert2 if it appears
-  const sweetConfirm = page.locator('.swal2-confirm').first()
-  if (await sweetConfirm.count()) {
-    await sweetConfirm.click()
-    console.log('[fillForm] Confirmed SweetAlert dialog')
+  // Dismiss up to 2 SweetAlert dialogs (confirm prompt + success notification)
+  for (let i = 0; i < 2; i++) {
+    try {
+      await page.locator('.swal2-popup').waitFor({ state: 'visible', timeout: 5000 })
+      const btn = page.locator('.swal2-confirm').first()
+      if (await btn.count()) {
+        await btn.click()
+        console.log(`[fillForm] Dismissed SweetAlert ${i + 1}`)
+        await page.waitForTimeout(600)
+      } else {
+        break
+      }
+    } catch {
+      break // No SweetAlert appeared — form may have submitted directly
+    }
   }
 
   await waitForSuccess(page)
@@ -200,12 +209,16 @@ async function waitForSuccess(page) {
     await page.waitForFunction(() => {
       const text = document.body.innerText || ''
       const url  = window.location.href
-      return text.includes('berjaya') || text.includes('Berjaya') ||
-             text.includes('mata') || !url.includes('/record/add')
+      if (text.includes('berjaya') || text.includes('Berjaya') || text.includes('mata')) return true
+      // /record/add/success is a success page — don't treat it as "still on form"
+      if (url.includes('/record/add/success')) return true
+      // Navigated completely away from the form area
+      if (!url.includes('/record/add')) return true
+      return false
     }, { timeout: 25000 })
   } catch {
     const url = page.url()
-    if (url.includes('/record/add')) {
+    if (url.includes('/record/add') && !url.includes('/record/add/success')) {
       throw new Error('Form did not submit — still on form after 25s')
     }
   }

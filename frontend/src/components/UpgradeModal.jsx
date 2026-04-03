@@ -1,13 +1,8 @@
-import { useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { useState, useEffect } from 'react'
+import { motion } from 'framer-motion'
 import { supabase } from '../lib/supabase'
 
 const BACKEND = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001'
-
-// ── TNG QR placeholder ────────────────────────────────────────────────────────
-// Replace TNG_QR_URL with your actual TNG QR image URL once you upload it.
-// You can upload the image to Supabase Storage or any image host.
-const TNG_QR_URL = import.meta.env.VITE_TNG_QR_URL || null
 
 const PLANS = [
   {
@@ -48,15 +43,35 @@ export default function UpgradeModal({ isOpen, onClose, currentPlan }) {
   const [step, setStep]           = useState('plans')  // 'plans' | 'payment' | 'done'
   const [selectedPlan, setSelected] = useState(null)
   const [reference, setReference] = useState('')
+  const [receiptData, setReceiptData] = useState(null)  // base64 receipt image
   const [submitting, setSubmitting] = useState(false)
   const [error, setError]         = useState('')
+  const [qrData, setQrData]       = useState(null)
+
+  useEffect(() => {
+    if (!isOpen) return
+    fetch(`${BACKEND}/api/payments/qr-settings`)
+      .then(r => r.json())
+      .then(d => setQrData(d.qr_data || null))
+      .catch(() => {})
+  }, [isOpen])
 
   const reset = () => {
     setStep('plans')
     setSelected(null)
     setReference('')
+    setReceiptData(null)
     setError('')
     setSubmitting(false)
+  }
+
+  function handleReceiptFile(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (file.size > 5 * 1024 * 1024) { setError('Receipt image must be under 5 MB.'); return }
+    const reader = new FileReader()
+    reader.onload = ev => setReceiptData(ev.target.result)
+    reader.readAsDataURL(file)
   }
 
   const handleClose = () => { reset(); onClose() }
@@ -78,7 +93,7 @@ export default function UpgradeModal({ isOpen, onClose, currentPlan }) {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify({ plan: selectedPlan.id, reference: reference.trim() }),
+        body: JSON.stringify({ plan: selectedPlan.id, reference: reference.trim(), receipt_data: receiptData || null }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to submit request')
@@ -170,16 +185,16 @@ export default function UpgradeModal({ isOpen, onClose, currentPlan }) {
               {/* TNG QR Code */}
               <div className="bg-white border border-line rounded-xl p-4 text-center space-y-3">
                 <p className="text-sm font-semibold text-heading">Scan to pay with TNG eWallet</p>
-                {TNG_QR_URL ? (
-                  <img src={TNG_QR_URL} alt="TNG QR Code" className="w-48 h-48 mx-auto rounded-lg object-contain" />
+                {qrData ? (
+                  <img src={qrData} alt="TNG QR Code" className="w-48 h-48 mx-auto rounded-lg object-contain" />
                 ) : (
                   <div className="w-48 h-48 mx-auto bg-gray-100 rounded-lg flex flex-col items-center justify-center gap-2 border-2 border-dashed border-gray-300">
                     <span className="text-3xl">📷</span>
-                    <p className="text-xs text-muted px-4 text-center">TNG QR code not yet uploaded.<br/>Set VITE_TNG_QR_URL in Vercel env.</p>
+                    <p className="text-xs text-muted px-4 text-center">TNG QR code not yet uploaded by admin.</p>
                   </div>
                 )}
                 <p className="text-xs text-muted">
-                  After paying, enter your TNG reference number below so we can verify your payment.
+                  After paying, enter your reference number and upload your payment screenshot below.
                 </p>
               </div>
 
@@ -195,6 +210,27 @@ export default function UpgradeModal({ isOpen, onClose, currentPlan }) {
                   placeholder="e.g. TNG2025XXXXXXXX"
                   className="w-full border border-line rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400"
                 />
+              </div>
+
+              {/* Receipt upload */}
+              <div>
+                <label className="block text-sm font-medium text-heading mb-1">
+                  Payment Screenshot <span className="text-muted font-normal">(recommended — speeds up approval)</span>
+                </label>
+                <label className="flex flex-col items-center justify-center w-full border-2 border-dashed border-line rounded-xl p-4 cursor-pointer hover:border-brand-400 hover:bg-brand-50/30 transition-colors">
+                  {receiptData ? (
+                    <img src={receiptData} alt="Receipt preview" className="max-h-40 rounded-lg object-contain" />
+                  ) : (
+                    <>
+                      <span className="text-2xl mb-1">📎</span>
+                      <span className="text-xs text-muted font-semibold">Click to upload screenshot (max 5 MB)</span>
+                    </>
+                  )}
+                  <input type="file" accept="image/*" className="hidden" onChange={handleReceiptFile} />
+                </label>
+                {receiptData && (
+                  <button onClick={() => setReceiptData(null)} className="text-xs text-danger-500 mt-1 hover:underline">Remove</button>
+                )}
               </div>
 
               {error && (

@@ -74,7 +74,7 @@ router.post('/', requireAuth, async (req, res) => {
   // noob = admin-granted tester role, never expires, unlimited books
   const planExpired = user.plan_expires_at && new Date(user.plan_expires_at) < new Date()
   const activePlan  = (user.plan === 'noob') ? 'noob' : (planExpired ? 'free' : (user.plan || 'free'))
-  const PLAN_MAX    = { free: 1, plus: 15, family: 15, noob: 999 }
+  const PLAN_MAX    = { free: 1, plus: 50, family: 50, noob: 999 }
   const maxAllowed  = isAdmin ? 9999 : (PLAN_MAX[activePlan] ?? 1)
 
   // Rate limit: 5 runs per user per hour (skip for admin and noob testers)

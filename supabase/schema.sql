@@ -11,6 +11,13 @@ create table if not exists users (
   cookie_encrypted text,
   cookie_updated_at timestamp with time zone,
   is_active boolean default false,
+  -- Plan management (added with payment feature)
+  plan text default 'free' check (plan in ('free','plus','family','noob')),
+  plan_expires_at timestamp with time zone,
+  -- Encrypted AINS credentials
+  ains_email_encrypted text,
+  ains_password_encrypted text,
+  ains_user_id_hash text,
   created_at timestamp with time zone default now()
 );
 
@@ -18,7 +25,8 @@ create table if not exists users (
 create table if not exists settings (
   id uuid primary key default uuid_generate_v4(),
   user_id uuid references users(id) on delete cascade unique,
-  books_per_month int default 4 check (books_per_month between 1 and 8),
+  -- Max 50 to support Pro/Family plan limits (was 8 for free tier only)
+  books_per_month int default 4 check (books_per_month between 1 and 50),
   language text default 'Melayu' check (language in ('Melayu','Inggeris','Cina','Tamil')),
   book_type text default 'Fizikal' check (book_type in ('Fizikal','E-Buku')),
   auto_schedule boolean default true,
@@ -116,11 +124,34 @@ create index if not exists idx_submissions_year_month on submissions(year, month
 create index if not exists idx_books_language on books(language);
 create index if not exists idx_settings_user_id on settings(user_id);
 
--- Add AINS user ID hash for one-AINS-per-account enforcement
--- Run this if column doesn't exist: ALTER TABLE users ADD COLUMN IF NOT EXISTS ains_user_id_hash text;
--- Run this for uniqueness: CREATE UNIQUE INDEX IF NOT EXISTS idx_users_ains_user_id_hash ON users(ains_user_id_hash) WHERE ains_user_id_hash IS NOT NULL;
-alter table users add column if not exists ains_user_id_hash text;
+-- AINS hash uniqueness index (column now in CREATE TABLE above)
 create unique index if not exists idx_users_ains_user_id_hash on users(ains_user_id_hash) where ains_user_id_hash is not null;
 
--- Add encrypted AINS password storage for bot fallback login
-alter table users add column if not exists ains_password_encrypted text;
+-- Admin settings (key-value store for site configuration)
+create table if not exists admin_settings (
+  key  text primary key,
+  value text not null,
+  updated_at timestamp with time zone default now()
+);
+alter table admin_settings enable row level security;
+create policy "Service role full access admin_settings" on admin_settings
+  for all using (auth.role() = 'service_role');
+
+-- Payment requests table (manual QR payment flow)
+create table if not exists payment_requests (
+  id uuid primary key default uuid_generate_v4(),
+  user_id uuid references users(id) on delete cascade not null,
+  plan text not null check (plan in ('plus','family')),
+  amount int not null,
+  reference text,
+  receipt_data text,
+  status text default 'pending' check (status in ('pending','approved','rejected')),
+  reviewed_at timestamp with time zone,
+  reviewed_by text,
+  created_at timestamp with time zone default now()
+);
+alter table payment_requests enable row level security;
+create policy "Service role full access payment_requests" on payment_requests
+  for all using (auth.role() = 'service_role');
+create index if not exists idx_payment_requests_user_status
+  on payment_requests(user_id, status);

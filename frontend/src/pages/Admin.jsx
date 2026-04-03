@@ -3,12 +3,12 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import ConnectAINSModal from '../components/ConnectAINSModal'
 
-const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL || 'm-10603978@moe-dl.edu.my'
+const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL || 'nigellim7070@gmail.com'
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001'
 
 export default function Admin() {
   const navigate = useNavigate()
-  const [tab, setTab]           = useState('users')   // 'users' | 'payments'
+  const [tab, setTab]           = useState('users')   // 'users' | 'payments' | 'settings'
   const [users, setUsers]       = useState([])
   const [payments, setPayments] = useState([])
   const [loading, setLoading]   = useState(true)
@@ -20,8 +20,15 @@ export default function Admin() {
   const [token, setToken]       = useState('')
   const [connectTarget, setConnectTarget] = useState(null) // { id, email } of user to connect AINS for
   const [roleTarget, setRoleTarget]       = useState(null) // userId being role-changed
+  // QR settings state
+  const [qrData, setQrData]       = useState(null)   // current saved QR (base64 or URL)
+  const [qrPreview, setQrPreview] = useState(null)   // newly picked image preview
+  const [qrSaving, setQrSaving]   = useState(false)
+  // Receipt lightbox
+  const [receiptOpen, setReceiptOpen] = useState(null) // receipt data URL to display
 
   useEffect(() => { checkAdminAndLoad() }, [])
+  useEffect(() => { if (tab === 'settings') fetchQrSettings() }, [tab])
 
   async function checkAdminAndLoad() {
     const { data: { session } } = await supabase.auth.getSession()
@@ -105,6 +112,42 @@ export default function Admin() {
     } catch (err) { showToast(err.message, 'error') }
   }
 
+  async function fetchQrSettings() {
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/payments/qr-settings`)
+      const d = await res.json()
+      setQrData(d.qr_data || null)
+      setQrPreview(null)
+    } catch {}
+  }
+
+  function handleQrFile(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (file.size > 2 * 1024 * 1024) { showToast('Image must be under 2 MB', 'error'); return }
+    const reader = new FileReader()
+    reader.onload = ev => setQrPreview(ev.target.result)
+    reader.readAsDataURL(file)
+  }
+
+  async function saveQr() {
+    if (!qrPreview) return
+    setQrSaving(true)
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/payments/admin/qr-settings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ qr_data: qrPreview }),
+      })
+      const d = await res.json()
+      if (!res.ok) throw new Error(d.error)
+      setQrData(qrPreview)
+      setQrPreview(null)
+      showToast('QR code saved!')
+    } catch (err) { showToast(err.message, 'error') }
+    finally { setQrSaving(false) }
+  }
+
   function showToast(msg, type = 'success') {
     setToasting({ msg, type })
     setTimeout(() => setToasting(null), 3000)
@@ -168,6 +211,7 @@ export default function Admin() {
           {[
             { id: 'users',    label: 'Users' },
             { id: 'payments', label: `Payments${pendingPayCount > 0 ? ` (${pendingPayCount})` : ''}` },
+            { id: 'settings', label: 'Settings' },
           ].map(t => (
             <button
               key={t.id}
@@ -365,9 +409,12 @@ export default function Admin() {
                         {pr.reference && <span>Ref: <strong className="text-heading">{pr.reference}</strong></span>}
                         {pr.reviewed_by && <span>Reviewed by: {pr.reviewed_by}</span>}
                         {pr.receipt_data && (
-                          <a href={pr.receipt_data} target="_blank" rel="noreferrer" className="text-brand-600 hover:underline font-semibold">
-                            View Receipt
-                          </a>
+                          <button
+                            onClick={() => setReceiptOpen(pr.receipt_data)}
+                            className="text-brand-600 hover:underline font-semibold"
+                          >
+                            View Receipt 🖼
+                          </button>
                         )}
                       </div>
                     </div>
@@ -393,7 +440,78 @@ export default function Admin() {
             )}
           </>
         )}
+        {/* ── Settings tab ── */}
+        {tab === 'settings' && (
+          <div className="max-w-md space-y-6">
+            <div className="card-p">
+              <h2 className="font-display text-base font-bold text-heading mb-1">TNG eWallet QR Code</h2>
+              <p className="text-xs text-muted mb-4">This QR is shown to users on the payment screen. Upload a new image to replace it.</p>
+
+              {/* Current QR */}
+              <div className="mb-4">
+                <p className="text-xs font-bold text-muted uppercase tracking-wide mb-2">Current QR</p>
+                {qrData ? (
+                  <img src={qrData} alt="Current TNG QR" className="w-48 h-48 object-contain rounded-xl border border-line" />
+                ) : (
+                  <div className="w-48 h-48 bg-gray-100 rounded-xl border-2 border-dashed border-gray-300 flex flex-col items-center justify-center gap-2">
+                    <span className="text-3xl">📷</span>
+                    <p className="text-xs text-muted text-center px-4">No QR uploaded yet</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Upload new QR */}
+              <div className="space-y-3">
+                <p className="text-xs font-bold text-muted uppercase tracking-wide">Upload New QR</p>
+                <label className="flex flex-col items-center justify-center w-full border-2 border-dashed border-line rounded-xl p-5 cursor-pointer hover:border-brand-400 hover:bg-brand-50/30 transition-colors">
+                  {qrPreview ? (
+                    <img src={qrPreview} alt="New QR preview" className="w-48 h-48 object-contain rounded-lg" />
+                  ) : (
+                    <>
+                      <span className="text-3xl mb-2">📤</span>
+                      <span className="text-sm font-semibold text-muted">Click to select image (max 2 MB)</span>
+                    </>
+                  )}
+                  <input type="file" accept="image/*" className="hidden" onChange={handleQrFile} />
+                </label>
+                {qrPreview && (
+                  <div className="flex gap-2">
+                    <button
+                      onClick={saveQr}
+                      disabled={qrSaving}
+                      className="flex-1 py-2.5 bg-brand-600 text-white rounded-xl font-bold text-sm hover:bg-brand-700 disabled:opacity-50 transition-colors"
+                    >
+                      {qrSaving ? 'Saving…' : 'Save QR Code'}
+                    </button>
+                    <button
+                      onClick={() => setQrPreview(null)}
+                      className="px-4 py-2.5 border border-line rounded-xl text-muted text-sm font-bold hover:bg-gray-50"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* Receipt Lightbox */}
+      {receiptOpen && (
+        <div
+          className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
+          onClick={() => setReceiptOpen(null)}
+        >
+          <div className="relative max-w-lg w-full" onClick={e => e.stopPropagation()}>
+            <button
+              onClick={() => setReceiptOpen(null)}
+              className="absolute -top-10 right-0 text-white/70 hover:text-white text-3xl leading-none"
+            >×</button>
+            <img src={receiptOpen} alt="Payment receipt" className="w-full rounded-2xl shadow-2xl object-contain max-h-[80vh]" />
+          </div>
+        </div>
+      )}
 
       {/* Toast */}
       {toasting && (

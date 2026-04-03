@@ -4,22 +4,22 @@ export default {
   theme: {
     extend: {
       colors: {
-        page:    '#F9F7F3',
-        heading: '#1A1A2E',
-        body:    '#374151',
-        muted:   '#6B7280',
-        subtle:  '#9CA3AF',
-        line:    '#E5E7EB',
+        page:    '#F8FAFC',
+        heading: '#0F172A',
+        body:    '#334155',
+        muted:   '#64748B',
+        subtle:  '#94A3B8',
+        line:    '#E2E8F0',
         brand: {
-          50:  '#EEF2FF',
-          100: '#E0E7FF',
-          200: '#C7D2FE',
-          300: '#A5B4FC',
-          400: '#818CF8',
-          500: '#6366F1',
-          600: '#4F46E5',
-          700: '#4338CA',
-          800: '#3730A3',
+          50:  '#EFF6FF',
+          100: '#DBEAFE',
+          200: '#BFDBFE',
+          300: '#93C5FD',
+          400: '#60A5FA',
+          500: '#3B82F6',
+          600: '#2563EB',
+          700: '#1D4ED8',
+          800: '#1E40AF',
         },
         ok: {
           50:  '#ECFDF5',
@@ -45,8 +45,8 @@ export default {
         },
       },
       fontFamily: {
-        sans:    ['"DM Sans"', 'sans-serif'],
-        display: ['Fraunces', 'serif'],
+        sans:    ['"Plus Jakarta Sans"', 'sans-serif'],
+        display: ['"Plus Jakarta Sans"', 'sans-serif'],
       },
       boxShadow: {
         card:    '0 2px 12px rgba(0,0,0,0.06)',

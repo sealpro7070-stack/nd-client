@@ -4,6 +4,7 @@ import { motion } from 'framer-motion'
 import { supabase } from '../lib/supabase'
 import BookCard from '../components/BookCard'
 import ConnectAINSModal from '../components/ConnectAINSModal'
+import UpgradeModal from '../components/UpgradeModal'
 
 const BACKEND   = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001'
 const LANGUAGES = ['Malay', 'English', 'Chinese', 'Tamil']
@@ -25,6 +26,7 @@ export default function Dashboard() {
   const [credsStatus, setCredsStatus] = useState(null)
   const [plan, setPlan]             = useState('free')
   const [showAINSModal, setShowAINSModal] = useState(false)
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false)
 
   // Family plan state
   const [familySlots, setFamilySlots]   = useState([])
@@ -77,6 +79,9 @@ export default function Dashboard() {
         setCredsStatus(connected ? 'saved' : 'none')
         const userPlan = ud?.plan || 'free'
         setPlan(userPlan)
+        // Clamp bookCount to the plan's actual limit (settings may have a higher value than the plan allows)
+        const planMax = userPlan === 'free' ? 1 : userPlan === 'noob' ? 999 : 50
+        setBookCount(prev => Math.min(prev, planMax))
         if (!connected) setShowAINSModal(true)
 
         // Load family slots if on family plan
@@ -298,16 +303,26 @@ export default function Dashboard() {
                 : 'No records submitted this month yet.'}
             </p>
           </div>
-          <button
-            onClick={() => setShowAINSModal(true)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full flex-shrink-0 transition-opacity hover:opacity-80 ${credsStatus === 'saved' ? 'bg-white/15' : 'bg-warn-500/80'}`}
-            title={credsStatus === 'saved' ? 'Click to reconnect AINS' : 'Click to connect AINS'}
-          >
-            <span className={`w-1.5 h-1.5 rounded-full ${credsStatus === 'saved' ? 'bg-ok-400 animate-pulse' : 'bg-white'}`} />
-            <span className="text-white text-xs font-bold">
-              {credsStatus === 'saved' ? 'AINS Connected' : 'AINS Not Set'}
-            </span>
-          </button>
+          <div className="flex flex-col items-end gap-2 flex-shrink-0">
+            <button
+              onClick={() => setShowAINSModal(true)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full transition-opacity hover:opacity-80 ${credsStatus === 'saved' ? 'bg-white/15' : 'bg-warn-500/80'}`}
+              title={credsStatus === 'saved' ? 'Click to reconnect AINS' : 'Click to connect AINS'}
+            >
+              <span className={`w-1.5 h-1.5 rounded-full ${credsStatus === 'saved' ? 'bg-ok-400 animate-pulse' : 'bg-white'}`} />
+              <span className="text-white text-xs font-bold">
+                {credsStatus === 'saved' ? 'AINS Connected' : 'AINS Not Set'}
+              </span>
+            </button>
+            {plan === 'free' && (
+              <button
+                onClick={() => setShowUpgradeModal(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white text-brand-600 text-xs font-extrabold hover:bg-brand-50 transition-colors shadow-sm"
+              >
+                ⚡ Upgrade Plan
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="relative mt-5">
@@ -661,6 +676,13 @@ export default function Dashboard() {
         isOpen={showAINSModal}
         onClose={() => setShowAINSModal(false)}
         onSuccess={handleAINSConnected}
+      />
+
+      {/* ── Upgrade Modal ─────────────────────────── */}
+      <UpgradeModal
+        isOpen={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        currentPlan={plan}
       />
 
     </div>

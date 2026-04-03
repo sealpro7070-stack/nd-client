@@ -131,7 +131,17 @@ async function _startBot(userId, directCookie, directSsUser, directSsProfile, di
 
   // 4. Check submissions for the current period
   // Free plan  → 1 book per WEEK  (Monday 00:00 – Sunday 23:59 MYT)
-  // Plus/Family → 15 books per MONTH
+  // Plus/Family → up to 50 books per MONTH (per PLAN_MAX above)
+
+  // Clean up stale pending records (older than 30 min) — prevents phantom quota blocks
+  // from bot runs that crashed before they could mark submissions as failed/success
+  await supabase
+    .from('submissions')
+    .update({ status: 'failed', error_message: 'Timed out — previous run did not complete' })
+    .eq('user_id', userId)
+    .eq('status', 'pending')
+    .lt('created_at', new Date(Date.now() - 30 * 60 * 1000).toISOString())
+
   const now   = new Date()
   const month = now.getMonth() + 1
   const year  = now.getFullYear()

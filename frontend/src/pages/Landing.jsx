@@ -151,7 +151,7 @@ export default function Landing() {
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
-          options: { emailRedirectTo: window.location.origin },
+          options: { emailRedirectTo: 'https://nilam-auto.vercel.app' },
         })
         if (error) {
           // Normalise duplicate-account errors into a friendly message
@@ -210,7 +210,7 @@ export default function Landing() {
     const { error } = await supabase.auth.resend({
       type: 'signup',
       email,
-      options: { emailRedirectTo: window.location.origin },
+      options: { emailRedirectTo: 'https://nilam-auto.vercel.app' },
     })
     setResending(false)
     if (error) { setMessage(error.message); setIsError(true) }

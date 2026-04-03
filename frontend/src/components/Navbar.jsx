@@ -2,7 +2,8 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 
-const ADMIN_EMAIL = 'm-10603978@moe-dl.edu.my'
+// Use env var to avoid exposing PII in the public JS bundle
+const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL
 
 export default function Navbar() {
   const navigate = useNavigate()
@@ -48,6 +49,11 @@ export default function Navbar() {
           <NavLink to="/guide" className={linkClass}>Setup Guide</NavLink>
           <NavLink to="/settings" className={linkClass}>Settings</NavLink>
           <NavLink to="/history" className={linkClass}>History</NavLink>
+          <NavLink to="/upgrade" className={({ isActive }) =>
+            `text-sm font-semibold px-3.5 py-2 rounded-lg transition-all duration-150 ${
+              isActive ? 'text-brand-600 bg-brand-50' : 'text-brand-600 hover:bg-brand-50'
+            }`
+          }>Upgrade</NavLink>
           {isAdmin && (
             <NavLink
               to="/admin"
@@ -102,6 +108,7 @@ export default function Navbar() {
             { to: '/guide',     label: 'Setup Guide' },
             { to: '/settings',  label: 'Settings' },
             { to: '/history',   label: 'History' },
+            { to: '/upgrade',   label: 'Upgrade' },
           ].map(item => (
             <NavLink
               key={item.to}

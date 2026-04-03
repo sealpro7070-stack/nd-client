@@ -68,6 +68,24 @@ router.post('/request', requireAuth, async (req, res) => {
     return res.status(400).json({ error: 'Invalid plan. Must be "plus" or "family".' })
   }
 
+  // Validate reference length — prevents DoS via oversized strings
+  if (reference && reference.trim().length > 100) {
+    return res.status(400).json({ error: 'Reference must be 100 characters or fewer.' })
+  }
+
+  // Validate receipt MIME type — prevents XSS via SVG/script injection in admin lightbox
+  if (receipt_data) {
+    const ALLOWED_MIME_PREFIXES = ['data:image/jpeg;', 'data:image/png;', 'data:image/webp;', 'data:image/gif;']
+    const isValidImage = ALLOWED_MIME_PREFIXES.some(p => receipt_data.startsWith(p))
+    if (!isValidImage) {
+      return res.status(400).json({ error: 'Receipt must be a JPEG, PNG, WebP, or GIF image.' })
+    }
+    // Backend size guard: ~6MB base64 ≈ 4.5MB file
+    if (receipt_data.length > 6_000_000) {
+      return res.status(400).json({ error: 'Receipt image must be under 5MB.' })
+    }
+  }
+
   // Block if already has a pending request
   const { data: existing } = await supabase
     .from('payment_requests')
@@ -100,7 +118,7 @@ router.post('/request', requireAuth, async (req, res) => {
       user_id:   userId,
       plan,
       amount:    PLAN_PRICES[plan],
-      reference: reference || null,
+      reference: reference ? reference.trim() : null,
       receipt_data: receipt_data || null
     })
     .select()
@@ -178,13 +196,41 @@ router.post('/admin/review', requireAuth, requireAdmin, async (req, res) => {
       .eq('id', pr.user_id)
 
     if (planErr) {
-      // Revert the payment request back to pending
-      await supabase.from('payment_requests').update({ status: 'pending' }).eq('id', requestId)
+      // Revert the payment request back to pending — also clear audit fields
+      // so admin doesn't see stale reviewed_by on a re-pending request
+      await supabase.from('payment_requests')
+        .update({ status: 'pending', reviewed_at: null, reviewed_by: null })
+        .eq('id', requestId)
       return res.status(500).json({ error: 'Payment approved but plan update failed. Please retry.' })
     }
   }
 
   res.json({ success: true, action })
+})
+
+// ── GET /api/payments/qr-settings
+// Public: returns the current TNG QR image data (fetched by UpgradeModal)
+router.get('/qr-settings', async (req, res) => {
+  const { data } = await supabase
+    .from('admin_settings')
+    .select('value')
+    .eq('key', 'tng_qr')
+    .maybeSingle()
+  res.json({ qr_data: data?.value || null })
+})
+
+// ── POST /api/payments/admin/qr-settings
+// Admin: upload/replace the TNG QR image (stored as base64 data URL)
+router.post('/admin/qr-settings', requireAuth, requireAdmin, async (req, res) => {
+  const { qr_data } = req.body
+  if (!qr_data) return res.status(400).json({ error: 'qr_data required' })
+
+  const { error } = await supabase
+    .from('admin_settings')
+    .upsert({ key: 'tng_qr', value: qr_data, updated_at: new Date().toISOString() }, { onConflict: 'key' })
+
+  if (error) return res.status(500).json({ error: error.message })
+  res.json({ success: true })
 })
 
 // ── POST /api/payments/webhook
