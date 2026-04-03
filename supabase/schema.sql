@@ -70,11 +70,13 @@ alter table settings enable row level security;
 alter table submissions enable row level security;
 alter table books enable row level security;
 
--- Users: only own row
+-- Users: only own row (read-only via client — writes go through backend service role)
 create policy "Users can view own data" on users
   for select using (auth.uid() = id);
-create policy "Users can update own data" on users
-  for update using (auth.uid() = id);
+-- NOTE: No client-side update policy on users.
+-- All writes (plan, is_active, ains_cookie_encrypted etc.) are done server-side
+-- via the service role key. Granting a broad client update policy would allow
+-- users to self-upgrade their plan by directly PATCHing the Supabase REST API.
 
 -- Settings: only own settings
 create policy "Users can view own settings" on settings
