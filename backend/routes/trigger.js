@@ -82,7 +82,14 @@ router.post('/', requireAuth, async (req, res) => {
     return res.status(429).json({ error: 'Too many requests. Maximum 5 submissions per hour.' })
   }
 
-  const countNum = count ? Math.min(parseInt(count), maxAllowed) : null
+  let countNum = null
+  if (count !== undefined && count !== null) {
+    const parsed = Number(count)
+    if (!Number.isInteger(parsed) || parsed < 1 || parsed > 200) {
+      return res.status(400).json({ error: 'count must be an integer between 1 and 200' })
+    }
+    countNum = Math.min(parsed, maxAllowed)
+  }
 
   // Wait up to 3 minutes for bot to complete. If it takes longer, respond mid-flight.
   let responded = false

@@ -52,8 +52,10 @@ async function loginAndVerify(context, cookie, ssUser, ssProfile, cookies) {
 }
 
 async function takeScreenshot(page, label) {
+  if (process.env.NODE_ENV === 'production') return null
   try {
-    const filename = `${label}-${Date.now()}.png`
+    const safeLabel = label.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 40)
+    const filename = `${safeLabel}-${Date.now()}.png`
     const filepath = path.join(SCREENSHOTS_DIR, filename)
     await page.screenshot({ path: filepath, fullPage: true })
     console.log(`[bot] Screenshot saved: ${filename}`)

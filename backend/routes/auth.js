@@ -117,7 +117,7 @@ router.post('/connect', requireAuth, async (req, res) => {
       loginState[userId] = { status: 'success' }
     } catch (err) {
       console.error('[auth] Login flow failed:', err.message)
-      loginState[userId] = { status: 'error', message: err.message }
+      loginState[userId] = { status: 'error', message: 'Login failed. Please check your AINS email and password and try again.' }
     }
     // Auto-cleanup: if client never polls for the result, remove after 10 minutes
     setTimeout(() => { delete loginState[userId] }, 10 * 60 * 1000)

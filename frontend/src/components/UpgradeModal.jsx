@@ -54,10 +54,15 @@ export default function UpgradeModal({ isOpen, onClose, currentPlan }) {
 
   useEffect(() => {
     if (!isOpen) return
-    fetch(`${BACKEND}/api/payments/qr-settings`)
-      .then(r => r.json())
-      .then(d => setQrData(d.qr_data || null))
-      .catch(() => {})
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) return
+      fetch(`${BACKEND}/api/payments/qr-settings`, {
+        headers: { 'Authorization': `Bearer ${session.access_token}` },
+      })
+        .then(r => r.json())
+        .then(d => setQrData(d.qr_data || null))
+        .catch(() => {})
+    })
   }, [isOpen])
 
   const reset = () => {

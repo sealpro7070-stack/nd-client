@@ -1,7 +1,7 @@
 const supabase = require('./supabase')
 
 // Support comma-separated ADMIN_EMAIL for multiple admins
-// e.g. ADMIN_EMAIL=nigellim7070@gmail.com,m-10603978@moe-dl.edu.my
+// e.g. ADMIN_EMAIL=admin@example.com,second-admin@example.com
 const ADMIN_EMAILS = (process.env.ADMIN_EMAIL || '').split(',').map(e => e.trim()).filter(Boolean)
 function isAdminEmail(email) {
   return !!email && ADMIN_EMAILS.includes(email)
@@ -34,12 +34,6 @@ async function requireAuth(req, res, next) {
     const { data: { user }, error } = await supabase.auth.getUser(token)
     if (error || !user) {
       return res.status(401).json({ error: 'Invalid or expired session. Please log in again.' })
-    }
-
-    // Ensure the userId in the request matches the authenticated user
-    const requestUserId = req.body?.userId || req.query?.userId
-    if (requestUserId && requestUserId !== user.id) {
-      return res.status(403).json({ error: 'Access denied' })
     }
 
     req.authUser = user

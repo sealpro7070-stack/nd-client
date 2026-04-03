@@ -102,6 +102,24 @@ router.post('/request', requireAuth, async (req, res) => {
     })
   }
 
+  // 24-hour cooldown after a rejection to prevent admin queue spam
+  const { data: recentRejected } = await supabase
+    .from('payment_requests')
+    .select('created_at')
+    .eq('user_id', userId)
+    .eq('status', 'rejected')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (recentRejected) {
+    const hoursSince = (Date.now() - new Date(recentRejected.created_at)) / 3_600_000
+    if (hoursSince < 24) {
+      const hoursLeft = Math.ceil(24 - hoursSince)
+      return res.status(429).json({ error: `Please wait ${hoursLeft} more hour(s) before resubmitting.` })
+    }
+  }
+
   // Check if user already on this plan and not expired
   const { data: user } = await supabase
     .from('users')
@@ -213,8 +231,8 @@ router.post('/admin/review', requireAuth, requireAdmin, async (req, res) => {
 })
 
 // ── GET /api/payments/qr-settings
-// Public: returns the current TNG QR image data (fetched by UpgradeModal)
-router.get('/qr-settings', async (req, res) => {
+// Returns the current TNG QR image data (fetched by UpgradeModal — requires login)
+router.get('/qr-settings', requireAuth, async (req, res) => {
   const { data } = await supabase
     .from('admin_settings')
     .select('value')
