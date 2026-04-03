@@ -136,14 +136,15 @@ async function _startBot(userId, directCookie, directSsUser, directSsProfile, di
   // Free plan  → 1 book per WEEK  (Monday 00:00 – Sunday 23:59 MYT)
   // Plus/Family → up to 50 books per MONTH (per PLAN_MAX above)
 
-  // Clean up stale pending records (older than 30 min) — prevents phantom quota blocks
+  // Clean up stale pending records (older than 5 min) — prevents phantom quota blocks
   // from bot runs that crashed before they could mark submissions as failed/success
+  // 5 min matches the expected max bot runtime (~3 min), leaving a small margin
   await supabase
     .from('submissions')
     .update({ status: 'failed', error_message: 'Timed out — previous run did not complete' })
     .eq('user_id', userId)
     .eq('status', 'pending')
-    .lt('created_at', new Date(Date.now() - 30 * 60 * 1000).toISOString())
+    .lt('created_at', new Date(Date.now() - 5 * 60 * 1000).toISOString())
 
   const now   = new Date()
   const month = now.getMonth() + 1
@@ -312,8 +313,7 @@ async function _startBotForSlot(userId, slotId, slot) {
     .in('status', ['success', 'pending'])
 
   const alreadyBookIds = (existing || []).map(s => s.book_id)
-  // Cap at plan limit (15), not a magic number
-  const slotMax  = PLAN_MAX.family
+  const slotMax  = PLAN_MAX.family  // 50 books/month per slot
   const needed   = Math.min(slot.books_per_month || 4, slotMax) - alreadyBookIds.length
   if (needed <= 0) return { success: true, skipped: true, reason: 'already_complete' }
 

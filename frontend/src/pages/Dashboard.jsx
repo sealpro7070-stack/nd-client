@@ -329,8 +329,8 @@ export default function Dashboard() {
 
         <div className="relative mt-5">
           <div className="flex justify-between text-xs mb-1.5">
-            <span className="text-brand-200 font-semibold">This Month's Progress</span>
-            <span className="text-white font-bold">{stats.thisMonth} / {bookCount} books</span>
+            <span className="text-brand-200 font-semibold">{userPlan === 'free' ? "This Week's Progress" : "This Month's Progress"}</span>
+            <span className="text-white font-bold">{stats.thisMonth} / {bookCount} {userPlan === 'free' ? 'book this week' : 'books'}</span>
           </div>
           <div className="w-full h-2 bg-white/20 rounded-full overflow-hidden">
             <motion.div

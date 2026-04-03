@@ -146,7 +146,7 @@ export default function Settings() {
         <div>
           <p className="text-xs text-muted font-medium uppercase tracking-wide">Current Plan</p>
           <p className="font-display text-lg font-extrabold text-heading capitalize mt-0.5">
-            {planInfo.plan === 'free' ? 'Free' : planInfo.plan === 'plus' ? 'Plus' : 'Family'}
+            {planInfo.plan === 'free' ? 'Free' : planInfo.plan === 'plus' ? 'Plus' : planInfo.plan === 'noob' ? 'Tester' : 'Family'}
             {planInfo.plan !== 'free' && planInfo.plan_expires_at && (
               <span className="text-xs text-muted font-normal ml-2">
                 expires {new Date(planInfo.plan_expires_at).toLocaleDateString('en-MY', { day: 'numeric', month: 'short', year: 'numeric' })}
@@ -154,9 +154,10 @@ export default function Settings() {
             )}
           </p>
           <p className="text-xs text-muted mt-0.5">
-            {planInfo.plan === 'free'   && '1 book/month · Upgrade to submit more'}
-            {planInfo.plan === 'plus'   && '15 books/month · 1 AINS account'}
-            {planInfo.plan === 'family' && '15 books/month · Up to 3 AINS accounts'}
+            {planInfo.plan === 'free'   && '1 book/week · Upgrade to submit more'}
+            {planInfo.plan === 'plus'   && '50 books/month · 1 AINS account'}
+            {planInfo.plan === 'family' && '50 books/month · Up to 3 AINS accounts'}
+            {planInfo.plan === 'noob'   && 'Tester account · Unlimited'}
           </p>
         </div>
         {planInfo.plan !== 'family' && (

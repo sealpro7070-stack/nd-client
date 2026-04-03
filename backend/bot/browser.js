@@ -139,7 +139,8 @@ async function runBot({ user, settings, cookie, ssUser, ssProfile, cookies, book
   } catch (err) {
     console.error('[bot] Fatal error:', err.message)
     if (browser) await browser.close().catch(() => {})
-    await markSubmissions(submissions.map(s => s.id), 'failed', err.message)
+    const safeMsg = err.message.length > 200 ? err.message.substring(0, 200) + '...' : err.message
+    await markSubmissions(submissions.map(s => s.id), 'failed', safeMsg)
     return { success: false, reason: err.message }
   }
 }

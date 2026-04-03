@@ -49,6 +49,10 @@ export default function UpgradeModal({ isOpen, onClose, currentPlan }) {
   const [qrData, setQrData]       = useState(null)
 
   useEffect(() => {
+    if (isOpen) reset()
+  }, [isOpen])
+
+  useEffect(() => {
     if (!isOpen) return
     fetch(`${BACKEND}/api/payments/qr-settings`)
       .then(r => r.json())
@@ -82,6 +86,10 @@ export default function UpgradeModal({ isOpen, onClose, currentPlan }) {
   }
 
   const handleSubmitPayment = async () => {
+    if (!reference.trim() && !receiptData) {
+      setError('Please provide a reference number or payment screenshot so we can verify your payment.')
+      return
+    }
     setSubmitting(true)
     setError('')
     try {

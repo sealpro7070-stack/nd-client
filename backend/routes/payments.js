@@ -41,7 +41,7 @@ router.get('/my-plan', requireAuth, async (req, res) => {
   res.json({
     plan: data.plan || 'free',
     plan_expires_at: data.plan_expires_at || null,
-    is_active: data.is_active && data.plan !== 'free' && !planExpired,
+    is_active: data.is_active,
   })
 })
 
@@ -184,6 +184,9 @@ router.post('/admin/review', requireAuth, requireAdmin, async (req, res) => {
 
   // If approved: update user's plan
   if (action === 'approve') {
+    if (!['plus', 'family'].includes(pr.plan)) {
+      return res.status(400).json({ error: 'Invalid plan on this payment request.' })
+    }
     const expiresAt = new Date()
     expiresAt.setFullYear(expiresAt.getFullYear() + 1)
 

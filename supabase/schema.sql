@@ -8,10 +8,9 @@ create table if not exists users (
   id uuid primary key default uuid_generate_v4(),
   email text unique not null,
   delima_id text,
-  cookie_encrypted text,
-  cookie_updated_at timestamp with time zone,
+  ains_cookie_encrypted text,
   is_active boolean default false,
-  -- Plan management (added with payment feature)
+  -- Plan management
   plan text default 'free' check (plan in ('free','plus','family','noob')),
   plan_expires_at timestamp with time zone,
   -- Encrypted AINS credentials
@@ -51,17 +50,32 @@ create table if not exists books (
   created_at timestamp with time zone default now()
 );
 
+-- Family slots table (up to 3 child AINS accounts per family plan)
+create table if not exists family_slots (
+  id                    uuid primary key default uuid_generate_v4(),
+  user_id               uuid references users(id) on delete cascade,
+  slot_name             text not null,
+  ains_cookie_encrypted text,
+  ains_email_encrypted  text,
+  ains_user_id_hash     text,
+  language              text default 'Melayu' check (language in ('Melayu','Inggeris','Cina','Tamil')),
+  books_per_month       int default 4 check (books_per_month between 1 and 50),
+  created_at            timestamp with time zone default now(),
+  unique (user_id, slot_name)
+);
+
 -- Submissions table
 create table if not exists submissions (
-  id uuid primary key default uuid_generate_v4(),
-  user_id uuid references users(id) on delete cascade,
-  book_id uuid references books(id),
-  submitted_at timestamp with time zone,
-  month int check (month between 1 and 12),
-  year int,
-  status text default 'pending' check (status in ('pending','success','failed')),
-  error_message text,
-  created_at timestamp with time zone default now()
+  id             uuid primary key default uuid_generate_v4(),
+  user_id        uuid references users(id) on delete cascade,
+  book_id        uuid references books(id),
+  family_slot_id uuid references family_slots(id) on delete set null,
+  submitted_at   timestamp with time zone,
+  month          int check (month between 1 and 12),
+  year           int,
+  status         text default 'pending' check (status in ('pending','success','failed')),
+  error_message  text,
+  created_at     timestamp with time zone default now()
 );
 
 -- Row Level Security
@@ -69,6 +83,7 @@ alter table users enable row level security;
 alter table settings enable row level security;
 alter table submissions enable row level security;
 alter table books enable row level security;
+alter table family_slots enable row level security;
 
 -- Users: only own row (read-only via client — writes go through backend service role)
 create policy "Users can view own data" on users
@@ -96,6 +111,10 @@ create policy "Users can insert own submissions" on submissions
 create policy "Books are readable by authenticated users" on books
   for select using (auth.role() = 'authenticated');
 
+-- Family slots: users see only their own
+create policy "Users see own family slots" on family_slots
+  for select using (auth.uid() = user_id);
+
 -- Service role can do everything (for backend)
 create policy "Service role full access users" on users
   for all using (auth.role() = 'service_role');
@@ -104,6 +123,8 @@ create policy "Service role full access settings" on settings
 create policy "Service role full access submissions" on submissions
   for all using (auth.role() = 'service_role');
 create policy "Service role full access books" on books
+  for all using (auth.role() = 'service_role');
+create policy "Service role full access family_slots" on family_slots
   for all using (auth.role() = 'service_role');
 
 -- Trigger: auto-create settings row when user is created
@@ -126,8 +147,11 @@ create index if not exists idx_submissions_year_month on submissions(year, month
 create index if not exists idx_books_language on books(language);
 create index if not exists idx_settings_user_id on settings(user_id);
 
--- AINS hash uniqueness index (column now in CREATE TABLE above)
+-- AINS hash uniqueness index
 create unique index if not exists idx_users_ains_user_id_hash on users(ains_user_id_hash) where ains_user_id_hash is not null;
+create unique index if not exists idx_family_slots_ains_hash on family_slots(ains_user_id_hash) where ains_user_id_hash is not null;
+create index if not exists idx_family_slots_user_id on family_slots(user_id);
+create index if not exists idx_submissions_family_slot on submissions(family_slot_id) where family_slot_id is not null;
 
 -- Admin settings (key-value store for site configuration)
 create table if not exists admin_settings (
@@ -153,6 +177,8 @@ create table if not exists payment_requests (
   created_at timestamp with time zone default now()
 );
 alter table payment_requests enable row level security;
+create policy "Users can view own payment requests" on payment_requests
+  for select using (auth.uid() = user_id);
 create policy "Service role full access payment_requests" on payment_requests
   for all using (auth.role() = 'service_role');
 create index if not exists idx_payment_requests_user_status
