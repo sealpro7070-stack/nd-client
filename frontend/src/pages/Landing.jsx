@@ -471,7 +471,7 @@ export default function Landing() {
                 <p className="font-display text-4xl font-extrabold text-white mb-1">RM18</p>
                 <p className="text-brand-200 text-xs mb-5">/ year · ≈ RM1.50/month</p>
                 <ul className="space-y-2.5 mb-6">
-                  {['Up to 8 books / month', 'All 4 languages', 'Full history', 'Monthly auto-schedule', 'Priority support'].map(f => (
+                  {['Up to 50 books / month', 'All 4 languages', 'Full history', 'Monthly auto-schedule', 'Priority support'].map(f => (
                     <li key={f} className="flex items-center gap-2.5 text-sm text-white">
                       <svg className="w-4 h-4 text-brand-200 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
                       {f}
