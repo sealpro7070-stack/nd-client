@@ -6,6 +6,8 @@ import History   from './pages/History'
 import Admin     from './pages/Admin'
 import Upgrade   from './pages/Upgrade'
 import Guide     from './pages/Guide'
+import Privacy   from './pages/Privacy'
+import Terms     from './pages/Terms'
 import Navbar    from './components/Navbar'
 
 function App() {
@@ -18,6 +20,8 @@ function App() {
       <Route path="/settings"  element={<AppLayout><Settings /></AppLayout>} />
       <Route path="/history"   element={<AppLayout><History /></AppLayout>} />
       <Route path="/guide"     element={<AppLayout><Guide /></AppLayout>} />
+      <Route path="/privacy"   element={<Privacy />} />
+      <Route path="/terms"     element={<Terms />} />
       <Route path="*"          element={<Navigate to="/" replace />} />
     </Routes>
   )

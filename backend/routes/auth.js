@@ -97,14 +97,12 @@ router.post('/connect', requireAuth, async (req, res) => {
 
       const encrypted = encrypt(sessionData)
       const encryptedEmail = encrypt(email)
-      const encryptedPassword = encrypt(password)
 
       const { error } = await supabase
         .from('users')
         .update({
           ains_cookie_encrypted: encrypted,
           ains_email_encrypted: encryptedEmail,
-          ains_password_encrypted: encryptedPassword,
         })
         .eq('id', userId)
 

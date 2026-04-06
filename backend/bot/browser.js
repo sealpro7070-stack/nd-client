@@ -65,7 +65,7 @@ async function takeScreenshot(page, label) {
   }
 }
 
-async function runBot({ user, settings, cookie, ssUser, ssProfile, cookies, books, submissions, ainsEmail, ainsPassword }) {
+async function runBot({ user, settings, cookie, ssUser, ssProfile, cookies, books, submissions }) {
   let browser
   try {
     const launched = await launchBrowser()
@@ -73,15 +73,7 @@ async function runBot({ user, settings, cookie, ssUser, ssProfile, cookies, book
     const context = launched.context
 
     // Inject session (use captured cookie)
-    let { page, isLoggedIn } = await loginAndVerify(context, cookie, ssUser, ssProfile, cookies)
-
-    // If session injection failed AND we have saved credentials, do a fresh login
-    if (!isLoggedIn && ainsEmail && ainsPassword) {
-      console.log('[bot] Session injection failed — attempting fresh login with saved credentials')
-      await takeScreenshot(page, 'session-failed-before-relogin')
-      isLoggedIn = await loginWithCredentials(context, page, ainsEmail, ainsPassword)
-      console.log(`[bot] Fresh login result: ${isLoggedIn ? 'SUCCESS' : 'FAILED'}`)
-    }
+    const { page, isLoggedIn } = await loginAndVerify(context, cookie, ssUser, ssProfile, cookies)
 
     if (!isLoggedIn) {
       console.error('[bot] All login methods failed')

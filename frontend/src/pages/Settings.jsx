@@ -286,48 +286,25 @@ export default function Settings() {
           </div>
         </div>
 
-        {/* Group 2: Schedule */}
+        {/* Group 2: Monthly Reminder — Coming Soon */}
         <div>
-          <h2 className="font-display text-base font-bold text-heading mb-3">Schedule</h2>
-          <div className="card-p space-y-4">
+          <h2 className="font-display text-base font-bold text-heading mb-3">Monthly Reminder</h2>
+          <div className="card-p space-y-3 opacity-60 pointer-events-none select-none">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-bold text-heading">Auto-Schedule</p>
-                <p className="text-xs text-muted mt-0.5">Automatically submit on a set day each month</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-bold text-heading">Email Reminder</p>
+                  <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-warn-100 text-warn-700">Coming Soon</span>
+                </div>
+                <p className="text-xs text-muted mt-0.5">Get an email reminder to submit on a set day each month</p>
               </div>
-              <button
-                type="button"
-                onClick={() => setForm(f => ({ ...f, auto_schedule: !f.auto_schedule }))}
-                className={`relative inline-flex h-7 items-center rounded-full transition-colors duration-200 ${form.auto_schedule ? 'bg-brand-600' : 'bg-gray-200'}`}
+              <div
+                className="relative inline-flex h-7 items-center rounded-full bg-gray-200"
                 style={{ width: 52 }}
               >
-                <span
-                  className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform duration-200 ${form.auto_schedule ? 'translate-x-7' : 'translate-x-1'}`}
-                />
-              </button>
+                <span className="inline-block h-5 w-5 transform rounded-full bg-white shadow translate-x-1" />
+              </div>
             </div>
-
-            {form.auto_schedule && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-              >
-                <label className="label">Schedule Day</label>
-                <div className="flex items-center gap-3 mt-1">
-                  <input
-                    type="number"
-                    min={1} max={28}
-                    value={form.schedule_day}
-                    onChange={e => setForm(f => ({ ...f, schedule_day: Number(e.target.value) }))}
-                    className="input w-24"
-                  />
-                  <p className="text-sm text-muted">of every month</p>
-                </div>
-                <p className="text-xs text-brand-600 font-semibold mt-2">
-                  Will submit on day {form.schedule_day} of each month
-                </p>
-              </motion.div>
-            )}
           </div>
         </div>
 

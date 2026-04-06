@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { supabase } from '../lib/supabase'
@@ -113,6 +113,7 @@ export default function Landing() {
   const [isError, setIsError]   = useState(false)
   const [resending, setResending] = useState(false)
   const [resent, setResent]       = useState(false)
+  const [agreedToTerms, setAgreedToTerms] = useState(false)
 
   // When the user clicks the verification link, Supabase redirects back here
   // with a session in the URL hash. Detect it and send them to the dashboard.
@@ -146,6 +147,12 @@ export default function Landing() {
     setLoading(true)
     setMessage('')
     setIsError(false)
+    if (mode === 'signup' && !agreedToTerms) {
+      setMessage('Please agree to the Terms of Use and Privacy Policy to continue.')
+      setIsError(true)
+      setLoading(false)
+      return
+    }
     try {
       if (mode === 'signup') {
         const { data, error } = await supabase.auth.signUp({
@@ -390,14 +397,14 @@ export default function Landing() {
               },
               {
                 n: '3',
-                label: 'Log in and we\'ll capture it',
-                body: 'On the Dashboard, click "Connect & Submit". You\'ll see the AINS login page. Complete your login normally (including 2FA if needed). Once you\'re logged in, we capture your session and the popup closes.',
-                tip: 'Your session is encrypted and stored securely. Your password is never sent to us — only your session cookie.',
+                label: 'Connect your AINS account',
+                body: 'On the Dashboard, click "Connect AINS Account". Enter your AINS email and password — we use them to log in and capture your session, then discard the password immediately. Your encrypted session is stored securely.',
+                tip: 'Your AINS session is encrypted with AES-256. Sessions last about 30 days — you\'ll get a reminder when it\'s time to reconnect.',
               },
               {
                 n: '4',
-                label: 'Sit back — it runs every month',
-                body: 'Nilam Auto logs in to AINS and submits your reading records automatically on your schedule day each month. Check History anytime to see what was submitted.',
+                label: 'Get reminded — then submit in one tap',
+                body: 'On your chosen day each month, we send you an email reminder. Open the app, tap Submit Now, and your records are submitted in under a minute. Check History anytime to see what was submitted.',
               },
             ].map((step, i) => (
               <motion.div key={step.n} {...inView(i * 0.05)} className="flex gap-5 bg-white rounded-2xl border border-line p-5 hover:border-brand-200 transition-colors">
@@ -445,7 +452,7 @@ export default function Landing() {
               <p className="font-display text-4xl font-extrabold text-heading mb-1">RM0</p>
               <p className="text-subtle text-xs mb-5">Forever free</p>
               <ul className="space-y-2.5 mb-6">
-                {['1 book / month', '1 language', '7-day history', 'Manual submit only'].map(f => (
+                {['1 book / week', '1 language', '7-day history', 'Manual submit only'].map(f => (
                   <li key={f} className="flex items-center gap-2.5 text-sm text-muted">
                     <svg className="w-4 h-4 text-subtle flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
                     {f}
@@ -471,7 +478,7 @@ export default function Landing() {
                 <p className="font-display text-4xl font-extrabold text-white mb-1">RM18</p>
                 <p className="text-brand-200 text-xs mb-5">/ year · ≈ RM1.50/month</p>
                 <ul className="space-y-2.5 mb-6">
-                  {['Up to 50 books / month', 'All 4 languages', 'Full history', 'Monthly auto-schedule', 'Priority support'].map(f => (
+                  {['Up to 50 books / month', 'All 4 languages', 'Full history', 'Monthly email reminder (coming soon)', 'Priority support'].map(f => (
                     <li key={f} className="flex items-center gap-2.5 text-sm text-white">
                       <svg className="w-4 h-4 text-brand-200 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
                       {f}
@@ -500,7 +507,7 @@ export default function Landing() {
             <p className="text-muted text-sm mt-2">
               {mode === 'login' ? "Don't have an account? " : 'Already have an account? '}
               <button
-                onClick={() => { setMode(mode === 'login' ? 'signup' : 'login'); setMessage('') }}
+                onClick={() => { setMode(mode === 'login' ? 'signup' : 'login'); setMessage(''); setAgreedToTerms(false) }}
                 className="text-brand-600 font-semibold hover:underline"
               >
                 {mode === 'login' ? 'Sign up free' : 'Sign in'}
@@ -514,7 +521,7 @@ export default function Landing() {
               {[{ k: 'login', l: 'Sign In' }, { k: 'signup', l: 'Sign Up' }].map(t => (
                 <button
                   key={t.k}
-                  onClick={() => { setMode(t.k); setMessage('') }}
+                  onClick={() => { setMode(t.k); setMessage(''); setAgreedToTerms(false) }}
                   className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${
                     mode === t.k ? 'bg-white text-heading shadow-sm' : 'text-muted hover:text-heading'
                   }`}
@@ -555,7 +562,26 @@ export default function Landing() {
                 </p>
               )}
 
-              <button type="submit" disabled={loading} className="btn-primary w-full py-3">
+              {mode === 'signup' && (
+                <div className="flex items-start gap-2.5">
+                  <input
+                    id="agree-terms"
+                    type="checkbox"
+                    checked={agreedToTerms}
+                    onChange={e => setAgreedToTerms(e.target.checked)}
+                    className="mt-0.5 w-4 h-4 rounded border-line accent-brand-600 cursor-pointer flex-shrink-0"
+                  />
+                  <label htmlFor="agree-terms" className="text-xs text-muted leading-relaxed cursor-pointer">
+                    I have read and agree to the{' '}
+                    <Link to="/terms" target="_blank" className="text-brand-600 font-semibold hover:underline">Terms of Use</Link>
+                    {' '}and{' '}
+                    <Link to="/privacy" target="_blank" className="text-brand-600 font-semibold hover:underline">Privacy Policy</Link>.
+                    I understand my AINS session will be used to automate my reading record submissions.
+                  </label>
+                </div>
+              )}
+
+              <button type="submit" disabled={loading || (mode === 'signup' && !agreedToTerms)} className="btn-primary w-full py-3">
                 {loading ? (
                   <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Processing…</>
                 ) : mode === 'login' ? 'Sign In' : 'Create Account'}
@@ -588,8 +614,11 @@ export default function Landing() {
             </div>
             <span className="font-display font-bold text-sm">Nilam Auto</span>
           </div>
-          <p className="text-white/40 text-xs">© 2025 Nilam Auto. Built for Malaysian students.</p>
-          <p className="text-white/40 text-xs">Data encrypted with AES-256</p>
+          <p className="text-white/40 text-xs">© 2026 Nilam Auto. Built for Malaysian students.</p>
+          <div className="flex items-center gap-4">
+            <Link to="/terms" className="text-white/40 text-xs hover:text-white/70 transition-colors">Terms of Use</Link>
+            <Link to="/privacy" className="text-white/40 text-xs hover:text-white/70 transition-colors">Privacy Policy</Link>
+          </div>
         </div>
       </footer>
     </div>

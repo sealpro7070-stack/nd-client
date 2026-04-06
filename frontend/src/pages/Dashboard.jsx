@@ -278,9 +278,9 @@ export default function Dashboard() {
   const displayName = user?.email?.split('@')[0] || 'there'
   const hour        = new Date().getHours()
   const greeting    = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
-  const nextRun     = settings?.auto_schedule
+  const nextReminder = settings?.auto_schedule
     ? `Day ${settings.schedule_day} of next month`
-    : 'No schedule set'
+    : 'No reminder set'
   const pct = bookCount > 0 ? Math.min((stats.thisMonth / bookCount) * 100, 100) : 0
 
   return (
@@ -348,7 +348,7 @@ export default function Dashboard() {
         {[
           { label: 'Total Submitted', value: stats.successful, icon: BookIcon },
           { label: 'Language', value: settings?.language ?? '—', icon: GlobeIcon },
-          { label: 'Next Run', value: nextRun, icon: ClockIcon, highlight: settings?.auto_schedule },
+          { label: 'Next Reminder', value: nextReminder, icon: ClockIcon, highlight: settings?.auto_schedule },
         ].map((s, i) => (
           <motion.div
             key={s.label}

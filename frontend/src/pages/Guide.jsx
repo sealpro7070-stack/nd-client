@@ -22,7 +22,7 @@ const STEPS = [
     n: '3',
     title: 'Connect your AINS account',
     body: 'On the Dashboard, click "Connect & Submit". A popup will show the AINS login page. Complete your login normally — if you use 2FA (Microsoft/Google), you\'ll verify it yourself. Once logged in, we capture your session and close the popup.',
-    tip: 'You have 15 minutes to complete login. Your session is encrypted and stored securely — never your password.',
+    tip: 'Your AINS password is used once to log in and immediately discarded. Only your encrypted session is stored — never your password.',
   },
   {
     n: '4',
@@ -31,8 +31,9 @@ const STEPS = [
   },
   {
     n: '5',
-    title: 'Runs automatically every month',
-    body: 'With auto-schedule enabled, Nilam Auto submits your records on the day you chose — every month, without you doing anything. Works on PC and mobile.',
+    title: 'Get reminded — submit in one tap',
+    body: 'With monthly reminders enabled, you\'ll get an email on your chosen day each month. Open the app, tap Submit Now, and your records are submitted in under a minute. Works on PC and mobile.',
+    tip: 'Because AINS sessions expire after ~30 days, we send a reminder instead of running silently in the background — so you\'re always in control.',
   },
 ]
 
@@ -97,7 +98,7 @@ export default function Guide() {
           },
           {
             q: 'Is my password stored?',
-            a: 'No. We capture your session cookie after you log in, not your password. Your password never leaves your browser.',
+            a: 'No. Your AINS password is used once to log in and capture your session, then immediately discarded — it is never saved to our database. Only your encrypted session cookie is stored.',
           },
           {
             q: 'What if my session expires?',
@@ -108,8 +109,8 @@ export default function Guide() {
             a: 'Yes — open nilam-auto.vercel.app in any mobile browser. Everything works the same way.',
           },
           {
-            q: 'When does the auto-schedule run?',
-            a: 'On the day of the month you set in Settings. For example, if you set day 15, it runs on the 15th of every month at 9 AM Malaysia time.',
+            q: 'How does the monthly reminder work?',
+            a: 'On the day you set in Settings, you\'ll receive an email reminder at 9 AM Malaysia time. Open the app and tap Submit Now — the bot submits your records immediately while your session is fresh.',
           },
         ].map((faq, i) => (
           <div key={i} className="border-t border-line pt-4 first:border-0 first:pt-0">

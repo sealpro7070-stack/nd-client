@@ -4,7 +4,7 @@ import { motion } from 'framer-motion'
 import { supabase } from '../lib/supabase'
 
 const FREE_FEATURES = [
-  '1 book / month',
+  '1 book / week',
   '1 language only',
   '7-day history',
   'Manual submit only',
@@ -14,7 +14,7 @@ const PRO_FEATURES = [
   'Up to 50 books / month',
   'All 4 languages',
   'Full submission history',
-  'Monthly auto-schedule',
+  'Monthly email reminder (coming soon)',
   'Status notifications',
   'Priority support',
 ]
