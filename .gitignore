@@ -10,6 +10,13 @@ node_modules/
 
 # Build output
 frontend/.vite/
+frontend/dist/
+dist/
+
+# Env production variants (never commit these)
+**/.env.production
+**/.env.production.local
+frontend/.env.production
 
 # Playwright
 backend/screenshots/
