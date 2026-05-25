@@ -313,7 +313,51 @@ function Pricing({ onGetStarted }) {
   )
 }
 
-function AuthSection({ mode, setMode, email, setEmail, password, setPassword, loading, message, isError, agreedToTerms, setAgreedToTerms, onSubmit, resending, resent, onResend }) {
+function AuthSection({ mode, setMode, email, setEmail, password, setPassword, loading, message, isError, agreedToTerms, setAgreedToTerms, onSubmit, resending, resent, onResend, onForgot, forgotSent }) {
+  if (mode === 'forgot') {
+    return (
+      <section id="auth" className="bg-cream border-t-[3px] border-ink py-16 sm:py-24 px-5">
+        <div className="max-w-md mx-auto">
+          <div className="text-center mb-8">
+            <h2 className="font-display font-black text-ink text-3xl sm:text-4xl tracking-tight">Reset password.</h2>
+            <p className="text-ink/60 text-sm mt-2 font-medium">
+              Remember it?{' '}
+              <button onClick={() => setMode('login')} className="text-cobalt font-extrabold hover:underline">Sign in</button>
+            </p>
+          </div>
+          <div className="bg-white border-[3px] border-ink rounded-2xl p-6" style={{ boxShadow: '8px 8px 0 #FFD23F' }}>
+            {forgotSent ? (
+              <div className="text-center py-4">
+                <p className="text-3xl mb-3">📬</p>
+                <p className="font-extrabold text-ink text-base">Check your email.</p>
+                <p className="text-sm text-ink/60 mt-1">We sent a password reset link to <span className="font-bold text-ink">{email}</span>.</p>
+                <button onClick={() => setMode('login')} className="mt-5 text-sm font-extrabold text-cobalt hover:underline">
+                  Back to sign in
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={onForgot} className="space-y-4">
+                <div>
+                  <label className="block text-[11px] font-extrabold uppercase tracking-wider text-ink/60 mb-1">Email address</label>
+                  <input type="email" value={email} onChange={e => setEmail(e.target.value)}
+                    placeholder="student@school.edu.my" required
+                    className="w-full px-3 py-2.5 rounded-lg border-[2px] border-ink bg-white font-bold text-sm text-ink placeholder:text-ink/30 focus:outline-none focus:ring-2 focus:ring-yellow" />
+                </div>
+                {message && (
+                  <p className={`text-sm font-bold ${isError ? 'text-red-600' : 'text-[#0E7D4F]'}`}>{message}</p>
+                )}
+                <button type="submit" disabled={loading}
+                  className="w-full chunky-btn chunky-btn--primary chunky-btn--lg justify-center">
+                  {loading ? <><AuthSpinner />Sending…</> : 'Send reset link'}
+                </button>
+              </form>
+            )}
+          </div>
+        </div>
+      </section>
+    )
+  }
+
   return (
     <section id="auth" className="bg-cream border-t-[3px] border-ink py-16 sm:py-24 px-5">
       <div className="max-w-md mx-auto">
@@ -351,7 +395,15 @@ function AuthSection({ mode, setMode, email, setEmail, password, setPassword, lo
                 className="w-full px-3 py-2.5 rounded-lg border-[2px] border-ink bg-white font-bold text-sm text-ink placeholder:text-ink/30 focus:outline-none focus:ring-2 focus:ring-yellow" />
             </div>
             <div>
-              <label className="block text-[11px] font-extrabold uppercase tracking-wider text-ink/60 mb-1">Password</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-[11px] font-extrabold uppercase tracking-wider text-ink/60">Password</label>
+                {mode === 'login' && (
+                  <button type="button" onClick={() => setMode('forgot')}
+                    className="text-[11px] font-extrabold text-cobalt hover:underline">
+                    Forgot password?
+                  </button>
+                )}
+              </div>
               <input type="password" value={password} onChange={e => setPassword(e.target.value)}
                 placeholder="••••••••" required minLength={6}
                 className="w-full px-3 py-2.5 rounded-lg border-[2px] border-ink bg-white font-bold text-sm text-ink placeholder:text-ink/30 focus:outline-none focus:ring-2 focus:ring-yellow" />
@@ -439,6 +491,7 @@ export default function Landing() {
   const [resending, setResending]       = useState(false)
   const [resent, setResent]             = useState(false)
   const [agreedToTerms, setAgreedToTerms] = useState(false)
+  const [forgotSent, setForgotSent]     = useState(false)
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
@@ -515,6 +568,18 @@ export default function Landing() {
     }
   }
 
+  async function handleForgot(e) {
+    e.preventDefault()
+    setLoading(true); setMessage(''); setIsError(false)
+    const siteUrl = import.meta.env.VITE_SITE_URL || 'https://nilamdesk.vercel.app'
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${siteUrl}/reset-password`,
+    })
+    setLoading(false)
+    if (error) { setMessage(error.message); setIsError(true) }
+    else { setForgotSent(true) }
+  }
+
   async function handleResend() {
     if (!email) { setMessage('Enter your email address first.'); setIsError(true); return }
     setResending(true); setMessage(''); setIsError(false)
@@ -542,13 +607,14 @@ export default function Landing() {
       <DemoSection />
       <Pricing onGetStarted={() => scrollToAuth('signup')} />
       <AuthSection
-        mode={mode} setMode={m => { setMode(m); setMessage(''); setAgreedToTerms(false) }}
+        mode={mode} setMode={m => { setMode(m); setMessage(''); setAgreedToTerms(false); setForgotSent(false) }}
         email={email} setEmail={setEmail}
         password={password} setPassword={setPassword}
         loading={loading} message={message} isError={isError}
         agreedToTerms={agreedToTerms} setAgreedToTerms={setAgreedToTerms}
         onSubmit={handleAuth}
         resending={resending} resent={resent} onResend={handleResend}
+        onForgot={handleForgot} forgotSent={forgotSent}
       />
       <Footer />
     </div>
