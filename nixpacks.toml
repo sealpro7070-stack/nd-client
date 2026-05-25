@@ -1,0 +1,8 @@
+[phases.install]
+cmds = ["npm --prefix backend install"]
+
+[phases.build]
+cmds = ["cd backend && npx playwright install chromium --with-deps"]
+
+[start]
+cmd = "npm --prefix backend start"
