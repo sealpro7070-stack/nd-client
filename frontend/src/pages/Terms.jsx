@@ -32,12 +32,12 @@ export default function Terms() {
           </div>
 
           <div className="bg-warn-50 border border-warn-200 rounded-xl p-4 text-sm text-warn-800 font-medium">
-            By creating an account, you confirm that you have read and agree to these terms. Please read them carefully before using Nilam Auto.
+            By creating an account, you confirm that you have read and agree to these terms. Please read them carefully before using NilamDesk.
           </div>
 
           <Section title="1. About the Service">
-            <p>Nilam Auto ("the Service") is an independent, third-party automation tool that helps Malaysian students submit their NILAM reading records on the AINS platform (ains.moe.gov.my) using your own account credentials.</p>
-            <p><strong>Nilam Auto is not affiliated with, endorsed by, or officially connected to the Ministry of Education Malaysia (KPM), the AINS platform, or any government body.</strong></p>
+            <p>NilamDesk ("the Service") is an independent, third-party automation tool that helps Malaysian students submit their NILAM reading records on the AINS platform (ains.moe.gov.my) using your own account credentials.</p>
+            <p><strong>NilamDesk is not affiliated with, endorsed by, or officially connected to the Ministry of Education Malaysia (KPM), the AINS platform, or any government body.</strong></p>
           </Section>
 
           <Section title="2. Eligibility">
@@ -49,20 +49,20 @@ export default function Terms() {
           </Section>
 
           <Section title="3. Acceptable Use">
-            <p>You agree to use Nilam Auto only for its intended purpose: automating your own legitimate NILAM reading record submissions. You must not:</p>
+            <p>You agree to use NilamDesk only for its intended purpose: automating your own legitimate NILAM reading record submissions. You must not:</p>
             <ul>
               <li>Submit records for books you have not actually read.</li>
               <li>Use the service to submit records on behalf of another person without their explicit consent.</li>
               <li>Attempt to reverse-engineer, hack, or abuse the service or the AINS platform.</li>
               <li>Share your account with others or use the service in a way that violates AINS's own terms.</li>
-              <li>Use automated scripts, bots, or tools to abuse the Nilam Auto platform itself.</li>
+              <li>Use automated scripts, bots, or tools to abuse the NilamDesk platform itself.</li>
             </ul>
           </Section>
 
           <Section title="4. Your AINS Credentials">
             <ul>
-              <li>You are responsible for your own AINS account. By connecting it to Nilam Auto, you grant the service permission to log in and submit reading records on your behalf.</li>
-              <li>Your AINS password is entered once for login purposes and is immediately discarded — it is never stored by Nilam Auto.</li>
+              <li>You are responsible for your own AINS account. By connecting it to NilamDesk, you grant the service permission to log in and submit reading records on your behalf.</li>
+              <li>Your AINS password is entered once for login purposes and is immediately discarded — it is never stored by NilamDesk.</li>
               <li>You may disconnect your AINS account at any time by reconnecting with updated credentials or contacting support.</li>
             </ul>
           </Section>
@@ -77,7 +77,7 @@ export default function Terms() {
 
           <Section title="6. Service Availability and Accuracy">
             <ul>
-              <li>Nilam Auto depends on the availability and structure of the AINS website. If AINS changes its interface or restricts access, the service may stop functioning partially or completely. We will attempt to restore functionality but cannot guarantee any specific uptime.</li>
+              <li>NilamDesk depends on the availability and structure of the AINS website. If AINS changes its interface or restricts access, the service may stop functioning partially or completely. We will attempt to restore functionality but cannot guarantee any specific uptime.</li>
               <li>The Service is provided "as is" without warranties of any kind. We are not responsible for any submission failures, missed deadlines, or consequences arising from use of the service.</li>
             </ul>
           </Section>
@@ -91,7 +91,7 @@ export default function Terms() {
           </Section>
 
           <Section title="9. Contact">
-            <p>If you have questions about these Terms, please contact us through the Nilam Auto platform.</p>
+            <p>If you have questions about these Terms, please contact us through the NilamDesk platform.</p>
           </Section>
         </motion.div>
       </div>

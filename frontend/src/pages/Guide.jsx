@@ -9,7 +9,7 @@ const up = (delay = 0) => ({
 const STEPS = [
   {
     n: '1',
-    title: 'Create your Nilam Auto account',
+    title: 'Create your NilamDesk account',
     body: 'Sign up with your personal email and a password. Check your inbox for a verification link and click it to activate your account.',
     tip: 'Use Gmail, Outlook, or any personal email — avoid school emails which may block automated messages.',
   },
@@ -106,7 +106,7 @@ export default function Guide() {
           },
           {
             q: 'Does it work on mobile?',
-            a: 'Yes — open nilam-auto.vercel.app in any mobile browser. Everything works the same way.',
+            a: 'Yes — open nilamdesk.vercel.app in any mobile browser. Everything works the same way.',
           },
           {
             q: 'How does the monthly reminder work?',

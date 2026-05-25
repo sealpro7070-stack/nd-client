@@ -6,7 +6,7 @@ const BACKEND = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001'
 
 // targetUserId — admin-only prop to connect AINS on behalf of another user
 export default function ConnectAINSModal({ isOpen, onClose, onSuccess, targetUserId }) {
-  const [phase, setPhase] = useState('form') // 'form' | 'connecting' | 'waiting_mfa' | 'success' | 'error'
+  const [phase, setPhase] = useState('form') // 'form' | 'connecting' | 'waiting_mfa' | 'capturing' | 'success' | 'error'
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [errorMsg, setErrorMsg] = useState('')
@@ -46,6 +46,8 @@ export default function ConnectAINSModal({ isOpen, onClose, onSuccess, targetUse
       if (data.status === 'waiting_mfa') {
         setMfaNumber(data.mfaNumber || null)
         setPhase('waiting_mfa')
+      } else if (data.status === 'capturing') {
+        setPhase('capturing')
       } else if (data.status === 'success') {
         stopPolling()
         setPhase('success')
@@ -54,6 +56,11 @@ export default function ConnectAINSModal({ isOpen, onClose, onSuccess, targetUse
         stopPolling()
         setPhase('error')
         setErrorMsg(data.message || 'Login failed. Please try again.')
+      } else if (data.status === 'idle') {
+        // Backend restarted and lost in-memory state — stop polling and show error
+        stopPolling()
+        setPhase('error')
+        setErrorMsg('Connection was interrupted (server restarted). Please try again.')
       }
     } catch {
       // network hiccup — keep polling
@@ -132,7 +139,7 @@ export default function ConnectAINSModal({ isOpen, onClose, onSuccess, targetUse
   }
 
   const handleClose = async () => {
-    if (phase === 'connecting' || phase === 'waiting_mfa') {
+    if (phase === 'connecting' || phase === 'waiting_mfa' || phase === 'capturing') {
       await cancelConnect()
     }
     onClose()
@@ -162,6 +169,12 @@ export default function ConnectAINSModal({ isOpen, onClose, onSuccess, targetUse
                 <p className="text-sm text-brand-800">
                   Enter your AINS (DELIMa) login details. After clicking Connect,
                   approve the notification on your phone, then switch back here.
+                </p>
+              </div>
+              <div className="bg-yellow/40 border-[2px] border-ink/30 rounded-lg px-3 py-2.5 flex items-start gap-2">
+                <span className="text-sm leading-none flex-shrink-0 mt-0.5">⚠️</span>
+                <p className="text-xs font-bold text-ink/80 leading-snug">
+                  Each AINS account (e.g. m-12345678@moe-dl.edu.my) can only be connected to <span className="underline">one NilamDesk account</span>. Sharing accounts is not allowed per our Terms of Use.
                 </p>
               </div>
 
@@ -242,6 +255,22 @@ export default function ConnectAINSModal({ isOpen, onClose, onSuccess, targetUse
                   </p>
                 </div>
               )}
+              <div className="w-6 h-6 border-2 border-brand-400 border-t-transparent rounded-full animate-spin mx-auto" />
+              <button onClick={handleClose} className="w-full py-2.5 rounded-xl border border-line text-muted font-bold hover:bg-gray-50 transition-colors text-sm">
+                Cancel
+              </button>
+            </div>
+          )}
+
+          {/* Capturing session phase (after MFA approved, waiting for AINS to load) */}
+          {phase === 'capturing' && (
+            <div className="py-6 text-center space-y-4">
+              <div className="text-4xl">✅</div>
+              <div>
+                <p className="font-semibold text-heading text-lg">Approved!</p>
+                <p className="text-sm text-muted mt-1">Capturing your AINS session…</p>
+                <p className="text-xs text-subtle mt-2">This can take up to 3 minutes. Please don't close this window.</p>
+              </div>
               <div className="w-6 h-6 border-2 border-brand-400 border-t-transparent rounded-full animate-spin mx-auto" />
               <button onClick={handleClose} className="w-full py-2.5 rounded-xl border border-line text-muted font-bold hover:bg-gray-50 transition-colors text-sm">
                 Cancel

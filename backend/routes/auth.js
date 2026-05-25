@@ -63,7 +63,7 @@ router.post('/connect', requireAuth, async (req, res) => {
               .maybeSingle()
 
             if (conflict) {
-              loginState[userId] = { status: 'error', message: 'This AINS account is already connected to another Nilam Auto account.' }
+              loginState[userId] = { status: 'error', message: 'This AINS account is already connected to another NilamDesk account.' }
               return
             }
 

@@ -29,6 +29,17 @@ router.get('/', requireAuth, async (req, res) => {
   res.json({ submissions: data, total: count })
 })
 
+// Monday 00:00:00 MYT (UTC+8), expressed as UTC — mirrors bot.js getWeekStart()
+function getWeekStart() {
+  const MYT_OFFSET_MS = 8 * 60 * 60 * 1000
+  const nowMYT = new Date(Date.now() + MYT_OFFSET_MS)
+  const day = nowMYT.getUTCDay()
+  const mondayMYT = new Date(nowMYT)
+  mondayMYT.setUTCDate(nowMYT.getUTCDate() - ((day + 6) % 7))
+  mondayMYT.setUTCHours(0, 0, 0, 0)
+  return new Date(mondayMYT.getTime() - MYT_OFFSET_MS)
+}
+
 // GET /api/history/stats
 router.get('/stats', requireAuth, async (req, res) => {
   const userId = req.authUser.id
@@ -36,10 +47,11 @@ router.get('/stats', requireAuth, async (req, res) => {
   const now = new Date()
   const currentMonth = now.getMonth() + 1
   const currentYear  = now.getFullYear()
+  const weekStart    = getWeekStart().toISOString()
 
   const { data: allSubmissions, error } = await supabase
     .from('submissions')
-    .select('status, month, year, submitted_at')
+    .select('status, month, year, created_at')
     .eq('user_id', userId)
 
   if (error) return res.status(500).json({ error: 'Failed to load stats' })
@@ -48,6 +60,9 @@ router.get('/stats', requireAuth, async (req, res) => {
   const thisMonth = allSubmissions.filter(
     s => s.month === currentMonth && s.year === currentYear && s.status === 'success'
   ).length
+  const thisWeek = allSubmissions.filter(
+    s => s.status === 'success' && s.created_at >= weekStart
+  ).length
   const thisMonthPending = allSubmissions.filter(
     s => s.month === currentMonth && s.year === currentYear && s.status === 'pending'
   ).length
@@ -55,7 +70,7 @@ router.get('/stats', requireAuth, async (req, res) => {
     s => s.month === currentMonth && s.year === currentYear && s.status === 'failed'
   ).length
 
-  res.json({ total, successful: total, thisMonth, thisMonthPending, thisMonthFailed, currentMonth, currentYear })
+  res.json({ total, successful: total, thisMonth, thisWeek, thisMonthPending, thisMonthFailed, currentMonth, currentYear })
 })
 
 module.exports = router

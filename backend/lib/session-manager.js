@@ -56,6 +56,19 @@ async function createSession(userId) {
         : originalQuery(params)
   })
 
+  // Intercept sessionStorage.setItem so we capture jb-app-* values the instant Vue writes them.
+  // Polling waitForFunction can miss a write that happens before polling fires; this doesn't.
+  await context.addInitScript(() => {
+    const orig = Storage.prototype.setItem
+    Storage.prototype.setItem = function (key, val) {
+      orig.call(this, key, val)
+      if (key === 'jb-app-token' || key === 'jb-app-user' || key === 'jb-app-profile') {
+        window.__nilamCapture = window.__nilamCapture || {}
+        window.__nilamCapture[key] = val
+      }
+    }
+  })
+
   sessions[userId] = { browser, context, page }
   return sessions[userId]
 }
@@ -184,16 +197,19 @@ async function performLogin(userId, email, password, onStatus) {
 
     console.log(`[login] Credentials submitted (${isGoogle ? 'Google' : 'Microsoft'}), checking for MFA challenge`)
 
-    // Wait for MFA page to render — increase wait to 5s to give the number time to appear
-    await page.waitForTimeout(5000)
+    // Wait up to 8s for the auth provider MFA page to render, but stop early if the
+    // URL already moved on (no MFA needed, or instant approval).
+    const authProviderPattern = /accounts\.google\.com|login\.microsoftonline\.com|login\.microsoft\.com/
+    await Promise.race([
+      page.waitForURL(url => !authProviderPattern.test(url.href), { timeout: 8000 }),
+      new Promise(r => setTimeout(r, 8000)),
+    ]).catch(() => {})
 
     // Detect number-matching challenge — both Google and Microsoft can show a
     // 2-digit number on screen that the user must tap on their phone to confirm.
     let mfaNumber = null
     const urlAfterCreds = page.url()
-    const onAuthProvider = urlAfterCreds.includes('accounts.google.com') ||
-                           urlAfterCreds.includes('login.microsoftonline.com') ||
-                           urlAfterCreds.includes('login.microsoft.com')
+    const onAuthProvider = authProviderPattern.test(urlAfterCreds)
 
     const extractNumber = () => page.evaluate(() => {
       const candidates = []
@@ -214,10 +230,9 @@ async function performLogin(userId, email, password, onStatus) {
     if (onAuthProvider) {
       mfaNumber = await extractNumber()
 
-      // If first attempt found nothing, wait another 3s and retry once
-      // (number-matching challenges sometimes take a moment to render)
+      // Retry once after 2s — number-matching challenges sometimes take a moment to render
       if (!mfaNumber) {
-        await page.waitForTimeout(3000)
+        await new Promise(r => setTimeout(r, 2000))
         mfaNumber = await extractNumber()
       }
 
@@ -238,67 +253,102 @@ async function performLogin(userId, email, password, onStatus) {
     )
     console.log(`[login] MFA approved, now on: ${page.url()}`)
 
-    // After Google OAuth, the browser goes through api.moe.gov.my/callback before
-    // landing on the actual AINS app. Wait for the final ains.moe.gov.my URL.
-    if (!page.url().includes('ains.moe.gov.my')) {
-      console.log('[login] Waiting for final redirect to ains.moe.gov.my...')
-      await page.waitForURL(/ains\.moe\.gov\.my/, { timeout: 30000 })
-      console.log(`[login] Landed on AINS: ${page.url()}`)
-    }
+    // MFA approved — update status so the frontend stops showing "Check your phone"
+    // and shows a "capturing session" spinner instead.
+    if (onStatus) onStatus('capturing')
 
-    // Wait for the Vue app to set jb-app-token in sessionStorage.
-    // Use waitForFunction (polls every 300ms) instead of a fixed sleep loop — fires
-    // the instant the token appears, saving up to 25 seconds in the worst case.
-    const getAny = (key) => page.evaluate(
-      (k) => sessionStorage.getItem(k) || localStorage.getItem(k), key
-    ).catch(() => null)
+    // Hard 3-minute deadline for the entire post-MFA capture phase.
+    // Without this, any hung Playwright call (network, page crash, slow AINS server)
+    // leaves the user waiting on the "Capturing…" screen indefinitely.
+    const CAPTURE_TIMEOUT_MS = 3 * 60 * 1000
+    const captureDeadline = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Session capture timed out after 3 minutes')), CAPTURE_TIMEOUT_MS)
+    )
 
-    console.log('[login] Waiting for jb-app-token in sessionStorage...')
-    await page.waitForFunction(
-      () => !!(sessionStorage.getItem('jb-app-token') || localStorage.getItem('jb-app-token')),
-      { timeout: 20000, polling: 300 }
-    ).catch(() => {})
+    const captureSession = async () => {
+      // After Google OAuth the browser passes through api.moe.gov.my/callback (or
+      // ains-api.moe.gov.my/auth/callback) before landing on the real AINS frontend.
+      // We must wait for https://ains.moe.gov.my specifically — not any moe.gov.my subdomain.
+      const isOnAinsFrontend = () => page.url().startsWith('https://ains.moe.gov.my')
+      if (!isOnAinsFrontend()) {
+        console.log('[login] Waiting for final redirect to ains.moe.gov.my...')
+        await page.waitForURL(
+          url => url.href.startsWith('https://ains.moe.gov.my'),
+          { timeout: 60000 }
+        )
+        console.log(`[login] Landed on AINS: ${page.url()}`)
+      }
 
-    let ssToken = await getAny('jb-app-token')
-    
-    // Fix: Wait a generous amount of time for the Vuex store to finish resolving 
-    // user information asynchronously via the AINS API. If we don't wait, ssUser 
-    // is captured as null, and the bot gets kicked out when it tries to inject it.
-    console.log('[login] Waiting for jb-app-user and profile to populate...');
-    await page.waitForFunction(
-      () => !!(sessionStorage.getItem('jb-app-user') || localStorage.getItem('jb-app-user')),
-      { timeout: 10000, polling: 300 }
-    ).catch(() => console.log('[login] jb-app-user did not populate after 10s'));
+      // The addInitScript installed in createSession intercepts sessionStorage.setItem
+      // and writes values into window.__nilamCapture the instant Vue sets them.
+      // Poll __nilamCapture (100ms) instead of re-reading sessionStorage directly —
+      // this fires within one render cycle of the Vue app writing the token.
+      const getCapture = (key) => page.evaluate(
+        (k) => (window.__nilamCapture && window.__nilamCapture[k]) ||
+                sessionStorage.getItem(k) || localStorage.getItem(k),
+        key
+      ).catch(() => null)
 
-    const storageInfo = await page.evaluate(() => ({
-      url: window.location.href,
-      ss: Object.keys(sessionStorage),
-    })).catch(() => ({ url: 'unknown', ss: [] }))
-    console.log(`[login] After token wait: ssToken=${!!ssToken}, url=${storageInfo.url}, ssKeys=${storageInfo.ss.join(',')}`)
-
-    // If still nothing, re-navigate to AINS root to re-trigger Vue router
-    if (!ssToken) {
-      console.warn('[login] jb-app-token still null — re-navigating to AINS root')
-      await page.goto(AINS_URL, { waitUntil: 'domcontentloaded', timeout: 20000 }).catch(() => {})
-      // Wait up to 8s for the token after re-navigation
+      console.log('[login] Waiting for jb-app-token via capture intercept...')
       await page.waitForFunction(
-        () => !!(sessionStorage.getItem('jb-app-token') || localStorage.getItem('jb-app-token')),
-        { timeout: 8000, polling: 300 }
+        () => !!(
+          (window.__nilamCapture && window.__nilamCapture['jb-app-token']) ||
+          sessionStorage.getItem('jb-app-token') ||
+          localStorage.getItem('jb-app-token')
+        ),
+        { timeout: 30000, polling: 100 }
       ).catch(() => {})
-      ssToken = await getAny('jb-app-token')
-      console.log(`[login] After re-navigate: ssToken=${!!ssToken}`)
+
+      let ssToken = await getCapture('jb-app-token')
+
+      // Wait for jb-app-user (set asynchronously by the Vuex store after API call)
+      console.log('[login] Waiting for jb-app-user...')
+      await page.waitForFunction(
+        () => !!(
+          (window.__nilamCapture && window.__nilamCapture['jb-app-user']) ||
+          sessionStorage.getItem('jb-app-user') ||
+          localStorage.getItem('jb-app-user')
+        ),
+        { timeout: 15000, polling: 100 }
+      ).catch(() => console.log('[login] jb-app-user did not populate after 15s'))
+
+      const storageInfo = await page.evaluate(() => ({
+        url: window.location.href,
+        ss: Object.keys(sessionStorage),
+        captured: Object.keys(window.__nilamCapture || {}),
+      })).catch(() => ({ url: 'unknown', ss: [], captured: [] }))
+      console.log(`[login] Storage state: ssToken=${!!ssToken}, url=${storageInfo.url}, ssKeys=${storageInfo.ss.join(',')}, captured=${storageInfo.captured.join(',')}`)
+
+      // If still nothing, re-navigate to AINS root to re-trigger the Vue router
+      if (!ssToken) {
+        console.warn('[login] jb-app-token still null — re-navigating to AINS root')
+        await page.goto(AINS_URL, { waitUntil: 'domcontentloaded', timeout: 20000 }).catch(() => {})
+        await page.waitForFunction(
+          () => !!(
+            (window.__nilamCapture && window.__nilamCapture['jb-app-token']) ||
+            sessionStorage.getItem('jb-app-token') ||
+            localStorage.getItem('jb-app-token')
+          ),
+          { timeout: 15000, polling: 100 }
+        ).catch(() => {})
+        ssToken = await getCapture('jb-app-token')
+        console.log(`[login] After re-navigate: ssToken=${!!ssToken}`)
+      }
+
+      const [ssUser, ssProfile] = await Promise.all([
+        getCapture('jb-app-user'),
+        getCapture('jb-app-profile'),
+      ])
+
+      const cookies = await getCookies(userId)
+      console.log(`[login] Session captured: ssToken=${!!ssToken}, ssUser=${!!ssUser}, cookies=${cookies.length}`)
+
+      return { ssToken, ssUser, ssProfile, cookies }
     }
 
-    const [ssUser, ssProfile] = await Promise.all([
-      getAny('jb-app-user'),
-      getAny('jb-app-profile'),
-    ])
-
-    const cookies = await getCookies(userId)
-    console.log(`[login] Session captured: ssToken=${!!ssToken}, ssUser=${!!ssUser}, cookies=${cookies.length}`)
-
+    const result = await Promise.race([captureSession(), captureDeadline])
     await destroySession(userId)
-    return { ssToken, ssUser, ssProfile, cookies }
+    return result
   } catch (err) {
     await destroySession(userId).catch(() => {})
     throw err

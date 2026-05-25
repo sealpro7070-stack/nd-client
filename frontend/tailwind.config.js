@@ -43,10 +43,16 @@ export default {
           500: '#EF4444',
           600: '#DC2626',
         },
+        // Design system v2 — landing page tokens
+        cream:  '#F4F1EA',
+        cobalt: '#2F5DDB',
+        yellow: '#FFD23F',
+        ink:    '#0F172A',
       },
       fontFamily: {
         sans:    ['"Plus Jakarta Sans"', 'sans-serif'],
         display: ['"Plus Jakarta Sans"', 'sans-serif'],
+        mono:    ['"JetBrains Mono"', 'ui-monospace', 'monospace'],
       },
       boxShadow: {
         card:    '0 2px 12px rgba(0,0,0,0.06)',

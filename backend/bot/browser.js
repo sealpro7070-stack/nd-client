@@ -13,7 +13,7 @@ if (!fs.existsSync(SCREENSHOTS_DIR)) fs.mkdirSync(SCREENSHOTS_DIR, { recursive: 
 
 async function launchBrowser() {
   const browser = await chromium.launch({
-    headless: false,
+    headless: process.env.SHOW_BROWSER !== '1',
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',

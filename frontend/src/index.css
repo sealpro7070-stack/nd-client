@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -73,3 +73,100 @@ html {
   .pb-safe         { padding-bottom: env(safe-area-inset-bottom); }
   .bottom-nav-safe { padding-bottom: calc(env(safe-area-inset-bottom) + 0.5rem); }
 }
+
+/* ── Chunky button system (landing page v2) ──────────────────────
+   Variant: --primary (cobalt), --ink (dark), --ghost (outline)
+   Size: default, --sm, --lg
+   3D push effect on hover/active */
+.chunky-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.65rem 1.1rem;
+  border: 3px solid #0F172A;
+  border-radius: 12px;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-weight: 800;
+  font-size: 0.875rem;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  transition: transform 0.08s ease, box-shadow 0.08s ease;
+  user-select: none;
+  line-height: 1;
+  white-space: nowrap;
+  text-decoration: none;
+}
+.chunky-btn--primary     { background: #2F5DDB; color: #F4F1EA; box-shadow: 4px 4px 0 #0F172A; }
+.chunky-btn--ink         { background: #0F172A; color: #F4F1EA; box-shadow: 4px 4px 0 #2F5DDB; }
+.chunky-btn--ghost       { background: transparent; color: #0F172A; box-shadow: 4px 4px 0 #0F172A; }
+.chunky-btn--ghost-light { background: transparent; color: #F4F1EA; border-color: #F4F1EA; box-shadow: 4px 4px 0 #F4F1EA; }
+
+/* Size variants — both naming conventions supported */
+.chunky-btn--sm, .chunky-btn--small { padding: 0.45rem 0.85rem; font-size: 0.75rem; border-radius: 10px; box-shadow: 3px 3px 0 #0F172A; }
+.chunky-btn--lg, .chunky-btn--large { padding: 0.95rem 1.5rem; font-size: 1rem; border-radius: 14px; box-shadow: 5px 5px 0 #0F172A; }
+.chunky-btn--ink.chunky-btn--lg,
+.chunky-btn--ink.chunky-btn--large  { box-shadow: 5px 5px 0 #2F5DDB; }
+
+.chunky-btn:hover:not(:disabled)                         { transform: translate(-2px, -2px); box-shadow: 6px 6px 0 #0F172A; }
+.chunky-btn--ink:hover:not(:disabled)                    { box-shadow: 6px 6px 0 #2F5DDB; }
+.chunky-btn--ghost-light:hover:not(:disabled)            { box-shadow: 6px 6px 0 #F4F1EA; }
+.chunky-btn--lg:hover:not(:disabled),
+.chunky-btn--large:hover:not(:disabled)                  { box-shadow: 7px 7px 0 #0F172A; }
+.chunky-btn--ink.chunky-btn--lg:hover:not(:disabled),
+.chunky-btn--ink.chunky-btn--large:hover:not(:disabled)  { box-shadow: 7px 7px 0 #2F5DDB; }
+.chunky-btn:active:not(:disabled)                        { transform: translate(2px, 2px); box-shadow: 0 0 0 transparent !important; }
+.chunky-btn:disabled                                     { cursor: not-allowed; opacity: 0.5; }
+
+/* ── Landing page animations ─────────────────────────────────── */
+@keyframes marqueeScroll {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+@keyframes mascotFloat {
+  0%, 100% { transform: translateY(0) rotate(-1deg); }
+  50%       { transform: translateY(-8px) rotate(1deg); }
+}
+@keyframes spinnerSpin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+/* ── Chunky range slider ─────────────────────────────────────── */
+.nilam-range {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 12px;
+  background: #F4F1EA;
+  border: 2.5px solid #0F172A;
+  border-radius: 999px;
+  outline: none;
+  padding: 0;
+}
+.nilam-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #FFD23F;
+  border: 2.5px solid #0F172A;
+  cursor: pointer;
+  box-shadow: 2px 2px 0 #0F172A;
+}
+.nilam-range::-moz-range-thumb {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #FFD23F;
+  border: 2.5px solid #0F172A;
+  cursor: pointer;
+  box-shadow: 2px 2px 0 #0F172A;
+}
+
+/* ── Demo frame scrollbar ──────────────────────────────────────*/
+.demo-frame::-webkit-scrollbar { width: 6px; }
+.demo-frame::-webkit-scrollbar-thumb { background: #0F172A33; border-radius: 4px; }

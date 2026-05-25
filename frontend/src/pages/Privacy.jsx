@@ -32,11 +32,11 @@ export default function Privacy() {
           </div>
 
           <div className="bg-brand-50 border border-brand-100 rounded-xl p-4 text-sm text-brand-700 font-medium">
-            Nilam Auto is an independent tool built for Malaysian students. We are not affiliated with, endorsed by, or connected to the Ministry of Education Malaysia (KPM) or the AINS platform.
+            NilamDesk is an independent tool built for Malaysian students. We are not affiliated with, endorsed by, or connected to the Ministry of Education Malaysia (KPM) or the AINS platform.
           </div>
 
           <Section title="1. What We Collect">
-            <p>When you use Nilam Auto, we collect and store the following information:</p>
+            <p>When you use NilamDesk, we collect and store the following information:</p>
             <ul>
               <li><strong>Email address</strong> — used to create and identify your account.</li>
               <li><strong>AINS session cookie (encrypted)</strong> — captured when you log in through our Connect AINS flow. Stored using AES-256-GCM encryption. This allows the bot to submit records on your behalf.</li>
@@ -83,11 +83,11 @@ export default function Privacy() {
           </Section>
 
           <Section title="7. Children's Privacy">
-            <p>Nilam Auto is designed for use by students and parents of students in Malaysia. If you are under 13, a parent or guardian must create and manage your account. We do not knowingly collect data from children without parental consent.</p>
+            <p>NilamDesk is designed for use by students and parents of students in Malaysia. If you are under 13, a parent or guardian must create and manage your account. We do not knowingly collect data from children without parental consent.</p>
           </Section>
 
           <Section title="8. Contact">
-            <p>For privacy-related concerns or data deletion requests, please contact the developer through the Nilam Auto platform.</p>
+            <p>For privacy-related concerns or data deletion requests, please contact the developer through the NilamDesk platform.</p>
           </Section>
         </motion.div>
       </div>

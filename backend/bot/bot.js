@@ -12,7 +12,7 @@ const { isAdminEmail } = require('../lib/auth-middleware')
 
 // Plan limits — single source of truth
 // noob = tester role granted by admin, effectively unlimited
-const PLAN_MAX = { free: 1, plus: 50, family: 50, noob: 999 }
+const PLAN_MAX = { free: 1, plus: 30, family: 50, noob: 999 }
 
 // Per-user/slot lock: prevents simultaneous bot runs for the same user
 const activeBotRuns = new Map()
@@ -157,7 +157,7 @@ async function _startBot(userId, directCookie, directSsUser, directSsProfile, di
     .select('book_id')
     .eq('user_id', userId)
     .is('family_slot_id', null)
-    .in('status', ['success', 'pending'])
+    .in('status', ['success'])
 
   if (isFree) {
     // Weekly window: Monday 00:00:00 to now
@@ -171,18 +171,27 @@ async function _startBot(userId, directCookie, directSsUser, directSsProfile, di
   const alreadySubmitted = existing || []
   const alreadyBookIds   = alreadySubmitted.map(s => s.book_id)
 
+  // ── Credit balance ────────────────────────────────────────
+  // Free users: 1 book/week is credit-free; additional books consume 1 credit each
+  // Paid users: all books consume 1 credit each (plan just sets the monthly cap)
+  const creditBalance  = isAdminUser ? Infinity : (user.credits || 0)
+  const freeRemaining  = isFree ? Math.max(0, 1 - alreadySubmitted.length) : 0
+  // Total books allowed this period including free slot + credit allowance
+  const totalAllowed   = isFree ? (freeRemaining + creditBalance) : maxAllowed
+
   // 5. Determine how many books to submit — enforce plan limit in the bot itself
   let needed
   if (overrideCount && overrideCount > 0) {
-    // overrideCount must not allow exceeding the remaining period allowance
-    needed = Math.min(overrideCount, maxAllowed - alreadySubmitted.length)
-    console.log(`[bot] Manual override: requested ${overrideCount}, allowed ${needed} (${alreadySubmitted.length}/${maxAllowed} already done ${periodLabel})`)
+    needed = Math.min(overrideCount, totalAllowed - alreadySubmitted.length)
+    console.log(`[bot] Manual override: requested ${overrideCount}, allowed ${needed} (${alreadySubmitted.length}/${totalAllowed} already done ${periodLabel})`)
   } else {
-    // Quota mode: free uses weekly max (1), paid uses books_per_month capped at plan max
-    const periodTarget = isFree ? maxAllowed : Math.min(userSettings.books_per_month, maxAllowed)
+    // Quota mode: free uses weekly max (free slot + credits), paid uses books_per_month capped at plan max
+    const periodTarget = isFree
+      ? Math.min(userSettings.books_per_month || 4, totalAllowed)
+      : Math.min(userSettings.books_per_month, maxAllowed)
     needed = periodTarget - alreadySubmitted.length
     if (needed <= 0) {
-      console.log(`[bot] Already submitted ${alreadySubmitted.length}/${maxAllowed} books ${periodLabel}. Nothing to do.`)
+      console.log(`[bot] Already submitted ${alreadySubmitted.length}/${periodTarget} books ${periodLabel}. Nothing to do.`)
       return { success: true, skipped: true, reason: 'already_complete' }
     }
     console.log(`[bot] Need ${needed} more book(s) to reach ${isFree ? 'weekly' : 'monthly'} quota (${alreadySubmitted.length}/${periodTarget} done)`)
@@ -191,6 +200,14 @@ async function _startBot(userId, directCookie, directSsUser, directSsProfile, di
   if (needed <= 0) {
     console.log(`[bot] ${isFree ? 'Weekly' : 'Monthly'} quota already met. Nothing to do.`)
     return { success: true, skipped: true, reason: 'already_complete' }
+  }
+
+  // For paid plans: require credits
+  if (!isFree && !isAdminUser) {
+    if (creditBalance <= 0) {
+      throw new Error('No credits remaining. Top up credits to continue submitting.')
+    }
+    needed = Math.min(needed, creditBalance)
   }
 
   // 6. Pick books: matching language, excluding already submitted this month
@@ -242,6 +259,29 @@ async function _startBot(userId, directCookie, directSsUser, directSsProfile, di
     submissions: insertedSubs,
   })
 
+  // 9. Deduct credits for successful submissions
+  if (!isAdminUser) {
+    try {
+      const { data: finalSubs } = await supabase
+        .from('submissions')
+        .select('status')
+        .in('id', insertedSubs.map(s => s.id))
+
+      const successCount = finalSubs?.filter(s => s.status === 'success').length || 0
+      if (successCount > 0) {
+        // For free users: the first book(s) of the week are free — don't deduct those
+        const freeUsedThisRun = isFree ? Math.min(freeRemaining, successCount) : 0
+        const creditsToDeduct = successCount - freeUsedThisRun
+        if (creditsToDeduct > 0) {
+          await supabase.rpc('add_credits', { target_user_id: userId, amount: -creditsToDeduct })
+          console.log(`[bot] Deducted ${creditsToDeduct} credit(s) (${successCount} succeeded, ${freeUsedThisRun} were free)`)
+        }
+      }
+    } catch (err) {
+      console.warn('[bot] Credit deduction failed:', err.message)
+    }
+  }
+
   return result
 }
 
@@ -292,7 +332,15 @@ async function _startBotForSlot(userId, slotId, slot) {
   const month = now.getMonth() + 1
   const year  = now.getFullYear()
 
-  // Include pending to prevent race condition duplicates
+  // Clean up stale pending records (older than 5 min) — same logic as _startBot
+  await supabase
+    .from('submissions')
+    .update({ status: 'failed', error_message: 'Timed out — previous run did not complete' })
+    .eq('user_id', userId)
+    .eq('family_slot_id', slotId)
+    .eq('status', 'pending')
+    .lt('created_at', new Date(Date.now() - 5 * 60 * 1000).toISOString())
+
   const { data: existing } = await supabase
     .from('submissions')
     .select('book_id')
@@ -300,7 +348,7 @@ async function _startBotForSlot(userId, slotId, slot) {
     .eq('family_slot_id', slotId)
     .eq('month', month)
     .eq('year', year)
-    .in('status', ['success', 'pending'])
+    .in('status', ['success'])
 
   const alreadyBookIds = (existing || []).map(s => s.book_id)
   const slotMax  = PLAN_MAX.family  // 50 books/month per slot

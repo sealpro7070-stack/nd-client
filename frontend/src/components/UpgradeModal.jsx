@@ -7,11 +7,12 @@ const BACKEND = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001'
 const PLANS = [
   {
     id: 'plus',
-    name: 'Plus',
+    name: 'Pro',
     price: 'RM18',
-    period: '/year',
+    period: '/month',
     books: '50 books/month',
     badge: null,
+    comingSoon: false,
     features: [
       '50 books per month',
       'All 4 languages',
@@ -25,9 +26,10 @@ const PLANS = [
     id: 'family',
     name: 'Family',
     price: 'RM48',
-    period: '/year',
+    period: '/month',
     books: '50 books/month × 3 siblings',
-    badge: 'Best Value',
+    badge: 'Coming Soon',
+    comingSoon: true,
     features: [
       '50 books/month per sibling',
       'Up to 3 AINS accounts',
@@ -132,7 +134,7 @@ export default function UpgradeModal({ isOpen, onClose, currentPlan }) {
         <div className="bg-brand-600 text-white p-4 flex items-center justify-between flex-shrink-0">
           <h3 className="font-bold text-sm sm:text-base">
             {step === 'plans'   && 'Upgrade your plan'}
-            {step === 'payment' && `Pay for ${selectedPlan?.name} — ${selectedPlan?.price}/year`}
+            {step === 'payment' && `Pay for ${selectedPlan?.name} — ${selectedPlan?.price}/month`}
             {step === 'done'    && 'Payment submitted!'}
           </h3>
           <button onClick={handleClose} className="text-white/60 hover:text-white text-2xl leading-none">×</button>
@@ -150,34 +152,49 @@ export default function UpgradeModal({ isOpen, onClose, currentPlan }) {
               )}
               <div className="grid gap-4">
                 {PLANS.map(plan => (
-                  <button
-                    key={plan.id}
-                    onClick={() => handleSelectPlan(plan)}
-                    className={`relative text-left border-2 rounded-2xl p-4 transition-all hover:scale-[1.01] active:scale-[0.99] ${
-                      plan.color === 'ok'
-                        ? 'border-ok-400 bg-ok-50 hover:border-ok-500'
-                        : 'border-brand-400 bg-brand-50 hover:border-brand-500'
-                    }`}
-                  >
-                    {plan.badge && (
-                      <span className="absolute top-3 right-3 bg-ok-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
-                        {plan.badge}
+                  plan.comingSoon ? (
+                    <div
+                      key={plan.id}
+                      className="relative text-left border-2 rounded-2xl p-4 border-line bg-gray-50 opacity-60 cursor-not-allowed"
+                    >
+                      <span className="absolute top-3 right-3 bg-warn-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                        Coming Soon
                       </span>
-                    )}
-                    <div className="flex items-baseline gap-1 mb-1">
-                      <span className="font-display text-2xl font-extrabold text-heading">{plan.price}</span>
-                      <span className="text-sm text-muted">{plan.period}</span>
+                      <div className="flex items-baseline gap-1 mb-1">
+                        <span className="font-display text-2xl font-extrabold text-heading">{plan.price}</span>
+                        <span className="text-sm text-muted">{plan.period}</span>
+                      </div>
+                      <p className="font-bold text-heading text-sm mb-1">{plan.name}</p>
+                      <p className="text-xs text-muted mb-3">{plan.books}</p>
+                      <ul className="space-y-1">
+                        {plan.features.map((f, i) => (
+                          <li key={i} className="flex items-center gap-2 text-xs text-body">
+                            <span className="text-subtle font-bold">✓</span> {f}
+                          </li>
+                        ))}
+                      </ul>
                     </div>
-                    <p className="font-bold text-heading text-sm mb-1">{plan.name}</p>
-                    <p className="text-xs text-muted mb-3">{plan.books}</p>
-                    <ul className="space-y-1">
-                      {plan.features.map((f, i) => (
-                        <li key={i} className="flex items-center gap-2 text-xs text-body">
-                          <span className="text-ok-500 font-bold">✓</span> {f}
-                        </li>
-                      ))}
-                    </ul>
-                  </button>
+                  ) : (
+                    <button
+                      key={plan.id}
+                      onClick={() => handleSelectPlan(plan)}
+                      className="relative text-left border-2 rounded-2xl p-4 transition-all hover:scale-[1.01] active:scale-[0.99] border-brand-400 bg-brand-50 hover:border-brand-500"
+                    >
+                      <div className="flex items-baseline gap-1 mb-1">
+                        <span className="font-display text-2xl font-extrabold text-heading">{plan.price}</span>
+                        <span className="text-sm text-muted">{plan.period}</span>
+                      </div>
+                      <p className="font-bold text-heading text-sm mb-1">{plan.name}</p>
+                      <p className="text-xs text-muted mb-3">{plan.books}</p>
+                      <ul className="space-y-1">
+                        {plan.features.map((f, i) => (
+                          <li key={i} className="flex items-center gap-2 text-xs text-body">
+                            <span className="text-ok-500 font-bold">✓</span> {f}
+                          </li>
+                        ))}
+                      </ul>
+                    </button>
+                  )
                 ))}
               </div>
               <button onClick={handleClose} className="w-full py-2.5 rounded-xl border border-line text-muted font-bold text-sm hover:bg-gray-50">
@@ -192,7 +209,7 @@ export default function UpgradeModal({ isOpen, onClose, currentPlan }) {
               <div className="bg-gray-50 border border-line rounded-xl p-4 text-center space-y-1">
                 <p className="text-sm text-muted">Amount to pay</p>
                 <p className="font-display text-3xl font-extrabold text-heading">{selectedPlan.price}</p>
-                <p className="text-xs text-muted">{selectedPlan.name} Plan · 1 year</p>
+                <p className="text-xs text-muted">{selectedPlan.name} Plan · 1 month</p>
               </div>
 
               {/* TNG QR Code */}

@@ -7,7 +7,7 @@
  *   SMTP_USER   — your sending email address
  *   SMTP_PASS   — app password or SMTP password
  *   SMTP_FROM   — display name + address, e.g. "Nilam Auto <no-reply@nilam-auto.com>"
- *   SITE_URL    — frontend URL, e.g. https://nilam-auto.vercel.app
+ *   SITE_URL    — frontend URL, e.g. https://nilamdesk.vercel.app
  */
 
 const nodemailer = require('nodemailer')
@@ -36,7 +36,7 @@ async function sendReminderEmail(toEmail, scheduleDay) {
   if (!transporter) return
 
   const from    = process.env.SMTP_FROM || `"Nilam Auto" <${process.env.SMTP_USER}>`
-  const siteUrl = process.env.SITE_URL  || 'https://nilam-auto.vercel.app'
+  const siteUrl = process.env.SITE_URL  || 'https://nilamdesk.vercel.app'
   const dashboardUrl = `${siteUrl}/dashboard`
 
   const html = `

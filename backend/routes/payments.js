@@ -32,7 +32,7 @@ function requireAdmin(req, res, next) {
 router.get('/my-plan', requireAuth, async (req, res) => {
   const { data, error } = await supabase
     .from('users')
-    .select('plan, plan_expires_at, is_active')
+    .select('plan, plan_expires_at, is_active, credits')
     .eq('id', req.authUser.id)
     .single()
 
@@ -42,6 +42,7 @@ router.get('/my-plan', requireAuth, async (req, res) => {
     plan: data.plan || 'free',
     plan_expires_at: data.plan_expires_at || null,
     is_active: data.is_active,
+    credits: data.credits || 0,
   })
 })
 
@@ -200,34 +201,127 @@ router.post('/admin/review', requireAuth, requireAdmin, async (req, res) => {
   if (updateErr) return res.status(500).json({ error: updateErr.message })
   if (!updated?.length) return res.status(409).json({ error: `Request has already been processed` })
 
-  // If approved: update user's plan
+  // If approved: update user's plan or add credits
   if (action === 'approve') {
-    if (!['plus', 'family'].includes(pr.plan)) {
-      return res.status(400).json({ error: 'Invalid plan on this payment request.' })
-    }
-    const expiresAt = new Date()
-    expiresAt.setFullYear(expiresAt.getFullYear() + 1)
+    const requestType = pr.type || 'plan_upgrade'
 
-    const { error: planErr } = await supabase
-      .from('users')
-      .update({
-        plan:            pr.plan,
-        plan_expires_at: expiresAt.toISOString(),
-        is_active:       true,
+    if (requestType === 'credit_topup') {
+      // Add credits to user balance
+      const creditsToAdd = pr.credits_amount || pr.amount
+      const { error: creditErr } = await supabase.rpc('add_credits', {
+        target_user_id: pr.user_id,
+        amount: creditsToAdd,
       })
-      .eq('id', pr.user_id)
+      if (creditErr) {
+        await supabase.from('payment_requests')
+          .update({ status: 'pending', reviewed_at: null, reviewed_by: null })
+          .eq('id', requestId)
+        return res.status(500).json({ error: 'Payment approved but credits update failed. Please retry.' })
+      }
+    } else {
+      // Plan upgrade
+      if (!['plus', 'family'].includes(pr.plan)) {
+        return res.status(400).json({ error: 'Invalid plan on this payment request.' })
+      }
+      // Grant exactly 1 month from approval time
+      const expiresAt = new Date()
+      expiresAt.setMonth(expiresAt.getMonth() + 1)
 
-    if (planErr) {
-      // Revert the payment request back to pending — also clear audit fields
-      // so admin doesn't see stale reviewed_by on a re-pending request
-      await supabase.from('payment_requests')
-        .update({ status: 'pending', reviewed_at: null, reviewed_by: null })
-        .eq('id', requestId)
-      return res.status(500).json({ error: 'Payment approved but plan update failed. Please retry.' })
+      const { error: planErr } = await supabase
+        .from('users')
+        .update({
+          plan:            pr.plan,
+          plan_expires_at: expiresAt.toISOString(),
+          is_active:       true,
+        })
+        .eq('id', pr.user_id)
+
+      if (planErr) {
+        // Revert the payment request back to pending — also clear audit fields
+        // so admin doesn't see stale reviewed_by on a re-pending request
+        await supabase.from('payment_requests')
+          .update({ status: 'pending', reviewed_at: null, reviewed_by: null })
+          .eq('id', requestId)
+        return res.status(500).json({ error: 'Payment approved but plan update failed. Please retry.' })
+      }
+
+      // Grant 30 starter credits on plan approval
+      await supabase.rpc('add_credits', { target_user_id: pr.user_id, amount: 30 })
+        .catch(err => console.warn('[payments] Failed to grant starter credits:', err.message))
     }
   }
 
   res.json({ success: true, action })
+})
+
+// ── POST /api/payments/credits/request
+// Body: { credits: N, receipt_data } — N credits at RM1 each; open to all users
+router.post('/credits/request', requireAuth, async (req, res) => {
+  const userId = req.authUser.id
+  const { credits, receipt_data } = req.body
+
+  const amount = parseInt(credits)
+  if (isNaN(amount) || amount < 1 || amount > 1000) {
+    return res.status(400).json({ error: 'Credits must be between 1 and 1000.' })
+  }
+
+  if (!receipt_data) {
+    return res.status(400).json({ error: 'Receipt is required.' })
+  }
+
+  const ALLOWED_MIME_PREFIXES = ['data:image/jpeg;', 'data:image/png;', 'data:image/webp;', 'data:image/gif;']
+  if (!ALLOWED_MIME_PREFIXES.some(p => receipt_data.startsWith(p))) {
+    return res.status(400).json({ error: 'Receipt must be a JPEG, PNG, WebP, or GIF image.' })
+  }
+  if (receipt_data.length > 6_000_000) {
+    return res.status(400).json({ error: 'Receipt image must be under 5MB.' })
+  }
+
+  // Block if already has a pending credit top-up request
+  const { data: existing } = await supabase
+    .from('payment_requests')
+    .select('id, status, created_at')
+    .eq('user_id', userId)
+    .eq('status', 'pending')
+    .eq('type', 'credit_topup')
+    .maybeSingle()
+
+  if (existing) {
+    return res.status(409).json({
+      error: 'You already have a pending credit top-up request. Please wait for approval.',
+      existing,
+    })
+  }
+
+  const { data, error } = await supabase
+    .from('payment_requests')
+    .insert({
+      user_id:        userId,
+      type:           'credit_topup',
+      plan:           null,
+      amount:         amount,
+      credits_amount: amount,
+      receipt_data:   receipt_data,
+    })
+    .select()
+    .single()
+
+  if (error) return res.status(500).json({ error: error.message })
+  res.json({ success: true, request: data })
+})
+
+// ── GET /api/payments/my-credits-request
+// Returns the user's latest credit top-up request
+router.get('/my-credits-request', requireAuth, async (req, res) => {
+  const { data } = await supabase
+    .from('payment_requests')
+    .select('*')
+    .eq('user_id', req.authUser.id)
+    .eq('type', 'credit_topup')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  res.json({ request: data || null })
 })
 
 // ── GET /api/payments/qr-settings

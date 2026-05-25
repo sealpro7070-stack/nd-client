@@ -17,7 +17,10 @@ router.get('/', requireAuth, async (req, res) => {
     .maybeSingle()
 
   if (error) return res.status(500).json({ error: 'Failed to load settings' })
-  if (!data)  return res.status(404).json({ error: 'Settings not found' })
+  if (!data) return res.json({
+    user_id: userId, books_per_month: 4, language: 'Melayu',
+    book_type: 'Fizikal', auto_schedule: false, schedule_day: 15,
+  })
 
   res.json(data)
 })

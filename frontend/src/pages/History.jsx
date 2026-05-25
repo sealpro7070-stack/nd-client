@@ -61,133 +61,114 @@ export default function History() {
     >
       {/* Header */}
       <div>
-        <h1 className="font-display text-2xl font-extrabold text-heading">Submission History</h1>
-        <p className="text-muted text-sm mt-1">{total} total record{total !== 1 ? 's' : ''}</p>
+        <p className="font-mono text-cobalt text-xs tracking-[0.3em] uppercase font-bold">// history</p>
+        <h1 className="font-display font-black tracking-tight leading-none mt-2 text-ink text-3xl sm:text-5xl">
+          Everything submitted.
+        </h1>
+        <p className="text-ink/60 mt-2 font-medium text-sm sm:text-base">
+          {total} record{total !== 1 ? 's' : ''} total.
+        </p>
       </div>
 
-      {/* Filter bar */}
-      <div className="flex gap-2 flex-wrap">
-        {FILTERS.map(f => (
-          <button
-            key={f.key}
-            onClick={() => { setFilterStatus(f.key); setPage(0) }}
-            className={`px-4 py-2 rounded-xl text-sm font-bold border transition-all duration-150 ${
-              filterStatus === f.key
-                ? 'bg-brand-600 text-white border-brand-600 shadow-sm'
-                : 'bg-white text-muted border-line hover:border-brand-300 hover:text-brand-600'
-            }`}
-          >
-            {f.label}
-          </button>
-        ))}
+      {/* Controls */}
+      <div className="bg-white border-[3px] border-ink rounded-2xl p-3 flex items-center gap-2 flex-wrap"
+        style={{ boxShadow: '4px 4px 0 #0F172A' }}>
+        <div className="flex gap-1 bg-cream border-[2.5px] border-ink rounded-xl p-1">
+          {FILTERS.map(f => (
+            <button
+              key={f.key}
+              onClick={() => { setFilterStatus(f.key); setPage(0) }}
+              className={`px-3 text-xs font-extrabold rounded-lg transition-colors ${filterStatus === f.key ? 'bg-ink text-cream' : 'text-ink/60 hover:text-ink'}`}
+              style={{ minHeight: 36 }}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {loading ? (
         <div className="flex items-center justify-center py-20">
-          <div className="w-8 h-8 border-2 border-line border-t-brand-600 rounded-full animate-spin" />
+          <span style={{ width: 32, height: 32, border: '3px solid #0F172A', borderTopColor: '#FFD23F', borderRadius: '50%', animation: 'spin 0.8s linear infinite', display: 'inline-block' }} />
         </div>
       ) : filtered.length === 0 ? (
         <EmptyState />
       ) : (
-        <>
-          {/* Mobile: card list */}
-          <div className="sm:hidden space-y-3">
+        <div className="bg-white border-[3px] border-ink rounded-2xl overflow-hidden"
+          style={{ boxShadow: '4px 4px 0 #0F172A' }}>
+          <div className="px-5 py-3 bg-ink text-cream flex items-center justify-between">
+            <span className="font-display font-black text-sm uppercase tracking-[0.15em]">Records</span>
+            <span className="font-mono text-cream/70 text-[11px] font-bold">{filtered.length} shown</span>
+          </div>
+          <div className="divide-y-[2px] divide-ink/10">
             {filtered.map((s, i) => (
               <motion.div
                 key={s.id}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.04 }}
-                className="card-p"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: i * 0.03 }}
+                className="flex items-center gap-3 px-5 py-3 flex-wrap sm:flex-nowrap"
               >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-heading text-sm truncate">{s.books?.title || '—'}</p>
-                    <p className="text-xs text-muted mt-0.5">{s.books?.author}</p>
-                  </div>
-                  <StatusBadge status={s.status} />
+                {/* Status dot */}
+                <div className={`w-7 h-7 rounded-lg border-[2px] border-ink flex items-center justify-center flex-shrink-0 ${s.status === 'success' ? 'bg-[#A8E6A1]' : s.status === 'failed' ? 'bg-[#FF8FA3]' : 'bg-yellow'}`}>
+                  {s.status === 'success'
+                    ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0F172A" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    : s.status === 'failed'
+                    ? <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#0F172A" strokeWidth="3.5" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+                    : <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#0F172A" strokeWidth="3" strokeLinecap="round"><circle cx="12" cy="12" r="3"/></svg>
+                  }
                 </div>
-                <div className="flex flex-wrap items-center gap-2 mt-2.5">
+                {/* Title + author */}
+                <div className="min-w-0 flex-1">
+                  <p className="font-display font-extrabold text-ink text-sm truncate">{s.books?.title || '—'}</p>
+                  <p className="text-[11px] text-ink/55 font-medium truncate">{s.books?.author}</p>
+                  {s.error_message && <p className="text-[11px] text-[#C9362F] truncate font-mono mt-0.5">{s.error_message.slice(0, 60)}</p>}
+                </div>
+                {/* Meta */}
+                <div className="flex items-center gap-2 flex-shrink-0 w-full sm:w-auto justify-between sm:justify-end pl-9 sm:pl-0">
                   {s.books?.language && (
-                    <span className={`text-xs font-bold rounded-full px-2 py-0.5 ${LANG_COLORS[s.books.language] || 'bg-gray-100 text-muted'}`}>
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-md border-[2px] border-ink bg-cream text-ink">
                       {s.books.language}
                     </span>
                   )}
-                  {s.month && <span className="font-mono text-xs text-muted">{MONTHS[s.month - 1]} {s.year}</span>}
-                  {s.submitted_at && (
-                    <span className="font-mono text-xs text-subtle">
-                      {new Date(s.submitted_at).toLocaleDateString('en-MY', { day: 'numeric', month: 'short' })}
+                  {s.month && (
+                    <span className="font-mono text-[10px] text-ink/50 font-bold tabular-nums">
+                      {MONTHS[s.month - 1]} {s.year}
                     </span>
                   )}
+                  <span className={`text-[10px] font-extrabold uppercase tracking-wider px-2 py-1 rounded-md border-[2px] border-ink ${
+                    s.status === 'success' ? 'bg-[#A8E6A1] text-ink' :
+                    s.status === 'failed'  ? 'bg-[#FF8FA3] text-ink' :
+                                             'bg-yellow text-ink'
+                  }`}>
+                    {s.status === 'success' ? 'Submitted' : s.status === 'failed' ? 'Failed' : s.status}
+                  </span>
                 </div>
-                {s.error_message && <p className="text-xs text-danger-600 mt-1.5 truncate font-mono">{s.error_message}</p>}
               </motion.div>
             ))}
           </div>
-
-          {/* Desktop: table */}
-          <div className="hidden sm:block card p-0 overflow-hidden">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-line bg-gray-50/80">
-                  <th className="text-left px-6 py-4 text-xs font-bold text-muted uppercase tracking-widest">Book</th>
-                  <th className="text-left px-4 py-4 text-xs font-bold text-muted uppercase tracking-widest">Language</th>
-                  <th className="text-left px-4 py-4 text-xs font-bold text-muted uppercase tracking-widest hidden md:table-cell">Period</th>
-                  <th className="text-left px-4 py-4 text-xs font-bold text-muted uppercase tracking-widest">Status</th>
-                  <th className="text-left px-4 py-4 text-xs font-bold text-muted uppercase tracking-widest hidden lg:table-cell">Date</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((s, i) => (
-                  <motion.tr
-                    key={s.id}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: i * 0.03 }}
-                    className={`border-b border-line/50 hover:bg-brand-50/30 transition-colors ${i === filtered.length - 1 ? 'border-0' : ''}`}
-                  >
-                    <td className="px-6 py-4">
-                      <p className="font-semibold text-heading">{s.books?.title || '—'}</p>
-                      <p className="text-xs text-muted mt-0.5">{s.books?.author}</p>
-                    </td>
-                    <td className="px-4 py-4">
-                      <span className={`text-xs font-bold rounded-full px-2.5 py-1 ${LANG_COLORS[s.books?.language] || 'bg-gray-100 text-muted'}`}>
-                        {s.books?.language || '—'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-4 hidden md:table-cell font-mono text-xs text-muted">
-                      {s.month ? `${MONTHS[s.month - 1]} ${s.year}` : '—'}
-                    </td>
-                    <td className="px-4 py-4">
-                      <StatusBadge status={s.status} />
-                      {s.error_message && (
-                        <p className="text-xs text-danger-600 mt-1 max-w-xs truncate font-mono">{s.error_message}</p>
-                      )}
-                    </td>
-                    <td className="px-4 py-4 hidden lg:table-cell font-mono text-xs text-subtle">
-                      {s.submitted_at
-                        ? new Date(s.submitted_at).toLocaleDateString('en-MY', { day: 'numeric', month: 'short', year: 'numeric' })
-                        : '—'}
-                    </td>
-                  </motion.tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </>
+        </div>
       )}
 
       {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex items-center justify-between">
-          <p className="text-sm text-muted">
+          <p className="font-mono text-xs text-ink/50 font-bold">
             Page {page + 1} / {totalPages}
           </p>
           <div className="flex gap-2">
-            <button disabled={page === 0} onClick={() => setPage(p => p - 1)} className="btn-ghost text-sm py-2 px-4 disabled:opacity-30">
-              ← Previous
+            <button
+              disabled={page === 0}
+              onClick={() => setPage(p => p - 1)}
+              className="chunky-btn chunky-btn--ghost chunky-btn--small disabled:opacity-30"
+            >
+              ← Prev
             </button>
-            <button disabled={page >= totalPages - 1} onClick={() => setPage(p => p + 1)} className="btn-ghost text-sm py-2 px-4 disabled:opacity-30">
+            <button
+              disabled={page >= totalPages - 1}
+              onClick={() => setPage(p => p + 1)}
+              className="chunky-btn chunky-btn--ghost chunky-btn--small disabled:opacity-30"
+            >
               Next →
             </button>
           </div>
@@ -199,16 +180,16 @@ export default function History() {
 
 function EmptyState() {
   return (
-    <div className="card-p flex flex-col items-center justify-center py-16 gap-4">
-      <div className="w-16 h-16 bg-brand-50 border border-brand-100 rounded-2xl flex items-center justify-center">
-        <svg className="w-8 h-8 text-brand-300" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+    <div className="bg-white border-[3px] border-ink rounded-2xl p-10 text-center"
+      style={{ boxShadow: '4px 4px 0 #0F172A' }}>
+      <div className="w-14 h-14 bg-cream border-[2.5px] border-ink rounded-2xl flex items-center justify-center mx-auto mb-4"
+        style={{ boxShadow: '3px 3px 0 #0F172A' }}>
+        <svg className="w-7 h-7 text-ink/40" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
         </svg>
       </div>
-      <div className="text-center">
-        <p className="font-display font-bold text-muted text-lg">No records found</p>
-        <p className="text-subtle text-sm mt-1">Try a different filter or submit some books first.</p>
-      </div>
+      <p className="font-display font-black text-ink text-lg">No records found.</p>
+      <p className="text-ink/55 text-sm mt-1 font-medium">Try a different filter or submit some books first.</p>
     </div>
   )
 }

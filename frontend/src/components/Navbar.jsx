@@ -1,6 +1,7 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { MascotMark } from './Mascot'
 
 // Use env var to avoid exposing PII in the public JS bundle
 const ADMIN_EMAILS = (import.meta.env.VITE_ADMIN_EMAIL || '').split(',').map(e => e.trim()).filter(Boolean)
@@ -10,7 +11,9 @@ export default function Navbar() {
   const [isAdmin, setIsAdmin]         = useState(false)
   const [menuOpen, setMenuOpen]       = useState(false)
   const [userEmail, setUserEmail]     = useState('')
+  const [userInitials, setUserInitials] = useState('?')
   const [showUpgrade, setShowUpgrade] = useState(false)
+  const [ainsConnected, setAinsConnected] = useState(false)
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
@@ -19,19 +22,26 @@ export default function Navbar() {
       setIsAdmin(admin)
       setUserEmail(email)
 
+      // Derive initials from email prefix
+      const prefix = email.split('@')[0] || ''
+      const parts = prefix.split(/[._-]/).filter(Boolean)
+      setUserInitials(parts.length >= 2
+        ? (parts[0][0] + parts[1][0]).toUpperCase()
+        : prefix.slice(0, 2).toUpperCase() || '?'
+      )
+
       if (!session?.user || admin) {
         setShowUpgrade(false)
         return
       }
 
-      // Fetch plan to decide whether to show Upgrade link
       const { data } = await supabase
-        .from('users').select('plan, plan_expires_at').eq('id', session.user.id).maybeSingle()
+        .from('users').select('plan, plan_expires_at, ains_session').eq('id', session.user.id).maybeSingle()
       const plan = data?.plan || 'free'
       const expired = data?.plan_expires_at && new Date(data.plan_expires_at) < new Date()
-      // Show Upgrade if: free plan, or paid plan has expired, or noob (internal tester — no upgrade needed)
       const needsUpgrade = plan === 'free' || (plan !== 'noob' && expired)
       setShowUpgrade(!!needsUpgrade)
+      setAinsConnected(!!data?.ains_session)
     })
     return () => subscription.unsubscribe()
   }, [])
@@ -41,147 +51,96 @@ export default function Navbar() {
     navigate('/')
   }
 
-  const linkClass = ({ isActive }) =>
-    `text-sm font-semibold px-3.5 py-2 rounded-lg transition-all duration-150 ${
-      isActive
-        ? 'text-brand-600 bg-brand-50'
-        : 'text-muted hover:text-heading hover:bg-gray-50'
-    }`
+  const NAV_TABS = [
+    { to: '/dashboard', label: 'Dashboard' },
+    { to: '/history',   label: 'History'   },
+    { to: '/settings',  label: 'Settings'  },
+    ...(showUpgrade ? [{ to: '/upgrade', label: 'Upgrade' }] : []),
+    { to: '/guide',     label: 'Guide'     },
+    ...(isAdmin ? [{ to: '/admin', label: 'Admin' }] : []),
+  ]
 
   return (
-    <header className="bg-white border-b border-line sticky top-0 z-50">
-      <div className="max-w-5xl mx-auto px-4 h-14 sm:h-16 flex items-center justify-between">
+    <header className="bg-cream border-b-[3px] border-ink sticky top-0 z-50">
 
-        {/* Logo */}
-        <NavLink to="/dashboard" className="flex items-center gap-2.5 group">
-          <div className="w-8 h-8 bg-brand-600 rounded-lg flex items-center justify-center group-hover:bg-brand-700 transition-colors">
-            <BookIcon className="w-4 h-4 text-white" />
-          </div>
-          <span className="font-display font-bold text-heading tracking-tight">Nilam Auto</span>
+      {/* Top row: logo + user actions */}
+      <div className="flex items-center justify-between gap-3 px-4 sm:px-8 py-3 max-w-[1180px] mx-auto">
+        <NavLink to="/dashboard" className="flex items-center gap-2">
+          <MascotMark size={28} />
+          <span className="font-display font-black tracking-tight text-ink text-sm">
+            NILAM<span className="text-cobalt">.desk</span>
+          </span>
         </NavLink>
 
-        {/* Desktop nav */}
-        <nav className="hidden sm:flex items-center gap-0.5">
-          <NavLink to="/dashboard" className={linkClass}>Dashboard</NavLink>
-          <NavLink to="/guide" className={linkClass}>Setup Guide</NavLink>
-          <NavLink to="/settings" className={linkClass}>Settings</NavLink>
-          <NavLink to="/history" className={linkClass}>History</NavLink>
-          {showUpgrade && (
-            <NavLink to="/upgrade" className={({ isActive }) =>
-              `text-sm font-semibold px-3.5 py-2 rounded-lg transition-all duration-150 ${
-                isActive ? 'text-brand-600 bg-brand-50' : 'text-brand-600 hover:bg-brand-50'
-              }`
-            }>Upgrade</NavLink>
-          )}
-          {isAdmin && (
-            <NavLink
-              to="/admin"
-              className={({ isActive }) =>
-                `text-sm font-semibold px-3.5 py-2 rounded-lg transition-all ${
-                  isActive ? 'text-brand-600 bg-brand-50' : 'text-muted hover:text-brand-600 hover:bg-brand-50'
-                }`
-              }
-            >
-              Admin
-            </NavLink>
-          )}
-          <div className="w-px h-4 bg-line mx-2" />
-          <div className="hidden md:flex items-center gap-1.5 bg-ok-50 border border-ok-200 px-3 py-1.5 rounded-full mr-2">
-            <span className="w-1.5 h-1.5 bg-ok-500 rounded-full animate-pulse" />
-            <span className="text-ok-600 text-xs font-bold">Logged In</span>
-          </div>
-          <button
-            onClick={handleLogout}
-            className="flex items-center gap-1.5 text-sm font-semibold text-muted hover:text-danger-600 px-3.5 py-2 rounded-lg hover:bg-danger-50 transition-all"
-          >
-            <LogoutIcon className="w-4 h-4" />
-            Logout
-          </button>
-        </nav>
+        <div className="flex items-center gap-2">
+          {/* AINS connection pill — desktop only */}
+          <span className={`hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border-[2px] border-ink bg-white text-[10px] font-extrabold tracking-wider uppercase ${ainsConnected ? '' : 'opacity-60'}`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${ainsConnected ? 'bg-[#28C840]' : 'bg-[#FF6B3D]'}`} />
+            {ainsConnected ? 'AINS Connected' : 'Not Connected'}
+          </span>
 
-        {/* Mobile: hamburger */}
-        <button
-          onClick={() => setMenuOpen(v => !v)}
-          className="sm:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors"
-        >
-          {menuOpen
-            ? <XIcon className="w-5 h-5 text-muted" />
-            : <MenuIcon className="w-5 h-5 text-muted" />}
-        </button>
+          {/* Avatar + logout */}
+          <div className="relative">
+            <button
+              onClick={() => setMenuOpen(v => !v)}
+              className="w-9 h-9 rounded-full bg-yellow border-[2.5px] border-ink flex items-center justify-center font-display font-black text-ink text-[11px] hover:opacity-80 transition-opacity"
+              title={userEmail}
+            >
+              {userInitials}
+            </button>
+
+            {menuOpen && (
+              <div className="absolute right-0 top-full mt-2 w-52 bg-white border-[2.5px] border-ink rounded-2xl shadow-lg overflow-hidden z-50"
+                style={{ boxShadow: '4px 4px 0 #0F172A' }}>
+                <div className="px-4 py-3 border-b-[2px] border-ink bg-cream">
+                  <p className="text-[11px] font-mono text-ink/60 truncate">{userEmail}</p>
+                </div>
+                <button
+                  onClick={() => { setMenuOpen(false); handleLogout() }}
+                  className="w-full flex items-center gap-2 text-sm font-extrabold text-ink px-4 py-3 hover:bg-yellow transition-colors"
+                >
+                  <LogoutIcon className="w-4 h-4" />
+                  Log out
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
-      {/* Mobile dropdown */}
-      {menuOpen && (
-        <div className="sm:hidden border-t border-line bg-white px-3 py-2 space-y-0.5">
-          {userEmail && (
-            <div className="px-4 py-2 mb-1">
-              <p className="text-xs text-subtle font-mono truncate">{userEmail}</p>
-              <div className="flex items-center gap-1.5 mt-1">
-                <span className="w-1.5 h-1.5 bg-ok-500 rounded-full animate-pulse" />
-                <span className="text-ok-600 text-xs font-bold">Logged In</span>
-              </div>
-            </div>
-          )}
-          {[
-            { to: '/dashboard', label: 'Dashboard' },
-            { to: '/guide',     label: 'Setup Guide' },
-            { to: '/settings',  label: 'Settings' },
-            { to: '/history',   label: 'History' },
-            ...(showUpgrade ? [{ to: '/upgrade', label: 'Upgrade' }] : []),
-          ].map(item => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              onClick={() => setMenuOpen(false)}
-              className={({ isActive }) =>
-                `flex items-center text-sm font-semibold px-4 py-3 rounded-xl transition-all ${
-                  isActive ? 'bg-brand-50 text-brand-600' : 'text-muted hover:bg-gray-50 hover:text-heading'
-                }`
-              }
-            >
-              {item.label}
-            </NavLink>
-          ))}
-          {isAdmin && (
-            <NavLink
-              to="/admin"
-              onClick={() => setMenuOpen(false)}
-              className={({ isActive }) =>
-                `flex items-center text-sm font-semibold px-4 py-3 rounded-xl transition-all ${
-                  isActive ? 'bg-brand-50 text-brand-600' : 'text-muted hover:bg-gray-50 hover:text-brand-600'
-                }`
-              }
-            >
-              Admin
-            </NavLink>
-          )}
-          <button
-            onClick={handleLogout}
-            className="w-full flex items-center gap-2 text-sm font-semibold text-muted hover:text-danger-600 px-4 py-3 rounded-xl hover:bg-danger-50 transition-all"
+      {/* Tab row */}
+      <nav className="border-t-[2px] border-ink/10 flex gap-0 overflow-x-auto px-2 sm:px-6 max-w-[1180px] mx-auto">
+        {NAV_TABS.map(t => (
+          <NavLink
+            key={t.to}
+            to={t.to}
+            className={({ isActive }) =>
+              `relative px-4 py-3 font-display font-extrabold text-sm whitespace-nowrap transition-colors ${
+                isActive ? 'text-ink' : 'text-ink/50 hover:text-ink'
+              }`
+            }
+            style={{ minHeight: 48 }}
           >
-            <LogoutIcon className="w-4 h-4" />
-            Logout
-          </button>
-        </div>
+            {({ isActive }) => (
+              <>
+                {t.label}
+                {isActive && (
+                  <span className="absolute left-3 right-3 -bottom-[3px] h-[3px] bg-cobalt rounded-t" />
+                )}
+              </>
+            )}
+          </NavLink>
+        ))}
+      </nav>
+
+      {/* Close dropdown on outside click */}
+      {menuOpen && (
+        <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
       )}
     </header>
   )
 }
 
-function BookIcon({ className }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-    </svg>
-  )
-}
-function MenuIcon({ className }) {
-  return <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" /></svg>
-}
-function XIcon({ className }) {
-  return <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-}
 function LogoutIcon({ className }) {
   return <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
 }

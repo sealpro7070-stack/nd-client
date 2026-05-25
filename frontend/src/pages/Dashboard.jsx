@@ -26,8 +26,13 @@ export default function Dashboard() {
   const [isError, setIsError]       = useState(false)
   const [credsStatus, setCredsStatus] = useState(null)
   const [plan, setPlan]             = useState('free')
+  const [credits, setCredits]       = useState(0)
   const [showAINSModal, setShowAINSModal] = useState(false)
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
+
+  // Live progress state
+  const [liveProgress, setLiveProgress] = useState([])
+  const progressPollRef = useRef(null)
 
   // Family plan state
   const [familySlots, setFamilySlots]   = useState([])
@@ -47,18 +52,19 @@ export default function Dashboard() {
 
         const token = await getToken()
 
-        // Ensure user row exists in backend — handles Google OAuth logins
-        // that bypass Landing.jsx's register call. Safe to call every time (upsert).
         fetch(`${BACKEND}/api/auth/register`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
           body: JSON.stringify({ id: user.id, email: user.email }),
+          signal: AbortSignal.timeout(8000),
         }).catch(() => {})
 
+        const authHeader = { 'Authorization': `Bearer ${token}` }
+        const timeout = { signal: AbortSignal.timeout(10000) }
         const [sRes, stRes, rRes] = await Promise.allSettled([
-          fetch(`${BACKEND}/api/settings`, { headers: { 'Authorization': `Bearer ${token}` } }),
-          fetch(`${BACKEND}/api/history/stats`, { headers: { 'Authorization': `Bearer ${token}` } }),
-          fetch(`${BACKEND}/api/history?limit=5`, { headers: { 'Authorization': `Bearer ${token}` } }),
+          fetch(`${BACKEND}/api/settings`, { headers: authHeader, ...timeout }),
+          fetch(`${BACKEND}/api/history/stats`, { headers: authHeader, ...timeout }),
+          fetch(`${BACKEND}/api/history?limit=5`, { headers: authHeader, ...timeout }),
         ])
 
         if (sRes.status === 'fulfilled' && sRes.value.ok) {
@@ -75,14 +81,15 @@ export default function Dashboard() {
         }
 
         const { data: ud } = await supabase
-          .from('users').select('ains_cookie_encrypted, plan').eq('id', user.id).maybeSingle()
+          .from('users').select('ains_cookie_encrypted, plan, credits').eq('id', user.id).maybeSingle()
         const connected = !!ud?.ains_cookie_encrypted
         setCredsStatus(connected ? 'saved' : 'none')
         const isAdminUser = ADMIN_EMAILS.includes(user.email || '')
         const userPlan = isAdminUser ? 'noob' : (ud?.plan || 'free')
         setPlan(userPlan)
+        setCredits(ud?.credits || 0)
         // Clamp bookCount to the plan's actual limit (settings may have a higher value than the plan allows)
-        const planMax = userPlan === 'free' ? 1 : userPlan === 'noob' ? 999 : 50
+        const planMax = userPlan === 'free' ? 1 : userPlan === 'noob' ? 999 : 30
         setBookCount(prev => Math.min(prev, planMax))
         if (!connected) setShowAINSModal(true)
 
@@ -98,8 +105,8 @@ export default function Dashboard() {
     }
     load()
     return () => {
-      // Cleanup any slot polling on unmount
       Object.values(pollRefs.current).forEach(clearInterval)
+      if (progressPollRef.current) clearInterval(progressPollRef.current)
     }
   }, [])
 
@@ -123,6 +130,26 @@ export default function Dashboard() {
     setTriggering(true)
     setTriggerMsg('')
     setIsError(false)
+    setLiveProgress([])
+
+    const triggerTime = new Date().toISOString()
+
+    // Poll Supabase every 2s for live submission status
+    const stopProgressPoll = () => {
+      if (progressPollRef.current) { clearInterval(progressPollRef.current); progressPollRef.current = null }
+    }
+    const pollProgress = async () => {
+      const { data } = await supabase
+        .from('submissions')
+        .select('id, status, error_message, books(title)')
+        .eq('user_id', userId)
+        .is('family_slot_id', null)
+        .gte('created_at', triggerTime)
+        .order('created_at', { ascending: true })
+      if (data) setLiveProgress(data)
+    }
+    progressPollRef.current = setInterval(pollProgress, 2000)
+
     try {
       const token = await getToken()
       await fetch(`${BACKEND}/api/settings`, {
@@ -144,10 +171,20 @@ export default function Dashboard() {
       setIsError(true)
       if (/session expired|reconnect/i.test(err.message)) {
         setCredsStatus('none')
-        setShowAINSModal(true)  // auto-open reconnect modal so user doesn't have to hunt for it
+        setShowAINSModal(true)
       }
     } finally {
       setTriggering(false)
+      stopProgressPoll()
+      // Final poll to capture last status updates
+      const { data } = await supabase
+        .from('submissions')
+        .select('id, status, error_message, books(title)')
+        .eq('user_id', userId)
+        .is('family_slot_id', null)
+        .gte('created_at', triggerTime)
+        .order('created_at', { ascending: true })
+      if (data) setLiveProgress(data)
     }
   }
 
@@ -237,7 +274,9 @@ export default function Dashboard() {
           headers: { 'Authorization': `Bearer ${t}` },
         })
         const d = await r.json()
-        if (d.status === 'success') {
+        if (d.status === 'capturing') {
+          setSlot(slotId, { phase: 'capturing' })
+        } else if (d.status === 'success') {
           clearInterval(poll)
           setSlot(slotId, { phase: 'done', showForm: false, email: '', password: '' })
           await loadFamilySlots(user)
@@ -269,8 +308,8 @@ export default function Dashboard() {
   if (loading) return (
     <div className="flex items-center justify-center py-24">
       <div className="flex flex-col items-center gap-4">
-        <div className="w-8 h-8 border-2 border-line border-t-brand-600 rounded-full animate-spin" />
-        <p className="text-muted text-sm">Loading dashboard…</p>
+        <span style={{ width: 32, height: 32, border: '3px solid #0F172A', borderTopColor: '#FFD23F', borderRadius: '50%', animation: 'spin 0.8s linear infinite', display: 'inline-block' }} />
+        <p className="font-mono text-ink/60 text-sm font-bold">Loading dashboard…</p>
       </div>
     </div>
   )
@@ -281,7 +320,8 @@ export default function Dashboard() {
   const nextReminder = settings?.auto_schedule
     ? `Day ${settings.schedule_day} of next month`
     : 'No reminder set'
-  const pct = bookCount > 0 ? Math.min((stats.thisMonth / bookCount) * 100, 100) : 0
+  const periodCount = plan === 'free' ? (stats.thisWeek ?? 0) : stats.thisMonth
+  const pct = bookCount > 0 ? Math.min((periodCount / bookCount) * 100, 100) : 0
 
   return (
     <div className="space-y-5">
@@ -291,110 +331,147 @@ export default function Dashboard() {
         initial={{ opacity: 0, y: 14 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.45 }}
-        className="bg-brand-600 rounded-card p-6 text-white relative overflow-hidden"
+        className="bg-ink text-cream rounded-2xl p-5 sm:p-7 border-[3px] border-ink relative overflow-hidden"
+        style={{ boxShadow: '6px 6px 0 #2F5DDB' }}
       >
-        <div className="absolute -right-10 -top-10 w-48 h-48 bg-white/5 rounded-full pointer-events-none" />
-        <div className="absolute -right-2 -bottom-8 w-32 h-32 bg-white/5 rounded-full pointer-events-none" />
+        <div className="absolute inset-0 opacity-10 pointer-events-none" style={{
+          backgroundImage: 'radial-gradient(circle, #F4F1EA 1px, transparent 1px)',
+          backgroundSize: '20px 20px',
+        }} />
         <div className="relative flex items-start justify-between gap-4">
-          <div>
-            <p className="text-brand-200 text-sm font-semibold mb-0.5">{greeting},</p>
-            <h1 className="font-display text-2xl sm:text-3xl font-extrabold truncate">{displayName}</h1>
-            <p className="text-brand-100 text-sm mt-2">
+          <div className="min-w-0">
+            <p className="font-mono text-yellow text-[10px] tracking-[0.3em] uppercase">// {greeting.toLowerCase()}</p>
+            <h1 className="font-display font-black tracking-tight leading-none mt-2 text-3xl sm:text-5xl">
+              Hi, <span className="text-yellow">{displayName}</span>
+            </h1>
+            <p className="text-cream/70 font-medium mt-2.5 text-sm sm:text-base">
               {stats.thisMonth > 0
-                ? `${stats.thisMonth} record${stats.thisMonth !== 1 ? 's' : ''} submitted this month. Great work!`
+                ? `${stats.thisMonth} book${stats.thisMonth !== 1 ? 's' : ''} submitted this month.`
                 : 'No records submitted this month yet.'}
+              {' '}{nextReminder !== 'No reminder set' ? `Next run: ${nextReminder}.` : ''}
             </p>
           </div>
           <div className="flex flex-col items-end gap-2 flex-shrink-0">
             <button
               onClick={() => setShowAINSModal(true)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full transition-opacity hover:opacity-80 ${credsStatus === 'saved' ? 'bg-white/15' : 'bg-warn-500/80'}`}
-              title={credsStatus === 'saved' ? 'Click to reconnect AINS' : 'Click to connect AINS'}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border-[2px] border-cream/30 text-[11px] font-extrabold tracking-wider uppercase transition-opacity hover:opacity-80 ${credsStatus === 'saved' ? 'bg-cream/10' : 'bg-[#FF6B3D]/80'}`}
             >
-              <span className={`w-1.5 h-1.5 rounded-full ${credsStatus === 'saved' ? 'bg-ok-400 animate-pulse' : 'bg-white'}`} />
-              <span className="text-white text-xs font-bold">
+              <span className={`w-1.5 h-1.5 rounded-full ${credsStatus === 'saved' ? 'bg-[#28C840] animate-pulse' : 'bg-white'}`} />
+              <span className="text-cream">
                 {credsStatus === 'saved' ? 'AINS Connected' : 'AINS Not Set'}
               </span>
             </button>
             {plan === 'free' && !ADMIN_EMAILS.includes(user?.email || '') && (
               <button
                 onClick={() => setShowUpgradeModal(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white text-brand-600 text-xs font-extrabold hover:bg-brand-50 transition-colors shadow-sm"
+                className="chunky-btn chunky-btn--small"
+                style={{ background: '#FFD23F', color: '#0F172A', borderColor: '#F4F1EA', boxShadow: '3px 3px 0 #F4F1EA' }}
               >
-                ⚡ Upgrade Plan
+                ⚡ Upgrade
               </button>
             )}
           </div>
         </div>
 
         <div className="relative mt-5">
-          <div className="flex justify-between text-xs mb-1.5">
-            <span className="text-brand-200 font-semibold">{plan === 'free' ? "This Week's Progress" : "This Month's Progress"}</span>
-            <span className="text-white font-bold">{stats.thisMonth} / {bookCount} {plan === 'free' ? 'book this week' : 'books'}</span>
+          <div className="flex justify-between text-[11px] mb-1.5 font-bold">
+            <span className="text-cream/60 uppercase tracking-wider">{plan === 'free' ? "This week's progress" : "Monthly progress"}</span>
+            <span className="text-cream tabular-nums">{periodCount} / {bookCount} {plan === 'free' ? 'book' : 'books'}</span>
           </div>
-          <div className="w-full h-2 bg-white/20 rounded-full overflow-hidden">
+          <div className="w-full h-3 bg-cream/15 rounded-full overflow-hidden border-[2px] border-ink/40">
             <motion.div
               initial={{ width: 0 }}
               animate={{ width: `${pct}%` }}
               transition={{ duration: 1, ease: 'easeOut', delay: 0.3 }}
-              className="h-full bg-white rounded-full"
+              className="h-full bg-yellow rounded-full"
             />
           </div>
         </div>
       </motion.div>
 
       {/* ── Stats row ──────────────────────────────── */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: 'Total Submitted', value: stats.successful, icon: BookIcon },
-          { label: 'Language', value: settings?.language ?? '—', icon: GlobeIcon },
-          { label: 'Next Reminder', value: nextReminder, icon: ClockIcon, highlight: settings?.auto_schedule },
+          { label: 'This Month', value: stats.thisMonth,  accent: 'bg-yellow' },
+          { label: 'All Time',   value: stats.successful, accent: 'bg-cobalt text-cream' },
+          { label: 'Language',   value: settings?.language ?? '—', accent: 'bg-[#A8E6A1]' },
+          plan !== 'free'
+            ? { label: 'Credits', value: credits, accent: 'bg-[#FF8FA3]' }
+            : { label: 'Next Run', value: settings?.auto_schedule ? `Day ${settings.schedule_day}` : 'Manual', accent: 'bg-[#FF8FA3]' },
         ].map((s, i) => (
           <motion.div
             key={s.label}
             initial={{ opacity: 0, y: 14 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.45, delay: 0.05 + i * 0.04 }}
-            className={`card-p flex items-center gap-4 ${s.highlight ? 'border-l-4 border-l-brand-400' : ''}`}
+            className={`rounded-xl border-[2.5px] border-ink p-3 ${s.accent}`}
+            style={{ boxShadow: '3px 3px 0 #0F172A' }}
           >
-            <div className="w-10 h-10 bg-brand-50 rounded-xl flex items-center justify-center flex-shrink-0">
-              <s.icon className="w-5 h-5 text-brand-600" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-xs font-bold text-muted uppercase tracking-wide mb-0.5">{s.label}</p>
-              <p className="font-display font-bold text-heading truncate">{s.value}</p>
-            </div>
+            <p className="font-mono text-[10px] font-bold uppercase tracking-wider opacity-70">{s.label}</p>
+            <p className="font-display font-black text-xl leading-tight mt-1 truncate">{s.value}</p>
           </motion.div>
         ))}
       </div>
 
-      {/* ── Quick submit ───────────────────────────── */}
+      {/* ── AINS status card ───────────────────────── */}
+      <div className="bg-white border-[3px] border-ink rounded-2xl p-4 flex items-center justify-between gap-3"
+        style={{ boxShadow: '4px 4px 0 #0F172A' }}>
+        <div className="flex items-center gap-3 min-w-0">
+          <div className={`w-10 h-10 rounded-xl border-[2.5px] border-ink flex items-center justify-center flex-shrink-0 ${credsStatus === 'saved' ? 'bg-[#A8E6A1]' : 'bg-[#FF8FA3]'}`}>
+            {credsStatus === 'saved'
+              ? <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0F172A" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              : <LockIcon className="w-4 h-4 text-ink" />
+            }
+          </div>
+          <div className="min-w-0">
+            <p className="font-display font-black text-sm text-ink">
+              {credsStatus === 'saved' ? 'AINS Connected' : 'AINS Not Connected'}
+            </p>
+            <p className="text-xs text-ink/60 font-medium truncate">
+              {credsStatus === 'saved'
+                ? 'Session active · bot ready to submit'
+                : "Bot can't submit until you connect."}
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={() => setShowAINSModal(true)}
+          className="chunky-btn chunky-btn--small chunky-btn--ghost flex-shrink-0"
+        >
+          {credsStatus === 'saved' ? 'Reconnect' : 'Connect →'}
+        </button>
+      </div>
+
+      {/* ── Submit now ─────────────────────────────── */}
       <motion.div
         initial={{ opacity: 0, y: 14 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.45, delay: 0.12 }}
-        className="card-p border-l-4 border-l-brand-600"
+        className="bg-cream border-[3px] border-ink rounded-2xl overflow-hidden"
+        style={{ boxShadow: '6px 6px 0 #0F172A' }}
       >
-        <h2 className="font-display text-lg font-bold text-heading mb-5 flex items-center gap-2">
-          <span className="w-8 h-8 bg-brand-50 rounded-lg flex items-center justify-center">
-            <BoltIcon className="w-4 h-4 text-brand-600" />
-          </span>
-          Submit Now
-        </h2>
+        <div className="bg-yellow border-b-[3px] border-ink px-5 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="#0F172A"><path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z"/></svg>
+            <span className="font-display font-black uppercase tracking-[0.15em] text-sm text-ink">Submit Now</span>
+          </div>
+          <span className="font-mono font-bold text-ink/60 text-[10px] uppercase tracking-wider">Manual run</span>
+        </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-5">
+        <div className="p-5 sm:p-6 space-y-5">
+          {/* Language */}
           <div>
-            <label className="label">Language</label>
+            <p className="text-[11px] font-extrabold uppercase tracking-wider text-ink/50 mb-2">Language</p>
             <div className="flex flex-wrap gap-2">
               {LANGUAGES.map(l => (
                 <button
                   key={l}
                   onClick={() => setLang(l)}
-                  className={`px-3.5 py-2 rounded-xl text-sm font-bold border transition-all duration-150 ${
-                    lang === l
-                      ? 'bg-brand-600 text-white border-brand-600 shadow-sm scale-105'
-                      : 'bg-white text-muted border-line hover:border-brand-300 hover:text-brand-600'
-                  }`}
+                  disabled={triggering}
+                  className={`px-4 py-2 text-sm font-extrabold rounded-lg border-[2.5px] border-ink transition-all
+                    ${lang === l ? 'bg-ink text-cream' : 'bg-white text-ink hover:bg-yellow'}
+                    ${triggering ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  style={{ minHeight: 44 }}
                 >
                   {l}
                 </button>
@@ -402,60 +479,87 @@ export default function Dashboard() {
             </div>
           </div>
 
+          {/* Count stepper */}
           <div>
-            <label className="label">Number of Books</label>
-            <div className="flex items-center gap-3">
+            <p className="text-[11px] font-extrabold uppercase tracking-wider text-ink/50 mb-2">Books</p>
+            <div className="flex items-center justify-between bg-white border-[2.5px] border-ink rounded-xl p-1.5">
               <button
                 type="button"
                 onClick={() => setBookCount(v => Math.max(1, v - 1))}
-                disabled={bookCount <= 1}
-                className="w-10 h-10 rounded-xl bg-white border border-line text-heading text-xl font-bold hover:border-brand-300 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-              >
-                −
-              </button>
-              <div className="flex-1 text-center">
-                <span className="font-display text-3xl font-extrabold text-brand-600">{bookCount}</span>
-                <p className="text-xs text-muted mt-0.5">books / month</p>
+                disabled={bookCount <= 1 || triggering}
+                className="w-11 h-11 rounded-lg bg-cream border-[2px] border-ink font-black text-xl text-ink disabled:opacity-30 disabled:cursor-not-allowed"
+              >−</button>
+              <div className="text-center px-3">
+                <span className="font-display font-black text-4xl text-cobalt tabular-nums">{bookCount}</span>
+                <span className="block text-[10px] font-extrabold uppercase tracking-wider text-ink/50 -mt-1">per submit</span>
               </div>
               <button
                 type="button"
-                onClick={() => setBookCount(v => Math.min(plan === 'free' ? 1 : plan === 'noob' ? 999 : 50, v + 1))}
-                disabled={bookCount >= (plan === 'free' ? 1 : plan === 'noob' ? 999 : 50)}
-                className="w-10 h-10 rounded-xl bg-white border border-line text-heading text-xl font-bold hover:border-brand-300 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-              >
-                +
-              </button>
+                onClick={() => setBookCount(v => Math.min(plan === 'free' ? 1 : plan === 'noob' ? 999 : 30, v + 1))}
+                disabled={bookCount >= (plan === 'free' ? 1 : plan === 'noob' ? 999 : 30) || triggering}
+                className="w-11 h-11 rounded-lg bg-cream border-[2px] border-ink font-black text-xl text-ink disabled:opacity-30 disabled:cursor-not-allowed"
+              >+</button>
             </div>
           </div>
-        </div>
 
-        <div className="flex items-center gap-4 flex-wrap">
+          {/* CTA */}
           <button
             onClick={handleSubmit}
             disabled={triggering}
-            className="btn-primary px-8 py-3"
+            className="w-full chunky-btn chunky-btn--primary chunky-btn--large justify-center"
+            style={{ minHeight: 56, opacity: triggering ? 0.7 : 1 }}
           >
             {triggering ? (
-              <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Submitting…</>
+              <><DashSpin />Submitting {bookCount} book{bookCount !== 1 ? 's' : ''}…</>
             ) : credsStatus !== 'saved' ? (
-              <><LockIcon className="w-4 h-4" />Connect & Submit</>
+              <><LockIcon className="w-4 h-4" />Connect AINS to submit</>
             ) : (
-              <><BoltIcon className="w-4 h-4" />Submit {bookCount} {lang} Book{bookCount !== 1 ? 's' : ''}</>
+              <>⚡ Submit {bookCount} {lang} book{bookCount !== 1 ? 's' : ''}</>
             )}
           </button>
+
           {triggerMsg && (
-            <span className={`text-sm font-bold flex items-center gap-1.5 ${isError ? 'text-danger-600' : 'text-ok-600'}`}>
-              {isError ? <XCircleIcon className="w-4 h-4" /> : <CheckCircleIcon className="w-4 h-4" />}
+            <div className={`flex items-center gap-2 text-sm font-bold ${isError ? 'text-[#C9362F]' : 'text-[#0E7D4F]'}`}>
+              {isError ? <XCircleIcon className="w-4 h-4 flex-shrink-0" /> : <CheckCircleIcon className="w-4 h-4 flex-shrink-0" />}
               {triggerMsg}
-            </span>
+            </div>
+          )}
+
+          {/* Live progress feed */}
+          {liveProgress.length > 0 && (
+            <div className="border-[2.5px] border-ink rounded-xl overflow-hidden">
+              <div className="bg-ink text-cream px-4 py-2 flex items-center justify-between">
+                <span className="font-display font-black text-[11px] uppercase tracking-[0.2em]">Live</span>
+                <span className="text-[11px] font-bold text-cream/70">
+                  {liveProgress.filter(s => s.status === 'success').length}/{liveProgress.length} done
+                </span>
+              </div>
+              <div className="bg-white divide-y-[2px] divide-ink/10">
+                {liveProgress.map(sub => (
+                  <div key={sub.id} className="flex items-center gap-3 px-4 py-2.5">
+                    <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
+                      {sub.status === 'pending' && <span style={{ width: 14, height: 14, border: '2.5px solid #2F5DDB', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite', display: 'inline-block' }} />}
+                      {sub.status === 'success' && <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" fill="#0E7D4F"/><path d="M7.5 12.5l3 3 6-7" stroke="#F4F1EA" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                      {sub.status === 'failed'  && <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" fill="#C9362F"/><path d="M8 8l8 8M16 8l-8 8" stroke="#F4F1EA" strokeWidth="2.5" strokeLinecap="round"/></svg>}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <span className="text-sm font-bold text-ink truncate block">{sub.books?.title || 'Unknown book'}</span>
+                      {sub.status === 'failed' && sub.error_message && (
+                        <span className="text-xs text-[#C9362F] truncate block font-mono">{sub.error_message.slice(0, 80)}</span>
+                      )}
+                    </div>
+                    <span className={`text-[10px] font-extrabold uppercase tracking-wider flex-shrink-0 ${
+                      sub.status === 'success' ? 'text-[#0E7D4F]' :
+                      sub.status === 'failed'  ? 'text-[#C9362F]' : 'text-cobalt'
+                    }`}>
+                      {sub.status === 'pending' ? 'Sending' : sub.status === 'success' ? 'Done' : 'Failed'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
         </div>
-
-        <p className="text-xs text-subtle mt-3">
-          {credsStatus === 'saved'
-            ? 'Your AINS session is active. The bot will use it for monthly submissions.'
-            : 'Click "Connect & Submit" to log in to your AINS account.'}
-        </p>
       </motion.div>
 
       {/* ── Family Slots Panel ─────────────────────── */}
@@ -514,7 +618,7 @@ export default function Dashboard() {
                   </div>
 
                   {/* Connect form */}
-                  {(!slot.ains_connected || ss.showForm) && ss.phase !== 'connecting' && ss.phase !== 'done' && (
+                  {(!slot.ains_connected || ss.showForm) && ss.phase !== 'connecting' && ss.phase !== 'capturing' && ss.phase !== 'done' && (
                     <>
                       {ss.showForm ? (
                         <div className="space-y-2 pt-1">
@@ -567,6 +671,14 @@ export default function Dashboard() {
                     <div className="flex items-center gap-2 text-sm text-muted">
                       <span className="w-4 h-4 border-2 border-brand-200 border-t-brand-600 rounded-full animate-spin flex-shrink-0" />
                       <span>Signing in… approve the MFA notification on your phone.</span>
+                    </div>
+                  )}
+
+                  {/* Capturing state (MFA approved, capturing session) */}
+                  {ss.phase === 'capturing' && (
+                    <div className="flex items-center gap-2 text-sm text-muted">
+                      <span className="w-4 h-4 border-2 border-ok-200 border-t-ok-600 rounded-full animate-spin flex-shrink-0" />
+                      <span>Approved! Capturing session, please wait…</span>
                     </div>
                   )}
 
@@ -650,25 +762,29 @@ export default function Dashboard() {
         initial={{ opacity: 0, y: 14 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.45, delay: 0.16 }}
-        className="card-p"
+        className="bg-white border-[3px] border-ink rounded-2xl overflow-hidden"
+        style={{ boxShadow: '4px 4px 0 #0F172A' }}
       >
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="font-display text-lg font-bold text-heading">Recent Submissions</h2>
-          <button onClick={() => navigate('/history')} className="text-xs font-bold text-muted hover:text-brand-600 transition-colors">
-            View all →
+        <div className="px-5 py-3 border-b-[3px] border-ink flex items-center justify-between">
+          <span className="font-display font-black text-sm uppercase tracking-[0.15em] text-ink">Recent</span>
+          <button onClick={() => navigate('/history')} className="font-mono text-xs font-bold text-cobalt hover:underline">
+            view all →
           </button>
         </div>
 
         {recent.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12 gap-3">
-            <div className="w-12 h-12 bg-brand-50 border border-brand-100 rounded-2xl flex items-center justify-center">
-              <BookIcon className="w-6 h-6 text-brand-400" />
+          <div className="flex flex-col items-center justify-center py-12 gap-3 px-5">
+            <div className="w-12 h-12 bg-cream border-[2.5px] border-ink rounded-2xl flex items-center justify-center"
+              style={{ boxShadow: '3px 3px 0 #0F172A' }}>
+              <BookIcon className="w-6 h-6 text-ink/40" />
             </div>
-            <p className="text-muted text-sm font-semibold">No submissions yet</p>
-            <p className="text-subtle text-xs">Press "Submit Now" to get started.</p>
+            <p className="font-display font-black text-ink/50 text-sm">No submissions yet</p>
+            <p className="text-ink/40 text-xs font-medium">Press "Submit Now" to get started.</p>
           </div>
         ) : (
-          recent.map(s => <BookCard key={s.id} submission={s} />)
+          <div className="divide-y-[2px] divide-ink/10">
+            {recent.map(s => <BookCard key={s.id} submission={s} />)}
+          </div>
         )}
       </motion.div>
 
@@ -691,6 +807,9 @@ export default function Dashboard() {
   )
 }
 
+function DashSpin() {
+  return <span className="inline-block flex-shrink-0" style={{ width: 18, height: 18, border: '2.5px solid currentColor', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+}
 function BookIcon({ className }) {
   return <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
 }
