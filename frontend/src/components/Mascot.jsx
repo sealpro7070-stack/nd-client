@@ -1,7 +1,9 @@
 // Nila — the NilamDesk book-bot mascot.
 // Built entirely from SVG primitives. Three moods: idle, waving, cheering.
 
-export function Mascot({ size = 160, mood = 'idle', floating = false }) {
+import { memo } from 'react'
+
+export const Mascot = memo(function Mascot({ size = 160, mood = 'idle', floating = false }) {
   const w = size
   const h = Math.round(size * 1.15)
   const armsUp = mood === 'cheering'
@@ -67,7 +69,7 @@ export function Mascot({ size = 160, mood = 'idle', floating = false }) {
       </svg>
     </div>
   )
-}
+})
 
 // Compact logo-mark: just the head, square format
 export function MascotMark({ size = 36 }) {

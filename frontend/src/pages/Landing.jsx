@@ -592,8 +592,6 @@ export default function Landing() {
     else { setResent(true); setMessage('Verification email sent — check your inbox.') }
   }
 
-  const navigate = useNavigate()
-
   function scrollToAuth(m = 'signup') {
     setMode(m); setMessage(''); setAgreedToTerms(false)
     document.getElementById('auth')?.scrollIntoView({ behavior: 'smooth' })

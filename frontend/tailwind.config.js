@@ -8,7 +8,7 @@ export default {
         heading: '#0F172A',
         body:    '#334155',
         muted:   '#64748B',
-        subtle:  '#94A3B8',
+        subtle:  '#6B7280',
         line:    '#E2E8F0',
         brand: {
           50:  '#EFF6FF',

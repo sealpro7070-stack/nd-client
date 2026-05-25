@@ -9,7 +9,11 @@ const AINS_BASE = 'https://ains.moe.gov.my'
 const SCREENSHOTS_DIR = path.join(__dirname, '..', 'screenshots')
 
 // Ensure screenshots dir exists
-if (!fs.existsSync(SCREENSHOTS_DIR)) fs.mkdirSync(SCREENSHOTS_DIR, { recursive: true })
+try {
+  if (!fs.existsSync(SCREENSHOTS_DIR)) fs.mkdirSync(SCREENSHOTS_DIR, { recursive: true })
+} catch (err) {
+  console.warn('[bot] Could not create screenshots directory:', err.message)
+}
 
 async function launchBrowser() {
   const browser = await chromium.launch({

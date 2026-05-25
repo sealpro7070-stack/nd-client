@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import ConnectAINSModal from '../components/ConnectAINSModal'
@@ -157,16 +157,16 @@ export default function Admin() {
     setTimeout(() => setToasting(null), 3000)
   }
 
-  const filtered = users.filter(u => {
+  const filtered = useMemo(() => users.filter(u => {
     const matchSearch = u.email?.toLowerCase().includes(search.toLowerCase()) ||
                         u.delima_id?.toLowerCase().includes(search.toLowerCase())
     const matchFilter = filter === 'all' ? true : filter === 'active' ? u.is_active : !u.is_active
     return matchSearch && matchFilter
-  })
+  }), [users, search, filter])
 
-  const filteredPayments = payments.filter(p =>
+  const filteredPayments = useMemo(() => payments.filter(p =>
     payFilter === 'all' ? true : p.status === payFilter
-  )
+  ), [payments, payFilter])
 
   const pendingPayCount = payments.filter(p => p.status === 'pending').length
 

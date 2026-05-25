@@ -29,7 +29,8 @@ async function main() {
 
       if (!user) {
         console.error(`No user found for ${adminEmail}. Sign in on the frontend first.`)
-        process.exit(1)
+        process.exitCode = 1
+        return
       }
 
       console.log(`Found user:`)
@@ -40,11 +41,13 @@ async function main() {
 
       if (!user.is_active) {
         console.error('\nAccount not active. Go to /admin and approve your account first.')
-        process.exit(1)
+        process.exitCode = 1
+        return
       }
       if (!user.cookie_updated_at) {
         console.error('\nNo session saved. Use the Chrome extension to save your AINS session first.')
-        process.exit(1)
+        process.exitCode = 1
+        return
       }
 
       console.log(`\nRunning bot for ${user.email}...\n`)
@@ -52,7 +55,8 @@ async function main() {
     } else {
       console.error('Usage: node testBot.js <userId>')
       console.error('Or set TEST_USER_ID in .env')
-      process.exit(1)
+      process.exitCode = 1
+      return
     }
   } else {
     await runForUser(userId)
@@ -86,8 +90,8 @@ async function runForUser(userId) {
   } catch (err) {
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1)
     console.error(`\n✗ Error after ${elapsed}s: ${err.message}`)
-    process.exit(1)
+    process.exitCode = 1
   }
 }
 
-main()
+main().then(() => process.exit())

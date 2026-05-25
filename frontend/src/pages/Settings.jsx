@@ -290,29 +290,34 @@ export default function Settings() {
           </SetField>
 
           {/* Books per month */}
-          <SetField label="Books per month" hint={`${form.books_per_month} / ${planInfo.plan === 'free' ? 1 : 30} max`}>
-            <div className="flex items-center justify-between bg-white border-[2.5px] border-ink rounded-xl p-1.5">
-              <button
-                type="button"
-                onClick={() => setForm(f => ({ ...f, books_per_month: Math.max(1, f.books_per_month - 1) }))}
-                disabled={form.books_per_month <= 1}
-                className="w-11 h-11 rounded-lg bg-cream border-[2px] border-ink font-black text-xl text-ink disabled:opacity-30 disabled:cursor-not-allowed"
-              >−</button>
-              <div className="text-center px-3">
-                <span className="font-display font-black text-4xl text-cobalt tabular-nums">{form.books_per_month}</span>
-                <span className="block text-[10px] font-extrabold uppercase tracking-wider text-ink/50 -mt-1">per month</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setForm(f => ({ ...f, books_per_month: Math.min(planInfo.plan === 'free' ? 1 : 30, f.books_per_month + 1) }))}
-                disabled={form.books_per_month >= (planInfo.plan === 'free' ? 1 : 30)}
-                className="w-11 h-11 rounded-lg bg-cream border-[2px] border-ink font-black text-xl text-ink disabled:opacity-30 disabled:cursor-not-allowed"
-              >+</button>
-            </div>
-            {planInfo.plan === 'free' && (
-              <p className="text-[11px] text-ink/50 font-medium mt-2">Free plan: 1 book/week. Upgrade for up to 30.</p>
-            )}
-          </SetField>
+          {(() => {
+            const planMax = planInfo.plan === 'free' ? 1 : planInfo.plan === 'noob' ? 999 : 30
+            return (
+              <SetField label="Books per month" hint={`${form.books_per_month} / ${planMax} max`}>
+                <div className="flex items-center justify-between bg-white border-[2.5px] border-ink rounded-xl p-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setForm(f => ({ ...f, books_per_month: Math.max(1, f.books_per_month - 1) }))}
+                    disabled={form.books_per_month <= 1}
+                    className="w-11 h-11 rounded-lg bg-cream border-[2px] border-ink font-black text-xl text-ink disabled:opacity-30 disabled:cursor-not-allowed"
+                  >−</button>
+                  <div className="text-center px-3">
+                    <span className="font-display font-black text-4xl text-cobalt tabular-nums">{form.books_per_month}</span>
+                    <span className="block text-[10px] font-extrabold uppercase tracking-wider text-ink/50 -mt-1">per month</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setForm(f => ({ ...f, books_per_month: Math.min(planMax, f.books_per_month + 1) }))}
+                    disabled={form.books_per_month >= planMax}
+                    className="w-11 h-11 rounded-lg bg-cream border-[2px] border-ink font-black text-xl text-ink disabled:opacity-30 disabled:cursor-not-allowed"
+                  >+</button>
+                </div>
+                {planInfo.plan === 'free' && (
+                  <p className="text-[11px] text-ink/50 font-medium mt-2">Free plan: 1 book/week. Upgrade for up to 30.</p>
+                )}
+              </SetField>
+            )
+          })()}
         </SetSection>
 
         {/* ── [04] Monthly reminder — coming soon ──────── */}
@@ -339,6 +344,7 @@ export default function Settings() {
           {saved ? '✓ Saved' : saving ? 'Saving…' : 'Unsaved changes'}
         </span>
         <button
+          form="settings-form"
           onClick={handleSave}
           disabled={saving}
           className="chunky-btn chunky-btn--small flex-shrink-0"
