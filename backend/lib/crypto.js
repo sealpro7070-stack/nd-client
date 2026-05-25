@@ -1,16 +1,15 @@
 const crypto = require('crypto')
 
 const ALGORITHM = 'aes-256-gcm'
-const IV_LENGTH = 16
+const IV_LENGTH = 12
 const TAG_LENGTH = 16
 
 function getKey() {
   const key = process.env.ENCRYPTION_KEY
   if (!key) throw new Error('ENCRYPTION_KEY not set')
-  // Accept hex string (64 chars) or raw 32-char string
+  // Accept hex string (64 chars) only for maximum entropy
   if (key.length === 64) return Buffer.from(key, 'hex')
-  if (key.length === 32) return Buffer.from(key, 'utf8')
-  throw new Error('ENCRYPTION_KEY must be 32 bytes (64 hex chars or 32 utf8 chars)')
+  throw new Error('ENCRYPTION_KEY must be 64 hex characters (32 bytes)')
 }
 
 function encrypt(plaintext) {

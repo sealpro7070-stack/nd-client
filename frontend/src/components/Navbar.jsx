@@ -85,6 +85,9 @@ export default function Navbar() {
               onClick={() => setMenuOpen(v => !v)}
               className="w-9 h-9 rounded-full bg-yellow border-[2.5px] border-ink flex items-center justify-center font-display font-black text-ink text-[11px] hover:opacity-80 transition-opacity"
               title={userEmail}
+              aria-expanded={menuOpen}
+              aria-haspopup="menu"
+              aria-label="User menu"
             >
               {userInitials}
             </button>

@@ -49,28 +49,52 @@ router.get('/stats', requireAuth, async (req, res) => {
   const currentYear  = now.getFullYear()
   const weekStart    = getWeekStart().toISOString()
 
-  const { data: allSubmissions, error } = await supabase
-    .from('submissions')
-    .select('status, month, year, created_at')
-    .eq('user_id', userId)
+  // Use DB aggregation instead of loading all rows into memory
+  const { data: counts, error } = await supabase.rpc('get_submission_stats', {
+    p_user_id: userId,
+    p_month: currentMonth,
+    p_year: currentYear,
+    p_week_start: weekStart,
+  })
 
-  if (error) return res.status(500).json({ error: 'Failed to load stats' })
+  if (error) {
+    // Fallback to in-memory filtering if RPC doesn't exist yet
+    const { data: allSubmissions, error: fallbackErr } = await supabase
+      .from('submissions')
+      .select('status, month, year, created_at')
+      .eq('user_id', userId)
 
-  const total    = allSubmissions.filter(s => s.status === 'success').length
-  const thisMonth = allSubmissions.filter(
-    s => s.month === currentMonth && s.year === currentYear && s.status === 'success'
-  ).length
-  const thisWeek = allSubmissions.filter(
-    s => s.status === 'success' && s.created_at >= weekStart
-  ).length
-  const thisMonthPending = allSubmissions.filter(
-    s => s.month === currentMonth && s.year === currentYear && s.status === 'pending'
-  ).length
-  const thisMonthFailed = allSubmissions.filter(
-    s => s.month === currentMonth && s.year === currentYear && s.status === 'failed'
-  ).length
+    if (fallbackErr) return res.status(500).json({ error: 'Failed to load stats' })
 
-  res.json({ total, successful: total, thisMonth, thisWeek, thisMonthPending, thisMonthFailed, currentMonth, currentYear })
+    const total    = allSubmissions.filter(s => s.status === 'success').length
+    const thisMonth = allSubmissions.filter(
+      s => s.month === currentMonth && s.year === currentYear && s.status === 'success'
+    ).length
+    const thisWeek = allSubmissions.filter(
+      s => s.status === 'success' && s.created_at >= weekStart
+    ).length
+    const thisMonthPending = allSubmissions.filter(
+      s => s.month === currentMonth && s.year === currentYear && s.status === 'pending'
+    ).length
+    const thisMonthFailed = allSubmissions.filter(
+      s => s.month === currentMonth && s.year === currentYear && s.status === 'failed'
+    ).length
+
+    return res.json({ total, successful: total, thisMonth, thisWeek, thisMonthPending, thisMonthFailed, currentMonth, currentYear })
+  }
+
+  const row = counts?.[0] || {}
+  const total = parseInt(row.total_success || 0)
+  res.json({
+    total,
+    successful: total,
+    thisMonth: parseInt(row.this_month_success || 0),
+    thisWeek: parseInt(row.this_week_success || 0),
+    thisMonthPending: parseInt(row.this_month_pending || 0),
+    thisMonthFailed: parseInt(row.this_month_failed || 0),
+    currentMonth,
+    currentYear,
+  })
 })
 
 module.exports = router

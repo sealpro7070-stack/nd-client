@@ -3,8 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import ConnectAINSModal from '../components/ConnectAINSModal'
 
-const ADMIN_EMAILS = (import.meta.env.VITE_ADMIN_EMAIL || '').split(',').map(e => e.trim()).filter(Boolean)
-const isAdminEmail = (email) => !!email && ADMIN_EMAILS.includes(email)
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001'
 
 export default function Admin() {
@@ -34,7 +32,11 @@ export default function Admin() {
   async function checkAdminAndLoad() {
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) { navigate('/'); return }
-    if (!isAdminEmail(session.user.email)) { navigate('/dashboard'); return }
+    // Admin check is enforced by backend; we just verify the first admin endpoint succeeds
+    try {
+      const probe = await fetch(`${BACKEND_URL}/api/admin/users`, { headers: { Authorization: `Bearer ${session.access_token}` } })
+      if (!probe.ok) { navigate('/dashboard'); return }
+    } catch { navigate('/dashboard'); return }
     setToken(session.access_token)
     await Promise.all([fetchUsers(session.access_token), fetchPayments(session.access_token)])
   }
@@ -125,6 +127,7 @@ export default function Admin() {
   function handleQrFile(e) {
     const file = e.target.files?.[0]
     if (!file) return
+    if (!file.type.startsWith('image/')) { showToast('Please upload an image file.', 'error'); return }
     if (file.size > 2 * 1024 * 1024) { showToast('Image must be under 2 MB', 'error'); return }
     const reader = new FileReader()
     reader.onload = ev => setQrPreview(ev.target.result)
@@ -393,7 +396,7 @@ export default function Admin() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-semibold text-heading text-sm truncate">
-                          {pr.users?.email || pr.user_id.slice(0, 8) + '…'}
+                          {pr.users?.email || (pr.user_id?.slice(0, 8) ?? '') + '…'}
                         </span>
                         <span className={`text-xs font-bold px-2 py-0.5 rounded-full capitalize ${
                           pr.plan === 'family' ? 'bg-ok-100 text-ok-700' : 'bg-brand-100 text-brand-700'

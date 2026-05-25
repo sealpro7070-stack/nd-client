@@ -10,14 +10,10 @@ const { PLAN_MAX } = require('../bot/bot')
 router.post('/', requireAuth, async (req, res) => {
   console.log('[trigger] Received request:', JSON.stringify(req.body).substring(0, 100))
   let { userId, count } = req.body
-
-  if (!userId) {
-    return res.status(400).json({ error: 'userId is required' })
-  }
-
   const isAdmin = isAdminEmail(req.authUser?.email)
 
-  // Only admin can trigger for other users
+  // Default to current user; admin can pass a different userId
+  if (!userId) userId = req.authUser.id
   if (userId !== req.authUser.id && !isAdmin) {
     return res.status(403).json({ error: 'Access denied' })
   }

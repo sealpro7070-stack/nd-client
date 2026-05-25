@@ -18,3 +18,7 @@ BEGIN
   WHERE id = target_user_id;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- SECURITY FIX: revoke from public roles so only service_role can call this
+REVOKE EXECUTE ON FUNCTION add_credits(UUID, INT) FROM anon, authenticated;
+GRANT EXECUTE ON FUNCTION add_credits(UUID, INT) TO service_role;

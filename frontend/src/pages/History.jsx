@@ -25,6 +25,7 @@ export default function History() {
   const [total, setTotal]             = useState(0)
   const [page, setPage]               = useState(0)
   const [loading, setLoading]         = useState(true)
+  const [error, setError]             = useState('')
   const [filterStatus, setFilterStatus] = useState('all')
 
   useEffect(() => {
@@ -39,13 +40,21 @@ export default function History() {
   useEffect(() => {
     if (!user) return
     setLoading(true)
-    getToken().then(token => {
-      fetch(`${BACKEND}/api/history?userId=${user.id}&limit=${PAGE_SIZE}&offset=${page * PAGE_SIZE}`, {
-        headers: { 'Authorization': `Bearer ${token}` },
-      })
-        .then(r => r.json())
-        .then(data => { setSubmissions(data.submissions || []); setTotal(data.total || 0); setLoading(false) })
-        .catch(() => setLoading(false))
+    setError('')
+    getToken().then(async token => {
+      try {
+        const r = await fetch(`${BACKEND}/api/history?limit=${PAGE_SIZE}&offset=${page * PAGE_SIZE}`, {
+          headers: { 'Authorization': `Bearer ${token}` },
+        })
+        if (!r.ok) throw new Error((await r.json()).error || 'Failed to load history')
+        const data = await r.json()
+        setSubmissions(data.submissions || [])
+        setTotal(data.total || 0)
+      } catch (err) {
+        setError(err.message)
+      } finally {
+        setLoading(false)
+      }
     })
   }, [user, page])
 
@@ -90,6 +99,11 @@ export default function History() {
       {loading ? (
         <div className="flex items-center justify-center py-20">
           <span style={{ width: 32, height: 32, border: '3px solid #0F172A', borderTopColor: '#FFD23F', borderRadius: '50%', animation: 'spin 0.8s linear infinite', display: 'inline-block' }} />
+        </div>
+      ) : error ? (
+        <div className="bg-white border-[3px] border-ink rounded-2xl p-10 text-center" style={{ boxShadow: '4px 4px 0 #0F172A' }}>
+          <p className="font-display font-black text-ink text-lg">Error loading history</p>
+          <p className="text-ink/55 text-sm mt-1 font-medium">{error}</p>
         </div>
       ) : filtered.length === 0 ? (
         <EmptyState />

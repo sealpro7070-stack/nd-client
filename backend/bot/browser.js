@@ -143,10 +143,14 @@ async function markSubmissions(ids, status, note) {
   if (!ids || !ids.length) return
   const update = { status }
   if (note) update.error_message = note
-  await supabase
-    .from('submissions')
-    .update(update)
-    .in('id', ids)
+  try {
+    await supabase
+      .from('submissions')
+      .update(update)
+      .in('id', ids)
+  } catch (err) {
+    console.error('[bot] markSubmissions failed:', err.message)
+  }
 }
 
 module.exports = { runBot, launchBrowser, loginAndVerify, takeScreenshot }

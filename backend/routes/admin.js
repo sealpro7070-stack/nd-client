@@ -101,11 +101,15 @@ router.get('/users', requireAdmin, async (req, res) => {
 
 const VALID_ROLES = ['free', 'plus', 'family', 'noob']
 
+function isValidUUID(str) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str)
+}
+
 // POST /api/admin/set-role — assign a plan/role to any user
 router.post('/set-role', requireAdmin, async (req, res) => {
   const { userId, role } = req.body
 
-  if (!userId) return res.status(400).json({ error: 'userId is required' })
+  if (!userId || !isValidUUID(userId)) return res.status(400).json({ error: 'userId must be a valid UUID' })
   if (!VALID_ROLES.includes(role)) {
     return res.status(400).json({ error: `role must be one of: ${VALID_ROLES.join(', ')}` })
   }
@@ -141,8 +145,8 @@ router.post('/set-role', requireAdmin, async (req, res) => {
 router.post('/activate', requireAdmin, async (req, res) => {
   const { userId, activate } = req.body
 
-  if (!userId || typeof activate !== 'boolean') {
-    return res.status(400).json({ error: 'userId and activate (boolean) are required' })
+  if (!userId || !isValidUUID(userId) || typeof activate !== 'boolean') {
+    return res.status(400).json({ error: 'userId (valid UUID) and activate (boolean) are required' })
   }
 
   const { data, error } = await supabase

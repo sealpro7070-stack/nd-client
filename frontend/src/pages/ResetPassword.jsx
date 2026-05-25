@@ -17,7 +17,9 @@ export default function ResetPassword() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
       if (event === 'PASSWORD_RECOVERY') setReady(true)
     })
-    return () => subscription.unsubscribe()
+    // Fallback: if event never fires (expired link), still allow manual reset after 3s
+    const fallback = setTimeout(() => setReady(true), 3000)
+    return () => { subscription.unsubscribe(); clearTimeout(fallback) }
   }, [])
 
   async function handleSubmit(e) {

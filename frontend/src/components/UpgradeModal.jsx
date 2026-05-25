@@ -79,6 +79,7 @@ export default function UpgradeModal({ isOpen, onClose, currentPlan }) {
   function handleReceiptFile(e) {
     const file = e.target.files?.[0]
     if (!file) return
+    if (!file.type.startsWith('image/')) { setError('Please upload an image file.'); return }
     if (file.size > 5 * 1024 * 1024) { setError('Receipt image must be under 5 MB.'); return }
     const reader = new FileReader()
     reader.onload = ev => setReceiptData(ev.target.result)
@@ -137,7 +138,7 @@ export default function UpgradeModal({ isOpen, onClose, currentPlan }) {
             {step === 'payment' && `Pay for ${selectedPlan?.name} — ${selectedPlan?.price}/month`}
             {step === 'done'    && 'Payment submitted!'}
           </h3>
-          <button onClick={handleClose} className="text-white/60 hover:text-white text-2xl leading-none">×</button>
+          <button onClick={handleClose} aria-label="Close modal" className="text-white/60 hover:text-white text-2xl leading-none">×</button>
         </div>
 
         <div className="overflow-y-auto flex-1 p-5 sm:p-6 space-y-4">

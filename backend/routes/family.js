@@ -22,6 +22,16 @@ const VALID_LANGUAGES = ['Melayu', 'Inggeris', 'Cina', 'Tamil']
 // In-memory status store for slot connection flows (mirrors auth.js loginState pattern)
 const slotConnectState = {}
 
+// Evict stale slot connect states after 10 minutes to prevent memory leaks
+function scheduleSlotCleanup(stateKey) {
+  setTimeout(() => {
+    const s = slotConnectState[stateKey]
+    if (s && (s.status === 'success' || s.status === 'error')) {
+      delete slotConnectState[stateKey]
+    }
+  }, 10 * 60 * 1000)
+}
+
 // Guard: must have an active family plan
 async function requireFamily(req, res, next) {
   const { data: user, error: dbError } = await supabase
@@ -224,10 +234,12 @@ router.post('/slots/:slotId/connect', requireAuth, requireFamily, async (req, re
       }).eq('id', slotId)
 
       slotConnectState[stateKey] = { status: 'success' }
+      scheduleSlotCleanup(stateKey)
       console.log(`[family] Slot ${slotId} connected successfully`)
     } catch (err) {
       console.error(`[family] Slot connect failed: ${err.message}`)
       slotConnectState[stateKey] = { status: 'error', message: err.message }
+      scheduleSlotCleanup(stateKey)
     }
   })()
 })

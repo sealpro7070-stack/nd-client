@@ -16,7 +16,7 @@ export default function Dashboard() {
   const navigate = useNavigate()
   const [user, setUser]             = useState(null)
   const [settings, setSettings]     = useState(null)
-  const [stats, setStats]           = useState({ total: 0, successful: 0, thisMonth: 0 })
+  const [stats, setStats]           = useState({ total: 0, successful: 0, thisMonth: 0, thisWeek: 0 })
   const [recent, setRecent]         = useState([])
   const [loading, setLoading]       = useState(true)
   const [lang, setLang]             = useState('Malay')
@@ -97,8 +97,8 @@ export default function Dashboard() {
         if (userPlan === 'family') {
           await loadFamilySlots(user)
         }
-      } catch {
-        // Supabase unreachable
+      } catch (err) {
+        console.error('[dashboard] load error:', err)
       } finally {
         setLoading(false)
       }
@@ -134,21 +134,26 @@ export default function Dashboard() {
 
     const triggerTime = new Date().toISOString()
 
-    // Poll Supabase every 2s for live submission status
+    // Poll Supabase every 2s for live submission status (recursive setTimeout prevents overlap)
     const stopProgressPoll = () => {
-      if (progressPollRef.current) { clearInterval(progressPollRef.current); progressPollRef.current = null }
+      if (progressPollRef.current) { clearTimeout(progressPollRef.current); progressPollRef.current = null }
     }
     const pollProgress = async () => {
-      const { data } = await supabase
-        .from('submissions')
-        .select('id, status, error_message, books(title)')
-        .eq('user_id', userId)
-        .is('family_slot_id', null)
-        .gte('created_at', triggerTime)
-        .order('created_at', { ascending: true })
-      if (data) setLiveProgress(data)
+      try {
+        const { data } = await supabase
+          .from('submissions')
+          .select('id, status, error_message, books(title)')
+          .eq('user_id', userId)
+          .is('family_slot_id', null)
+          .gte('created_at', triggerTime)
+          .order('created_at', { ascending: true })
+        if (data) setLiveProgress(data)
+      } catch (err) {
+        // Silently ignore polling errors
+      }
+      progressPollRef.current = setTimeout(pollProgress, 2000)
     }
-    progressPollRef.current = setInterval(pollProgress, 2000)
+    progressPollRef.current = setTimeout(pollProgress, 2000)
 
     try {
       const token = await getToken()
@@ -160,7 +165,7 @@ export default function Dashboard() {
       const res  = await fetch(`${BACKEND}/api/trigger`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ userId, count }),
+        body: JSON.stringify({ count }),
       })
       const data = await res.json()
       if (!res.ok || data.success === false) throw new Error(data.error || 'Failed to start')
@@ -236,7 +241,7 @@ export default function Dashboard() {
       headers: { 'Authorization': `Bearer ${token}` },
     })
     if (!res.ok) return
-    clearInterval(pollRefs.current[slotId])
+    clearTimeout(pollRefs.current[slotId])
     setFamilySlots(prev => prev.filter(s => s.id !== slotId))
     setSlotStates(prev => { const n = { ...prev }; delete n[slotId]; return n })
   }
@@ -258,13 +263,12 @@ export default function Dashboard() {
       return
     }
 
-    // Poll connect-status every 2s (max 3 min)
-    clearInterval(pollRefs.current[slotId])
+    // Poll connect-status every 2s (max 3 min) — recursive setTimeout prevents overlap
+    clearTimeout(pollRefs.current[slotId])
     let attempts = 0
-    const poll = setInterval(async () => {
+    const poll = async () => {
       attempts++
       if (attempts > 90) { // 90 × 2s = 3 min
-        clearInterval(poll)
         setSlot(slotId, { phase: 'error', connectErr: 'Timed out. Please try again.' })
         return
       }
@@ -277,16 +281,17 @@ export default function Dashboard() {
         if (d.status === 'capturing') {
           setSlot(slotId, { phase: 'capturing' })
         } else if (d.status === 'success') {
-          clearInterval(poll)
           setSlot(slotId, { phase: 'done', showForm: false, email: '', password: '' })
           await loadFamilySlots(user)
+          return
         } else if (d.status === 'error') {
-          clearInterval(poll)
           setSlot(slotId, { phase: 'error', connectErr: d.message || 'Connection failed. Please try again.' })
+          return
         }
       } catch {}
-    }, 2000)
-    pollRefs.current[slotId] = poll
+      pollRefs.current[slotId] = setTimeout(poll, 2000)
+    }
+    pollRefs.current[slotId] = setTimeout(poll, 2000)
   }
 
   async function handleTriggerSlot(slotId) {

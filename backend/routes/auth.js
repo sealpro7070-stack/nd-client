@@ -29,6 +29,12 @@ router.post('/connect', requireAuth, async (req, res) => {
     return res.status(400).json({ error: 'email and password are required' })
   }
 
+  // Rate limit: max 5 connection attempts per user per hour
+  const { checkRateLimit } = require('../lib/auth-middleware')
+  if (!checkRateLimit(`ains-connect:${userId}`, 5, 3600000)) {
+    return res.status(429).json({ error: 'Too many connection attempts. Please wait before trying again.' })
+  }
+
   // If a login is already in progress for this user, reject
   if (loginState[userId]?.status === 'connecting' || loginState[userId]?.status === 'waiting_mfa') {
     return res.status(409).json({ error: 'Login already in progress' })
@@ -41,7 +47,8 @@ router.post('/connect', requireAuth, async (req, res) => {
   ;(async () => {
     try {
       // Clear any stale session so every reconnect starts completely fresh
-      await supabase.from('users').update({ ains_cookie_encrypted: null }).eq('id', userId).catch(() => {})
+      const { error: clearErr } = await supabase.from('users').update({ ains_cookie_encrypted: null }).eq('id', userId)
+      if (clearErr) console.error('[auth] Failed to clear stale session:', clearErr.message)
 
       const { ssToken, ssUser, ssProfile, cookies } = await sm.performLogin(
         userId,
@@ -70,7 +77,8 @@ router.post('/connect', requireAuth, async (req, res) => {
               return
             }
 
-            await supabase.from('users').update({ ains_user_id_hash: hash }).eq('id', userId).catch(() => {})
+            const { error: hashErr } = await supabase.from('users').update({ ains_user_id_hash: hash }).eq('id', userId)
+            if (hashErr) console.error('[auth] Failed to save ains_user_id_hash:', hashErr.message)
           }
         } catch (e) {
           console.warn('[auth] Could not parse ssUser for uniqueness check:', e.message)

@@ -15,7 +15,6 @@ create table if not exists users (
   plan_expires_at timestamp with time zone,
   -- Encrypted AINS credentials
   ains_email_encrypted text,
-  ains_password_encrypted text,
   ains_user_id_hash text,
   created_at timestamp with time zone default now()
 );
@@ -105,7 +104,12 @@ create policy "Users can update own settings" on settings
 create policy "Users can view own submissions" on submissions
   for select using (auth.uid() = user_id);
 create policy "Users can insert own submissions" on submissions
-  for insert with check (auth.uid() = user_id);
+  for insert with check (
+    auth.uid() = user_id AND
+    (family_slot_id IS NULL OR EXISTS (
+      SELECT 1 FROM family_slots WHERE id = family_slot_id AND user_id = auth.uid()
+    ))
+  );
 
 -- Books: readable by all authenticated users
 create policy "Books are readable by authenticated users" on books

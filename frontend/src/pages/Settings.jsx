@@ -56,6 +56,8 @@ function ChunkyToggle({ value, onChange, disabled }) {
       disabled={disabled}
       className={`relative w-14 h-8 rounded-full border-[2.5px] border-ink flex-shrink-0 transition-colors ${value ? 'bg-cobalt' : 'bg-cream'} ${disabled ? 'cursor-not-allowed' : ''}`}
       style={{ minHeight: 40, minWidth: 56 }}
+      role="switch"
+      aria-checked={value}
       aria-pressed={value}
     >
       <span
@@ -97,10 +99,16 @@ export default function Settings() {
         const { data: { session } } = await supabase.auth.getSession()
         const token = session?.access_token || ''
 
-        const res = await fetch(`${BACKEND}/api/settings`, {
-          headers: { 'Authorization': `Bearer ${token}` },
-          signal: AbortSignal.timeout(10000),
-        }).catch(() => null)
+        let res = null
+        try {
+          const controller = new AbortController()
+          const t = setTimeout(() => controller.abort(), 10000)
+          res = await fetch(`${BACKEND}/api/settings`, {
+            headers: { 'Authorization': `Bearer ${token}` },
+            signal: controller.signal,
+          })
+          clearTimeout(t)
+        } catch { res = null }
         if (res?.ok) {
           const data = await res.json()
           setForm({
@@ -120,8 +128,8 @@ export default function Settings() {
           .from('users').select('ains_cookie_encrypted, plan, plan_expires_at').eq('id', user.id).maybeSingle()
         setCredsStatus(ud?.ains_cookie_encrypted ? 'saved' : 'none')
         if (ud) setPlanInfo({ plan: ud.plan || 'free', plan_expires_at: ud.plan_expires_at })
-      } catch {
-        // network/auth error — page still renders with defaults
+      } catch (err) {
+        console.error('[settings] load error:', err)
       } finally {
         setLoading(false)
       }
@@ -139,7 +147,7 @@ export default function Settings() {
     const res = await fetch(`${BACKEND}/api/settings`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-      body: JSON.stringify({ userId: user.id, ...form }),
+      body: JSON.stringify(form),
     })
     setSaving(false)
     if (res.ok) { setSaved(true); setTimeout(() => setSaved(false), 3000) }

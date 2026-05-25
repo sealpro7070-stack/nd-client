@@ -49,7 +49,7 @@ router.get('/my-plan', requireAuth, async (req, res) => {
 // ── GET /api/payments/my-request
 // Returns the user's latest payment request (so UI can show pending state)
 router.get('/my-request', requireAuth, async (req, res) => {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('payment_requests')
     .select('*')
     .eq('user_id', req.authUser.id)
@@ -57,6 +57,7 @@ router.get('/my-request', requireAuth, async (req, res) => {
     .limit(1)
     .maybeSingle()
 
+  if (error) return res.status(500).json({ error: error.message })
   res.json({ request: data || null })
 })
 
@@ -313,7 +314,7 @@ router.post('/credits/request', requireAuth, async (req, res) => {
 // ── GET /api/payments/my-credits-request
 // Returns the user's latest credit top-up request
 router.get('/my-credits-request', requireAuth, async (req, res) => {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('payment_requests')
     .select('*')
     .eq('user_id', req.authUser.id)
@@ -321,17 +322,19 @@ router.get('/my-credits-request', requireAuth, async (req, res) => {
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle()
+  if (error) return res.status(500).json({ error: error.message })
   res.json({ request: data || null })
 })
 
 // ── GET /api/payments/qr-settings
 // Returns the current TNG QR image data (fetched by UpgradeModal — requires login)
 router.get('/qr-settings', requireAuth, async (req, res) => {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('admin_settings')
     .select('value')
     .eq('key', 'tng_qr')
     .maybeSingle()
+  if (error) return res.status(500).json({ error: error.message })
   res.json({ qr_data: data?.value || null })
 })
 

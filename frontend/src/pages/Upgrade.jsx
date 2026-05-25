@@ -63,6 +63,7 @@ export default function Upgrade() {
   function handleFileChange(e) {
     const file = e.target.files?.[0]
     if (!file) return
+    if (!file.type.startsWith('image/')) { setErrorMsg('Please upload an image file.'); return }
     if (file.size > 5 * 1024 * 1024) { setErrorMsg('File too large. Max 5 MB.'); return }
     setErrorMsg('')
     setReceiptFile(file)

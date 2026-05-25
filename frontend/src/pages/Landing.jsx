@@ -46,14 +46,14 @@ function Nav({ onSignIn, onGetStarted }) {
         </span>
       </div>
       <div className="flex items-center gap-2 sm:gap-3">
-        <button onClick={() => document.getElementById('how')?.scrollIntoView({ behavior: 'smooth' })}
+        <a href="#how"
           className="hidden sm:block font-bold text-sm text-ink/70 hover:text-ink px-4 py-2">
           How it works
-        </button>
-        <button onClick={() => document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' })}
+        </a>
+        <a href="#pricing"
           className="hidden sm:block font-bold text-sm text-ink/70 hover:text-ink px-4 py-2">
           Pricing
-        </button>
+        </a>
         <button onClick={onSignIn} className="font-bold text-sm text-ink/70 hover:text-ink px-3 py-2 sm:px-4">
           Sign in
         </button>
@@ -252,7 +252,7 @@ function DemoSection() {
   )
 }
 
-function Pricing({ onGetStarted }) {
+function Pricing({ onGetStarted, onNavigateUpgrade }) {
   return (
     <section id="pricing" className="bg-cream px-5 py-16 sm:px-10 sm:py-24">
       <div className="max-w-[1180px] mx-auto">
@@ -303,7 +303,7 @@ function Pricing({ onGetStarted }) {
                 </li>
               ))}
             </ul>
-            <button onClick={() => window.location.href = '/upgrade'} className="mt-6 w-full chunky-btn chunky-btn--ink justify-center">
+            <button onClick={onNavigateUpgrade} className="mt-6 w-full chunky-btn chunky-btn--ink justify-center">
               Go Pro — RM 18/mo →
             </button>
           </div>
@@ -592,6 +592,8 @@ export default function Landing() {
     else { setResent(true); setMessage('Verification email sent — check your inbox.') }
   }
 
+  const navigate = useNavigate()
+
   function scrollToAuth(m = 'signup') {
     setMode(m); setMessage(''); setAgreedToTerms(false)
     document.getElementById('auth')?.scrollIntoView({ behavior: 'smooth' })
@@ -605,7 +607,7 @@ export default function Landing() {
       <Problem />
       <HowItWorks />
       <DemoSection />
-      <Pricing onGetStarted={() => scrollToAuth('signup')} />
+      <Pricing onGetStarted={() => scrollToAuth('signup')} onNavigateUpgrade={() => navigate('/upgrade')} />
       <AuthSection
         mode={mode} setMode={m => { setMode(m); setMessage(''); setAgreedToTerms(false); setForgotSent(false) }}
         email={email} setEmail={setEmail}

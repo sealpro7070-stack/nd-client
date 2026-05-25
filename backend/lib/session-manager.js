@@ -339,6 +339,7 @@ async function performLogin(userId, email, password, onStatus) {
 }
 
 module.exports = {
+  sessions,
   createSession,
   getSession,
   destroySession,

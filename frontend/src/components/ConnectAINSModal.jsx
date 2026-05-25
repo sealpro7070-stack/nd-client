@@ -40,6 +40,16 @@ export default function ConnectAINSModal({ isOpen, onClose, onSuccess, targetUse
       const statusRes = await fetch(`${BACKEND}/api/auth/connect-status`, {
         headers: { 'Authorization': `Bearer ${pollToken}` },
       })
+      if (!statusRes.ok) {
+        // Server error — stop polling and show error after a few retries
+        if ((checkStatus.retryCount = (checkStatus.retryCount || 0) + 1) > 3) {
+          stopPolling()
+          setPhase('error')
+          setErrorMsg('Server error. Please try again.')
+        }
+        return
+      }
+      checkStatus.retryCount = 0
       const data = await statusRes.json()
       if (!activeRef.current) return
 
@@ -158,7 +168,7 @@ export default function ConnectAINSModal({ isOpen, onClose, onSuccess, targetUse
         {/* Header */}
         <div className="bg-brand-600 text-white p-4 flex items-center justify-between flex-shrink-0">
           <h3 className="font-bold text-sm sm:text-base">Connect your AINS Account</h3>
-          <button onClick={handleClose} className="text-white/60 hover:text-white text-2xl leading-none">×</button>
+          <button onClick={handleClose} aria-label="Close modal" className="text-white/60 hover:text-white text-2xl leading-none">×</button>
         </div>
 
         <div className="p-5 sm:p-6 space-y-4">

@@ -1,4 +1,6 @@
 import { Routes, Route, Navigate, NavLink, Link } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { supabase } from './lib/supabase'
 import Landing  from './pages/Landing'
 import Dashboard from './pages/Dashboard'
 import Settings  from './pages/Settings'
@@ -11,16 +13,35 @@ import Terms         from './pages/Terms'
 import ResetPassword from './pages/ResetPassword'
 import Navbar    from './components/Navbar'
 
+function AuthGuard({ children }) {
+  const [authed, setAuthed] = useState(null)
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => setAuthed(!!user))
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setAuthed(!!session?.user)
+    })
+    return () => subscription.unsubscribe()
+  }, [])
+  if (authed === null) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-page">
+        <span style={{ width: 32, height: 32, border: '3px solid #0F172A', borderTopColor: '#FFD23F', borderRadius: '50%', animation: 'spin 0.8s linear infinite', display: 'inline-block' }} />
+      </div>
+    )
+  }
+  return authed ? children : <Navigate to="/" replace />
+}
+
 function App() {
   return (
     <Routes>
       <Route path="/"         element={<Landing />} />
-      <Route path="/upgrade"  element={<Upgrade />} />
-      <Route path="/admin"    element={<Admin />} />
-      <Route path="/dashboard" element={<AppLayout><Dashboard /></AppLayout>} />
-      <Route path="/settings"  element={<AppLayout><Settings /></AppLayout>} />
-      <Route path="/history"   element={<AppLayout><History /></AppLayout>} />
-      <Route path="/guide"     element={<AppLayout><Guide /></AppLayout>} />
+      <Route path="/upgrade"  element={<AuthGuard><Upgrade /></AuthGuard>} />
+      <Route path="/admin"    element={<AuthGuard><Admin /></AuthGuard>} />
+      <Route path="/dashboard" element={<AuthGuard><AppLayout><Dashboard /></AppLayout></AuthGuard>} />
+      <Route path="/settings"  element={<AuthGuard><AppLayout><Settings /></AppLayout></AuthGuard>} />
+      <Route path="/history"   element={<AuthGuard><AppLayout><History /></AppLayout></AuthGuard>} />
+      <Route path="/guide"     element={<AuthGuard><AppLayout><Guide /></AppLayout></AuthGuard>} />
       <Route path="/privacy"        element={<Privacy />} />
       <Route path="/terms"          element={<Terms />} />
       <Route path="/reset-password" element={<ResetPassword />} />
