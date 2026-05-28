@@ -39,7 +39,7 @@ const ALLOWED_ORIGINS = [
 app.use(helmet())
 app.use(cors({
   origin: (origin, callback) => {
-    if (ALLOWED_ORIGINS.includes(origin)) return callback(null, true)
+    if (!origin || ALLOWED_ORIGINS.includes(origin)) return callback(null, true)
     callback(new Error('Not allowed by CORS'))
   },
   credentials: true
