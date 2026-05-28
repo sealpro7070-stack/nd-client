@@ -36,12 +36,12 @@ export default function Navbar() {
       }
 
       const { data } = await supabase
-        .from('users').select('plan, plan_expires_at, ains_session').eq('id', session.user.id).maybeSingle()
+        .from('users').select('plan, plan_expires_at, ains_cookie_encrypted').eq('id', session.user.id).maybeSingle()
       const plan = data?.plan || 'free'
       const expired = data?.plan_expires_at && new Date(data.plan_expires_at) < new Date()
       const needsUpgrade = plan === 'free' || (plan !== 'noob' && expired)
       setShowUpgrade(!!needsUpgrade)
-      setAinsConnected(!!data?.ains_session)
+      setAinsConnected(!!data?.ains_cookie_encrypted)
     })
     return () => subscription.unsubscribe()
   }, [])
