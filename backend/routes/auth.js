@@ -45,6 +45,15 @@ router.post('/connect', requireAuth, async (req, res) => {
 
   // Run login flow asynchronously — client polls /connect-status
   ;(async () => {
+    // Hard timeout: if login doesn't complete in 3 minutes, give up
+    const loginTimeout = setTimeout(() => {
+      if (loginState[userId]?.status === 'connecting' || loginState[userId]?.status === 'waiting_mfa') {
+        console.error('[auth] Login flow timed out for', userId)
+        loginState[userId] = { status: 'error', message: 'Login timed out. Please try again.' }
+        sm.destroySession(userId).catch(() => {})
+      }
+    }, 3 * 60 * 1000)
+
     try {
       // Clear any stale session so every reconnect starts completely fresh
       const { error: clearErr } = await supabase.from('users').update({ ains_cookie_encrypted: null }).eq('id', userId)
@@ -126,8 +135,10 @@ router.post('/connect', requireAuth, async (req, res) => {
       }
 
       loginState[userId] = { status: 'success' }
+      clearTimeout(loginTimeout)
     } catch (err) {
       console.error('[auth] Login flow failed:', err.message)
+      clearTimeout(loginTimeout)
       loginState[userId] = { status: 'error', message: 'Login failed. Please check your AINS email and password and try again.' }
     }
     // Auto-cleanup: if client never polls for the result, remove after 10 minutes
