@@ -219,7 +219,7 @@ async function _startBot(userId, directCookie, directSsUser, directSsProfile, di
     .eq('language', userSettings.language)
 
   if (alreadyBookIds.length > 0) {
-    booksQuery = booksQuery.not('id', 'in', alreadyBookIds)
+    booksQuery = booksQuery.not('id', 'in', `(${alreadyBookIds.join(',')})`)
   }
 
   const { data: availableBooks, error: booksErr } = await booksQuery.limit(200)
@@ -359,7 +359,7 @@ async function _startBotForSlot(userId, slotId, slot) {
 
   let booksQuery = supabase.from('books').select('*').eq('language', slot.language || 'Melayu')
   if (alreadyBookIds.length > 0) {
-    booksQuery = booksQuery.not('id', 'in', alreadyBookIds)
+    booksQuery = booksQuery.not('id', 'in', `(${alreadyBookIds.join(',')})`)
   }
 
   const { data: availableBooks } = await booksQuery.limit(200)
