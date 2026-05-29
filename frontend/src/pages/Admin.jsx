@@ -93,7 +93,11 @@ export default function Admin() {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
-      setUsers(prev => prev.map(u => u.id === userId ? { ...u, plan: role } : u))
+      setUsers(prev => prev.map(u => u.id === userId ? {
+        ...u,
+        plan: role,
+        is_active: (role === 'plus' || role === 'family' || role === 'noob') ? true : u.is_active,
+      } : u))
       showToast(`Role set to "${role}" for user`)
     } catch (err) { showToast(err.message, 'error') }
     finally { setRoleTarget(null) }

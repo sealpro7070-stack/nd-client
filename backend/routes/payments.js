@@ -224,9 +224,9 @@ router.post('/admin/review', requireAuth, requireAdmin, async (req, res) => {
       if (!['plus', 'family'].includes(pr.plan)) {
         return res.status(400).json({ error: 'Invalid plan on this payment request.' })
       }
-      // Grant exactly 1 month from approval time
+      // Grant exactly 1 year from approval time
       const expiresAt = new Date()
-      expiresAt.setMonth(expiresAt.getMonth() + 1)
+      expiresAt.setFullYear(expiresAt.getFullYear() + 1)
 
       const { error: planErr } = await supabase
         .from('users')
