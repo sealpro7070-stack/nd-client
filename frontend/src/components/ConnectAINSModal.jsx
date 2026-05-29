@@ -19,9 +19,29 @@ export default function ConnectAINSModal({ isOpen, onClose, onSuccess, targetUse
     if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
   }
 
+  // Read the access token straight from localStorage. Synchronous, no Web Lock,
+  // so it can never deadlock — used as a fallback if getSession() ever stalls.
+  const readTokenFromStorage = () => {
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i)
+        if (key && key.startsWith('sb-') && key.endsWith('-auth-token')) {
+          const parsed = JSON.parse(localStorage.getItem(key) || '{}')
+          if (parsed?.access_token) return parsed.access_token
+        }
+      }
+    } catch {}
+    return ''
+  }
+
   const getToken = async () => {
-    const { data: { session } } = await supabase.auth.getSession()
-    return session?.access_token || ''
+    try {
+      const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('getSession timeout')), 5000))
+      const { data: { session } } = await Promise.race([supabase.auth.getSession(), timeout])
+      return session?.access_token || readTokenFromStorage()
+    } catch {
+      return readTokenFromStorage()
+    }
   }
 
   const cancelConnect = async () => {
