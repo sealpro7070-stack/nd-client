@@ -139,7 +139,7 @@ function Hero({ onGetStarted }) {
 }
 
 function MarqueeBar() {
-  const items = ['AUTO-SUBMIT', '★', '4 LANGUAGES', '★', 'NO PASSWORD STORED', '★', 'RM18/MONTH', '★', '2,400+ STUDENTS', '★', '99.2% SUCCESS', '★', 'CANCEL ANYTIME']
+  const items = ['AUTO-SUBMIT', '★', '4 LANGUAGES', '★', 'NO PASSWORD STORED', '★', 'RM49.90/YEAR', '★', '2,400+ STUDENTS', '★', '99.2% SUCCESS', '★', '150 CREDITS INCLUDED']
   const row = [...items, ...items]
   return (
     <div className="bg-ink py-3 overflow-hidden border-y-[3px] border-ink">
@@ -189,7 +189,7 @@ function Problem() {
 function HowItWorks() {
   const steps = [
     { n: '01', title: 'Connect once.', body: 'Log in with your AINS account. We capture your session, encrypt it, and never see your password again.', tag: 'one-time, ~20s', tagBg: 'bg-yellow' },
-    { n: '02', title: 'Pick how many.', body: '1 to 50 books per month. Choose Malay, English, Chinese, or Tamil. Change anytime in settings.', tag: 'fully configurable', tagBg: 'bg-[#FF8FA3]' },
+    { n: '02', title: 'Pick how many.', body: '1 to 150 books per year (credits). Choose Malay, English, Chinese, or Tamil. Change anytime in settings.', tag: 'fully configurable', tagBg: 'bg-[#FF8FA3]' },
     { n: '03', title: 'Sit back.', body: 'On day 1 of every month, Nila opens AINS, fills your records, and emails you when it\'s done.', tag: '99.2% success rate', tagBg: 'bg-[#A8E6A1]' },
   ]
   return (
@@ -261,7 +261,7 @@ function Pricing({ onGetStarted, onNavigateUpgrade }) {
           Free is plenty.<br /><span className="text-cobalt">Pro is for the busy.</span>
         </h2>
         <p className="text-ink/60 mt-3 font-medium text-base sm:text-lg">
-          RM 18/month — about one nasi lemak set. Zero monthly NILAM panic, ever.
+          RM 49.90/year — less than 4 nasi lemak. 150 book credits, zero yearly NILAM panic.
         </p>
         <div className="mt-12 grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-3xl">
           {/* Free */}
@@ -290,11 +290,11 @@ function Pricing({ onGetStarted, onNavigateUpgrade }) {
             </div>
             <p className="font-display font-black text-ink text-xs uppercase tracking-[0.25em]">Pro</p>
             <div className="flex items-baseline gap-2 mt-3">
-              <span className="font-display font-black text-ink text-6xl tracking-tighter">RM 18</span>
-              <span className="font-bold text-ink/60 text-sm">per month</span>
+              <span className="font-display font-black text-ink text-6xl tracking-tighter">RM 49.90</span>
+              <span className="font-bold text-ink/60 text-sm">per year</span>
             </div>
             <ul className="mt-5 space-y-2.5">
-              {['Up to 50 books / month', 'All 4 languages, mixed', 'Auto-submit every 1st of month', 'Priority support (we reply lah)', 'Cancel anytime'].map(f => (
+              {['150 book credits / year', 'Credits deducted only on success', 'All 4 languages, mixed', 'Auto-submit every 1st of month', 'Priority support (we reply lah)'].map(f => (
                 <li key={f} className="flex items-start gap-2.5 text-sm font-semibold text-ink">
                   <span className="w-5 h-5 rounded-md border-[2px] border-ink flex items-center justify-center flex-shrink-0 mt-[1px]" style={{ background: '#0F172A' }}>
                     <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M2 6.5l2.5 2.5L10 3" stroke="#F4F1EA" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
@@ -304,7 +304,7 @@ function Pricing({ onGetStarted, onNavigateUpgrade }) {
               ))}
             </ul>
             <button onClick={onNavigateUpgrade} className="mt-6 w-full chunky-btn chunky-btn--ink justify-center">
-              Go Pro — RM 18/mo →
+              Go Pro — RM 49.90/yr →
             </button>
           </div>
         </div>

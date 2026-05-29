@@ -194,8 +194,8 @@ export default function Settings() {
             </p>
             <p className="text-xs text-ink/55 font-medium mt-0.5">
               {planInfo.plan === 'free'   && '1 book/week · Upgrade to submit more'}
-              {planInfo.plan === 'plus'   && `30 books/month${planInfo.plan_expires_at ? ` · expires ${new Date(planInfo.plan_expires_at).toLocaleDateString('en-MY', { day: 'numeric', month: 'short', year: 'numeric' })}` : ''}`}
-              {planInfo.plan === 'family' && '50 books/month · Up to 3 AINS accounts'}
+              {planInfo.plan === 'plus'   && `150 credits/year${planInfo.plan_expires_at ? ` · expires ${new Date(planInfo.plan_expires_at).toLocaleDateString('en-MY', { day: 'numeric', month: 'short', year: 'numeric' })}` : ''}`}
+              {planInfo.plan === 'family' && '150 credits/year · Up to 3 AINS accounts'}
               {planInfo.plan === 'noob'   && 'Tester account · Unlimited'}
             </p>
           </div>

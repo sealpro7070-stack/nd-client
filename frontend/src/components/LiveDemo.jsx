@@ -122,7 +122,7 @@ export default function LiveDemo() {
               <div className="flex items-center justify-between gap-3 mb-5">
                 <div>
                   <p className="text-[11px] font-bold text-ink/50 uppercase tracking-wider mb-0.5">Books per submit</p>
-                  <p className="text-ink/50 text-xs">Pro plan · up to 50/month</p>
+                  <p className="text-ink/50 text-xs">Pro plan · 150 credits/year</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <button disabled={stage === 'submitting' || count <= 1} onClick={() => setCount(c => Math.max(1, c - 1))}

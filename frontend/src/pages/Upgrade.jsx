@@ -8,19 +8,18 @@ const FREE_FEATURES = [
   { label: 'Manual submit only',        ok: true  },
   { label: 'Email reminders',           ok: true  },
   { label: 'Auto-submit every month',   ok: false },
-  { label: 'Up to 30 books / month',    ok: false },
+  { label: '150 book credits / year',   ok: false },
   { label: 'All 4 languages',           ok: false },
   { label: 'Priority support',          ok: false },
 ]
 
 const PRO_FEATURES = [
-  { label: '30 books / month',             ok: true },
-  { label: '30 starter credits included',  ok: true },
-  { label: 'All 4 languages, mixed',       ok: true },
-  { label: 'Auto-submit on day 1',         ok: true },
-  { label: 'Email + SMS notifications',    ok: true },
+  { label: '150 book credits / year',         ok: true },
+  { label: 'Credits deducted on success only', ok: true },
+  { label: 'All 4 languages, mixed',          ok: true },
+  { label: 'Auto-submit on day 1',            ok: true },
+  { label: 'Email + SMS notifications',       ok: true },
   { label: 'Priority support (we reply lah)', ok: true },
-  { label: 'Cancel anytime',              ok: true },
 ]
 
 const BACKEND = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001'
@@ -45,8 +44,8 @@ export default function Upgrade() {
   const [creditSubmitting, setCreditSubmitting] = useState(false)
   const creditFileInputRef                      = useRef(null)
 
-  const price = 18
-  const sub   = 'per month'
+  const price = 49.90
+  const sub   = 'per year'
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -161,7 +160,7 @@ export default function Upgrade() {
             </span>.
           </h1>
           <p className="text-cream/80 font-medium mt-3 text-sm sm:text-base max-w-md">
-            50 books/month, all four languages, auto-submit, priority support. About one nasi lemak per month.
+            150 book credits/year, all four languages, auto-submit, priority support. Less than 4 nasi lemak a year.
           </p>
         </div>
       </div>

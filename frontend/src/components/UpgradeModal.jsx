@@ -8,13 +8,13 @@ const PLANS = [
   {
     id: 'plus',
     name: 'Pro',
-    price: 'RM18',
-    period: '/month',
-    books: '50 books/month',
+    price: 'RM49.90',
+    period: '/year',
+    books: '150 credits/year',
     badge: null,
     comingSoon: false,
     features: [
-      '50 books per month',
+      '150 book credits per year',
       'All 4 languages',
       'Auto-schedule',
       'Full submission history',
@@ -135,7 +135,7 @@ export default function UpgradeModal({ isOpen, onClose, currentPlan }) {
         <div className="bg-brand-600 text-white p-4 flex items-center justify-between flex-shrink-0">
           <h3 className="font-bold text-sm sm:text-base">
             {step === 'plans'   && 'Upgrade your plan'}
-            {step === 'payment' && `Pay for ${selectedPlan?.name} — ${selectedPlan?.price}/month`}
+            {step === 'payment' && `Pay for ${selectedPlan?.name} — ${selectedPlan?.price}/year`}
             {step === 'done'    && 'Payment submitted!'}
           </h3>
           <button onClick={handleClose} aria-label="Close modal" className="text-white/60 hover:text-white text-2xl leading-none">×</button>
