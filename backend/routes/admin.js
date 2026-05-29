@@ -138,6 +138,12 @@ router.post('/set-role', requireAdmin, async (req, res) => {
     .single()
 
   if (error) return res.status(500).json({ error: error.message })
+
+  // Grant 150 credits when assigning a paid plan
+  if (role === 'plus' || role === 'family') {
+    await supabase.rpc('add_credits', { target_user_id: userId, amount: 150 })
+  }
+
   res.json({ success: true, user: data })
 })
 

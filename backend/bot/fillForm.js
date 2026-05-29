@@ -48,8 +48,17 @@ async function fillForm(page, book, settings) {
   await page.waitForTimeout(2000)
   console.log(`[fillForm] Loaded ${page.url()}`)
 
+  // Detect session expiry — AINS redirects away from /record/add when session is invalid
+  const currentUrl = page.url()
+  if (!currentUrl.includes('/record/add')) {
+    console.warn(`[fillForm] Session expired — redirected to ${currentUrl}`)
+    const err = new Error('AINS session expired. Please reconnect your AINS account.')
+    err.code = 'SESSION_EXPIRED'
+    throw err
+  }
+
   // Click the "Buku/E-Buku" card
-  await page.locator('text=Buku/E-Buku').first().waitFor({ timeout: 10000 })
+  await page.locator('text=Buku/E-Buku').first().waitFor({ timeout: 15000 })
   await page.locator('text=Buku/E-Buku').first().click()
   await page.waitForTimeout(500)
 

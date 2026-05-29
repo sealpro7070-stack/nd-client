@@ -111,6 +111,10 @@ async function runBot({ user, settings, cookie, ssUser, ssProfile, cookies, book
 
       } catch (err) {
         console.error(`[bot] ✗ Failed: "${book.title}" — ${err.message}`)
+
+        // Session expired — stop all submissions, let outer catch handle it
+        if (err.code === 'SESSION_EXPIRED') throw err
+
         await takeScreenshot(page, `fail-${book.title.replace(/\s+/g, '-').slice(0, 20)}`)
 
         await supabase
@@ -139,6 +143,7 @@ async function runBot({ user, settings, cookie, ssUser, ssProfile, cookies, book
     if (browser) await browser.close().catch(() => {})
     const safeMsg = err.message.length > 200 ? err.message.substring(0, 200) + '...' : err.message
     await markSubmissions(submissions.map(s => s.id), 'failed', safeMsg)
+    if (err.code === 'SESSION_EXPIRED') return { success: false, reason: 'session_expired' }
     return { success: false, reason: err.message }
   }
 }

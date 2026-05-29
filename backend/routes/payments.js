@@ -246,9 +246,9 @@ router.post('/admin/review', requireAuth, requireAdmin, async (req, res) => {
         return res.status(500).json({ error: 'Payment approved but plan update failed. Please retry.' })
       }
 
-      // Grant 30 starter credits on plan approval
-      await supabase.rpc('add_credits', { target_user_id: pr.user_id, amount: 30 })
-        .catch(err => console.warn('[payments] Failed to grant starter credits:', err.message))
+      // Grant 150 credits on plan approval
+      await supabase.rpc('add_credits', { target_user_id: pr.user_id, amount: 150 })
+        .catch(err => console.warn('[payments] Failed to grant credits:', err.message))
     }
   }
 

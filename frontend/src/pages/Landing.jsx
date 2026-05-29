@@ -505,9 +505,12 @@ export default function Landing() {
 
   async function syncUserToBackend(user) {
     try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+      if (!token) return
       await fetch(`${BACKEND}/api/auth/register`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ id: user.id, email: user.email }),
       })
     } catch {}
