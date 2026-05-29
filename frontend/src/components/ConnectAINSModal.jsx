@@ -119,6 +119,7 @@ export default function ConnectAINSModal({ isOpen, onClose, onSuccess, targetUse
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
       body: JSON.stringify(body),
+      signal: AbortSignal.timeout(30000),
     }).catch(() => null)
 
     if (!res?.ok) {
