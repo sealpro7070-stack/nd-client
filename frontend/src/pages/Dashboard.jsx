@@ -52,10 +52,12 @@ export default function Dashboard() {
 
         const token = await getToken()
 
+        let referredBy
+        try { referredBy = localStorage.getItem('nilam_ref') || undefined } catch {}
         fetch(`${BACKEND}/api/auth/register`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-          body: JSON.stringify({ id: user.id, email: user.email }),
+          body: JSON.stringify({ id: user.id, email: user.email, referred_by: referredBy }),
           signal: AbortSignal.timeout(8000),
         }).catch(() => {})
 

@@ -195,7 +195,7 @@ router.get('/saved-email', requireAuth, async (req, res) => {
 // POST /api/auth/register
 // Body: { id, email, delima_id }
 router.post('/register', requireAuth, async (req, res) => {
-  const { id, email, delima_id } = req.body
+  const { id, email, delima_id, referred_by } = req.body
 
   if (!id || !email) {
     return res.status(400).json({ error: 'id and email are required' })
@@ -209,12 +209,29 @@ router.post('/register', requireAuth, async (req, res) => {
   try {
     const isAdmin = isAdminEmail(req.authUser.email)
 
+    // Validate referral code (only attach a real, active code).
+    // The upsert below ignores duplicates, so referred_by is only ever set
+    // when the row is first created — it can never be changed later.
+    let refCode = null
+    if (referred_by && typeof referred_by === 'string') {
+      const code = referred_by.trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 32)
+      if (code) {
+        const { data: rc } = await supabase
+          .from('referral_codes')
+          .select('code, active')
+          .eq('code', code)
+          .maybeSingle()
+        if (rc && rc.active) refCode = rc.code
+      }
+    }
+
     // register() is called on EVERY login. It must NOT clobber existing state
     // (plan, credits, is_active) — doing so previously deactivated paid users
     // on every sign-in. Insert defaults only for brand-new users; never update
     // an existing row's plan/credits/activation here.
     const insertPayload = { id, email, is_active: isAdmin, credits: 1 }
     if (delima_id) insertPayload.delima_id = delima_id
+    if (refCode) insertPayload.referred_by = refCode
 
     const { error: insertErr } = await supabase
       .from('users')

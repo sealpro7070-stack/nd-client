@@ -9,9 +9,15 @@ const isAdminEmail = (email) => !!email && ADMIN_EMAILS.includes(email)
 
 export default function Admin() {
   const navigate = useNavigate()
-  const [tab, setTab]           = useState('users')   // 'users' | 'payments' | 'settings'
+  const [tab, setTab]           = useState('users')   // 'users' | 'payments' | 'referrals' | 'settings'
   const [users, setUsers]       = useState([])
   const [payments, setPayments] = useState([])
+  // Referrals state
+  const [codes, setCodes]             = useState([])
+  const [commissions, setCommissions] = useState([])
+  const [commFilter, setCommFilter]   = useState('pending')
+  const [newCode, setNewCode]         = useState({ code: '', owner_name: '', owner_contact: '', rate: '10' })
+  const [creatingCode, setCreatingCode] = useState(false)
   const [loading, setLoading]   = useState(true)
   const [error, setError]       = useState(null)
   const [search, setSearch]     = useState('')
@@ -30,6 +36,7 @@ export default function Admin() {
 
   useEffect(() => { checkAdminAndLoad() }, [])
   useEffect(() => { if (tab === 'settings') fetchQrSettings() }, [tab])
+  useEffect(() => { if (tab === 'referrals') { fetchCodes(); fetchCommissions() } }, [tab, commFilter])
 
   async function checkAdminAndLoad() {
     const { data: { session } } = await supabase.auth.getSession()
@@ -118,6 +125,92 @@ export default function Admin() {
       showToast(action === 'approve' ? 'Plan activated!' : 'Request rejected.')
       // Also refresh users so plan column updates
       fetchUsers()
+    } catch (err) { showToast(err.message, 'error') }
+  }
+
+  // ── Referrals ──────────────────────────────────────────────
+  async function fetchCodes() {
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/referrals/admin/codes`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      setCodes(data.codes || [])
+    } catch (err) { showToast(err.message, 'error') }
+  }
+
+  async function fetchCommissions() {
+    try {
+      const url = `${BACKEND_URL}/api/referrals/admin/commissions${commFilter !== 'all' ? `?status=${commFilter}` : ''}`
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      setCommissions(data.commissions || [])
+    } catch (err) { showToast(err.message, 'error') }
+  }
+
+  async function createCode(e) {
+    e.preventDefault()
+    setCreatingCode(true)
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/referrals/admin/codes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          code: newCode.code,
+          owner_name: newCode.owner_name,
+          owner_contact: newCode.owner_contact,
+          rate: Number(newCode.rate) / 100,
+        })
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      setNewCode({ code: '', owner_name: '', owner_contact: '', rate: '10' })
+      showToast('Referral code created!')
+      fetchCodes()
+    } catch (err) { showToast(err.message, 'error') }
+    finally { setCreatingCode(false) }
+  }
+
+  async function toggleCode(code, active) {
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/referrals/admin/codes/toggle`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ code, active: !active })
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      setCodes(prev => prev.map(c => c.code === code ? { ...c, active: !active } : c))
+    } catch (err) { showToast(err.message, 'error') }
+  }
+
+  async function markCommissionPaid(body, label) {
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/referrals/admin/commissions/mark-paid`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(body)
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      showToast(`${label} marked paid (${data.updated})`)
+      fetchCommissions(); fetchCodes()
+    } catch (err) { showToast(err.message, 'error') }
+  }
+
+  async function voidCommission(commissionId) {
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/referrals/admin/commissions/void`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ commissionId })
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      showToast('Commission voided')
+      fetchCommissions(); fetchCodes()
     } catch (err) { showToast(err.message, 'error') }
   }
 
@@ -221,6 +314,7 @@ export default function Admin() {
           {[
             { id: 'users',    label: 'Users' },
             { id: 'payments', label: `Payments${pendingPayCount > 0 ? ` (${pendingPayCount})` : ''}` },
+            { id: 'referrals', label: 'Referrals' },
             { id: 'settings', label: 'Settings' },
           ].map(t => (
             <button
@@ -452,6 +546,170 @@ export default function Admin() {
             )}
           </>
         )}
+        {/* ── Referrals tab ── */}
+        {tab === 'referrals' && (
+          <div className="space-y-8">
+            {/* Create code */}
+            <div className="card-p">
+              <h2 className="font-display text-base font-bold text-heading mb-1">Create Referral Code</h2>
+              <p className="text-xs text-muted mb-4">Give a marketer a code. They share <code className="text-brand-600">nilamdesk.vercel.app/?ref=CODE</code>. You earn nothing; they earn the rate on each referred user's first paid order.</p>
+              <form onSubmit={createCode} className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <input
+                  type="text" placeholder="Code (e.g. AISHA)" value={newCode.code}
+                  onChange={e => setNewCode(n => ({ ...n, code: e.target.value.toUpperCase() }))}
+                  className="input" required
+                />
+                <input
+                  type="text" placeholder="Marketer name" value={newCode.owner_name}
+                  onChange={e => setNewCode(n => ({ ...n, owner_name: e.target.value }))}
+                  className="input" required
+                />
+                <input
+                  type="text" placeholder="Contact (phone / email, optional)" value={newCode.owner_contact}
+                  onChange={e => setNewCode(n => ({ ...n, owner_contact: e.target.value }))}
+                  className="input"
+                />
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number" min="0" max="100" step="1" placeholder="Rate %" value={newCode.rate}
+                    onChange={e => setNewCode(n => ({ ...n, rate: e.target.value }))}
+                    className="input flex-1"
+                  />
+                  <span className="text-sm text-muted font-semibold">% commission</span>
+                </div>
+                <button
+                  type="submit" disabled={creatingCode}
+                  className="sm:col-span-2 py-2.5 bg-brand-600 text-white rounded-xl font-bold text-sm hover:bg-brand-700 disabled:opacity-50 transition-colors"
+                >
+                  {creatingCode ? 'Creating…' : 'Create Code'}
+                </button>
+              </form>
+            </div>
+
+            {/* Codes list */}
+            <div>
+              <h2 className="font-display text-base font-bold text-heading mb-3">Marketers</h2>
+              {codes.length === 0 ? (
+                <div className="card-p text-center py-8 text-muted text-sm">No referral codes yet.</div>
+              ) : (
+                <div className="card p-0 overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-gray-50 border-b border-line text-left">
+                        <th className="px-5 py-3 text-xs font-bold text-muted uppercase tracking-wide">Code</th>
+                        <th className="px-5 py-3 text-xs font-bold text-muted uppercase tracking-wide">Marketer</th>
+                        <th className="px-5 py-3 text-xs font-bold text-muted uppercase tracking-wide text-center">Rate</th>
+                        <th className="px-5 py-3 text-xs font-bold text-muted uppercase tracking-wide text-center hidden sm:table-cell">Signups</th>
+                        <th className="px-5 py-3 text-xs font-bold text-muted uppercase tracking-wide text-center hidden sm:table-cell">Orders</th>
+                        <th className="px-5 py-3 text-xs font-bold text-muted uppercase tracking-wide text-right">Owed</th>
+                        <th className="px-5 py-3 text-xs font-bold text-muted uppercase tracking-wide text-center">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {codes.map((c, i) => (
+                        <tr key={c.code} className={`border-b border-line/50 ${i === codes.length - 1 ? 'border-0' : ''}`}>
+                          <td className="px-5 py-4">
+                            <div className="font-mono font-bold text-heading">{c.code}</div>
+                            <button
+                              onClick={() => {
+                                navigator.clipboard?.writeText(`${window.location.origin}/m?token=${c.view_token}`)
+                                showToast('Marketer dashboard link copied')
+                              }}
+                              className="text-xs font-semibold text-brand-600 hover:underline mt-0.5"
+                            >Copy dashboard link</button>
+                          </td>
+                          <td className="px-5 py-4">
+                            <div className="font-semibold text-heading">{c.owner_name}</div>
+                            {c.owner_contact && <div className="text-xs text-muted">{c.owner_contact}</div>}
+                          </td>
+                          <td className="px-5 py-4 text-center text-muted">{Math.round(c.rate * 100)}%</td>
+                          <td className="px-5 py-4 text-center text-muted hidden sm:table-cell">{c.stats?.signups ?? 0}</td>
+                          <td className="px-5 py-4 text-center text-muted hidden sm:table-cell">{c.stats?.orders ?? 0}</td>
+                          <td className="px-5 py-4 text-right">
+                            <span className="font-bold text-heading">RM{(c.stats?.pending_total ?? 0).toFixed(2)}</span>
+                            {(c.stats?.pending_total ?? 0) > 0 && (
+                              <button
+                                onClick={() => markCommissionPaid({ code: c.code }, c.code)}
+                                className="block ml-auto mt-1 text-xs font-bold text-ok-600 hover:underline"
+                              >Pay all</button>
+                            )}
+                          </td>
+                          <td className="px-5 py-4 text-center">
+                            <button
+                              onClick={() => toggleCode(c.code, c.active)}
+                              className={`text-xs font-semibold px-3 py-1.5 rounded-lg transition ${
+                                c.active ? 'bg-ok-50 text-ok-700 hover:bg-ok-100' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                              }`}
+                            >{c.active ? 'Active' : 'Disabled'}</button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* Commissions */}
+            <div>
+              <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+                <h2 className="font-display text-base font-bold text-heading">Commissions</h2>
+                <div className="flex gap-2">
+                  {['pending', 'paid', 'void', 'all'].map(f => (
+                    <button
+                      key={f}
+                      onClick={() => setCommFilter(f)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all capitalize ${
+                        commFilter === f
+                          ? 'bg-brand-600 text-white border-brand-600'
+                          : 'bg-white border-line text-muted hover:border-brand-300 hover:text-brand-600'
+                      }`}
+                    >{f}</button>
+                  ))}
+                </div>
+              </div>
+              {commissions.length === 0 ? (
+                <div className="card-p text-center py-8 text-muted text-sm">No commissions found.</div>
+              ) : (
+                <div className="space-y-3">
+                  {commissions.map(cm => (
+                    <div key={cm.id} className="card-p flex flex-col sm:flex-row items-start sm:items-center gap-3 justify-between">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-mono font-bold text-heading text-sm">{cm.code}</span>
+                          <span className={`text-xs font-bold px-2 py-0.5 rounded-full capitalize ${
+                            cm.status === 'pending' ? 'bg-amber-100 text-amber-700' :
+                            cm.status === 'paid'    ? 'bg-ok-100 text-ok-700' :
+                                                      'bg-gray-100 text-gray-500'
+                          }`}>{cm.status}</span>
+                        </div>
+                        <div className="text-xs text-muted mt-1 flex flex-wrap gap-3">
+                          <span>From: {cm.users?.email || (cm.referred_user_id?.slice(0, 8) ?? '') + '…'}</span>
+                          <span>Order RM{Number(cm.order_amount).toFixed(2)}</span>
+                          <span className="font-bold text-heading">Commission RM{Number(cm.commission_amount).toFixed(2)}</span>
+                          <span>{new Date(cm.created_at).toLocaleDateString('en-MY')}</span>
+                        </div>
+                      </div>
+                      {cm.status === 'pending' && (
+                        <div className="flex gap-2 flex-shrink-0">
+                          <button
+                            onClick={() => markCommissionPaid({ commissionId: cm.id }, cm.code)}
+                            className="text-xs font-bold px-4 py-2 bg-ok-500 text-white rounded-lg hover:bg-ok-600 transition"
+                          >Mark Paid</button>
+                          <button
+                            onClick={() => voidCommission(cm.id)}
+                            className="text-xs font-bold px-4 py-2 bg-danger-50 text-danger-600 rounded-lg hover:bg-danger-100 transition"
+                          >Void</button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* ── Settings tab ── */}
         {tab === 'settings' && (
           <div className="max-w-md space-y-6">

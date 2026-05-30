@@ -241,6 +241,36 @@ router.post('/admin/review', requireAuth, requireAdmin, async (req, res) => {
           .eq('id', requestId)
         return res.status(500).json({ error: 'Payment approved but plan update failed. Please retry.' })
       }
+
+      // Record a referral commission for the marketer who referred this user.
+      // First-order-only is enforced by UNIQUE(referred_user_id), so the upsert
+      // is a no-op if a commission already exists. Non-blocking: a failure here
+      // must not undo a successful plan grant.
+      try {
+        const { data: refUser } = await supabase
+          .from('users').select('referred_by').eq('id', pr.user_id).single()
+
+        if (refUser?.referred_by) {
+          const { data: rc } = await supabase
+            .from('referral_codes')
+            .select('code, rate, active')
+            .eq('code', refUser.referred_by)
+            .maybeSingle()
+
+          if (rc && rc.active) {
+            const commission = Math.round(pr.amount * Number(rc.rate) * 100) / 100
+            await supabase.from('referral_commissions').upsert({
+              code:               rc.code,
+              referred_user_id:   pr.user_id,
+              payment_request_id: pr.id,
+              order_amount:       pr.amount,
+              commission_amount:  commission,
+            }, { onConflict: 'referred_user_id', ignoreDuplicates: true })
+          }
+        }
+      } catch (e) {
+        console.error('[payments] referral commission record failed:', e.message)
+      }
     }
   }
 

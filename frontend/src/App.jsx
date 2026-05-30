@@ -10,6 +10,7 @@ import Upgrade   from './pages/Upgrade'
 import Guide     from './pages/Guide'
 import Privacy       from './pages/Privacy'
 import Terms         from './pages/Terms'
+import Marketer      from './pages/Marketer'
 import ResetPassword from './pages/ResetPassword'
 import Navbar    from './components/Navbar'
 
@@ -44,6 +45,7 @@ function App() {
       <Route path="/guide"     element={<AuthGuard><AppLayout><Guide /></AppLayout></AuthGuard>} />
       <Route path="/privacy"        element={<Privacy />} />
       <Route path="/terms"          element={<Terms />} />
+      <Route path="/m"              element={<Marketer />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="*"          element={<Navigate to="/" replace />} />
     </Routes>

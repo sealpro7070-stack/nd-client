@@ -485,6 +485,16 @@ const [agreedToTerms, setAgreedToTerms] = useState(false)
   const [forgotSent, setForgotSent]     = useState(false)
 
   useEffect(() => {
+    // Capture a referral code from the URL (?ref=CODE) and remember it so it can
+    // be attached when the user signs up — even if they sign up minutes later.
+    try {
+      const ref = new URLSearchParams(window.location.search).get('ref')
+      if (ref) {
+        const code = ref.trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 32)
+        if (code) localStorage.setItem('nilam_ref', code)
+      }
+    } catch {}
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_IN' && session?.user) {
         if (session.user.app_metadata?.provider) syncUserToBackend(session.user)
@@ -499,10 +509,12 @@ const [agreedToTerms, setAgreedToTerms] = useState(false)
       const { data: { session } } = await supabase.auth.getSession()
       const token = session?.access_token
       if (!token) return
+      let referred_by
+      try { referred_by = localStorage.getItem('nilam_ref') || undefined } catch {}
       await fetch(`${BACKEND}/api/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ id: user.id, email: user.email }),
+        body: JSON.stringify({ id: user.id, email: user.email, referred_by }),
       })
     } catch {}
   }
