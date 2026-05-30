@@ -240,12 +240,41 @@ export default function Upgrade() {
             </div>
           </div>
 
-          {/* QR reminder */}
-          <div className="bg-yellow/40 border-[2px] border-ink rounded-xl px-4 py-3 flex items-start gap-2">
-            <span className="text-base leading-none flex-shrink-0">💡</span>
-            <div className="text-[11px] font-bold text-ink leading-snug space-y-0.5">
-              <p>Scan the same DuitNow QR on the Pro section above.</p>
-              <p>Pay exactly <span className="text-cobalt">RM {creditAmount}.00</span>, upload your receipt below.</p>
+          {/* QR + pay instructions */}
+          <div className="bg-cream border-[2.5px] border-ink rounded-xl overflow-hidden sm:flex">
+            <div className="bg-white p-4 flex flex-col items-center justify-center border-b-[2.5px] sm:border-b-0 sm:border-r-[2.5px] border-ink">
+              {qrData ? (
+                <img src={qrData} alt="DuitNow QR" className="w-44 h-44 object-contain rounded-lg border-[2px] border-ink" />
+              ) : (
+                <QrCodeSVG size={170} />
+              )}
+              <p className="font-mono text-[10px] font-bold text-ink/50 mt-3 uppercase tracking-wider">
+                Scan with any e-wallet
+              </p>
+            </div>
+            <div className="p-4 sm:p-5 flex-1 space-y-3">
+              <div>
+                <p className="font-mono text-cobalt text-[10px] font-bold tracking-[0.3em] uppercase">// step 1</p>
+                <p className="font-display font-black text-ink text-sm mt-1">
+                  Scan the QR to pay <span className="text-cobalt">RM {creditAmount}.00</span>
+                </p>
+                <p className="text-[11px] text-ink/55 font-medium mt-1">
+                  Works with TNG eWallet, Maybank2u, GrabPay, Boost, MAE — anything that supports DuitNow QR.
+                </p>
+              </div>
+              <div className="border-t-[2px] border-ink/10 pt-3">
+                <p className="font-mono text-cobalt text-[10px] font-bold tracking-[0.3em] uppercase">// step 2</p>
+                <p className="font-display font-black text-ink text-sm mt-1">Upload your receipt below</p>
+                <p className="text-[11px] text-ink/55 font-medium mt-1">
+                  Screenshot from your banking app works. Credits are added within 5 minutes after we verify.
+                </p>
+              </div>
+              <div className="bg-yellow/40 border-[2px] border-ink rounded-lg px-3 py-2 flex items-start gap-2">
+                <span className="text-base leading-none">💡</span>
+                <span className="text-[11px] font-bold text-ink leading-snug">
+                  Pay <span className="text-cobalt">exactly RM {creditAmount}.00</span> and add your name in the payment reference so we can match it faster.
+                </span>
+              </div>
             </div>
           </div>
 
