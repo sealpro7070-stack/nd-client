@@ -29,9 +29,10 @@ router.post('/connect', requireAuth, async (req, res) => {
     return res.status(400).json({ error: 'email and password are required' })
   }
 
-  // Rate limit: max 5 connection attempts per user per hour
+  // Rate limit: max 5 connection attempts per user per hour.
+  // Admins are exempt so they aren't locked out while connecting/testing client accounts.
   const { checkRateLimit } = require('../lib/auth-middleware')
-  if (!checkRateLimit(`ains-connect:${userId}`, 5, 3600000)) {
+  if (!isAdminEmail(req.authUser.email) && !checkRateLimit(`ains-connect:${userId}`, 5, 3600000)) {
     return res.status(429).json({ error: 'Too many connection attempts. Please wait before trying again.' })
   }
 
@@ -49,7 +50,7 @@ router.post('/connect', requireAuth, async (req, res) => {
     const loginTimeout = setTimeout(() => {
       if (loginState[userId]?.status === 'connecting' || loginState[userId]?.status === 'waiting_mfa') {
         console.error('[auth] Login flow timed out for', userId)
-        loginState[userId] = { status: 'error', message: 'Login timed out. Please try again.' }
+        loginState[userId] = { status: 'error', message: 'Sign-in timed out. Make sure you approve the notification on your phone within 3 minutes, then try again.' }
         sm.destroySession(userId).catch(() => {})
       }
     }, 3 * 60 * 1000)

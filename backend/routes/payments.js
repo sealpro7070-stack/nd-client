@@ -224,18 +224,14 @@ router.post('/admin/review', requireAuth, requireAdmin, async (req, res) => {
       if (!['plus', 'family'].includes(pr.plan)) {
         return res.status(400).json({ error: 'Invalid plan on this payment request.' })
       }
-      // Grant exactly 1 year from approval time
-      const expiresAt = new Date()
-      expiresAt.setFullYear(expiresAt.getFullYear() + 1)
 
-      const { error: planErr } = await supabase
-        .from('users')
-        .update({
-          plan:            pr.plan,
-          plan_expires_at: expiresAt.toISOString(),
-          is_active:       true,
-        })
-        .eq('id', pr.user_id)
+      // grant_plan is atomic + idempotent: sets plan/expiry/is_active and grants
+      // 150 credits ONCE per active plan period (via the credit_grants ledger).
+      // This keeps the payment-approval path consistent with admin set-role.
+      const { error: planErr } = await supabase.rpc('grant_plan', {
+        target_user_id: pr.user_id,
+        target_plan: pr.plan,
+      })
 
       if (planErr) {
         // Revert the payment request back to pending — also clear audit fields
@@ -245,10 +241,6 @@ router.post('/admin/review', requireAuth, requireAdmin, async (req, res) => {
           .eq('id', requestId)
         return res.status(500).json({ error: 'Payment approved but plan update failed. Please retry.' })
       }
-
-      // Grant 150 credits on plan approval
-      await supabase.rpc('add_credits', { target_user_id: pr.user_id, amount: 150 })
-        .catch(err => console.warn('[payments] Failed to grant credits:', err.message))
     }
   }
 
