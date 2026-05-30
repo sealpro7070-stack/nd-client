@@ -463,6 +463,7 @@ function Footer() {
         </div>
         <p className="font-mono text-cream/30 text-xs">© 2026 NilamDesk — submit gracefully.</p>
         <div className="flex items-center gap-4">
+          <a href="https://discord.gg/ZmXMFSpZnb" target="_blank" rel="noopener noreferrer" className="text-cream/40 text-xs hover:text-cream/70 font-bold transition-colors">Discord</a>
           <Link to="/terms" className="text-cream/40 text-xs hover:text-cream/70 font-bold transition-colors">Terms of Use</Link>
           <Link to="/privacy" className="text-cream/40 text-xs hover:text-cream/70 font-bold transition-colors">Privacy Policy</Link>
         </div>
