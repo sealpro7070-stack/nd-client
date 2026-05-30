@@ -59,17 +59,28 @@ router.get('/users', requireAdmin, async (req, res) => {
   const publicMap = {}
   for (const u of (publicUsers || [])) publicMap[u.id] = u
 
-  // 4. Fetch submission counts
+  // 4. Fetch submission counts via aggregated RPC (prevents OOM with large datasets)
   const userIds = authUsers.map(u => u.id)
-  const { data: subCounts } = userIds.length
-    ? await supabase.from('submissions').select('user_id, status').in('user_id', userIds)
-    : { data: [] }
-
-  const countMap = {}
-  for (const s of (subCounts || [])) {
-    if (!countMap[s.user_id]) countMap[s.user_id] = { total: 0, success: 0 }
-    countMap[s.user_id].total++
-    if (s.status === 'success') countMap[s.user_id].success++
+  let countMap = {}
+  if (userIds.length > 0) {
+    try {
+      const { data: aggCounts } = await supabase.rpc('get_admin_submission_counts', { p_user_ids: userIds })
+      for (const row of (aggCounts || [])) {
+        countMap[row.user_id] = { total: parseInt(row.total || 0), success: parseInt(row.success || 0) }
+      }
+    } catch (rpcErr) {
+      console.error('[admin] RPC aggregation failed, falling back to limited query:', rpcErr.message)
+      const { data: subCounts } = await supabase
+        .from('submissions')
+        .select('user_id, status')
+        .in('user_id', userIds)
+        .limit(5000)
+      for (const s of (subCounts || [])) {
+        if (!countMap[s.user_id]) countMap[s.user_id] = { total: 0, success: 0 }
+        countMap[s.user_id].total++
+        if (s.status === 'success') countMap[s.user_id].success++
+      }
+    }
   }
 
   // 5. Merge everything
@@ -122,7 +133,10 @@ router.post('/set-role', requireAdmin, async (req, res) => {
     target_plan: role,
   })
 
-  if (error) return res.status(500).json({ error: error.message })
+  if (error) {
+    console.error('[admin] set-role error:', error.message)
+    return res.status(500).json({ error: 'Internal server error' })
+  }
 
   const result = Array.isArray(data) ? data[0] : data
   res.json({
@@ -146,7 +160,10 @@ router.post('/activate', requireAdmin, async (req, res) => {
     .select('id, email, is_active')
     .single()
 
-  if (error) return res.status(500).json({ error: error.message })
+  if (error) {
+    console.error('[admin] activate error:', error.message)
+    return res.status(500).json({ error: 'Internal server error' })
+  }
 
   res.json({ success: true, user: data })
 })

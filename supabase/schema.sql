@@ -11,7 +11,7 @@ create table if not exists users (
   ains_cookie_encrypted text,
   is_active boolean default false,
   -- Plan management
-  plan text default 'free' check (plan in ('free','plus','family','noob')),
+  plan text default 'free' check (plan in ('free','plus','family','noob','tester')),
   plan_expires_at timestamp with time zone,
   -- Encrypted AINS credentials
   ains_email_encrypted text,
@@ -100,16 +100,9 @@ create policy "Users can insert own settings" on settings
 create policy "Users can update own settings" on settings
   for update using (auth.uid() = user_id);
 
--- Submissions: only own submissions
+-- Submissions: only own submissions (INSERT removed — only backend service_role can create submissions)
 create policy "Users can view own submissions" on submissions
   for select using (auth.uid() = user_id);
-create policy "Users can insert own submissions" on submissions
-  for insert with check (
-    auth.uid() = user_id AND
-    (family_slot_id IS NULL OR EXISTS (
-      SELECT 1 FROM family_slots WHERE id = family_slot_id AND user_id = auth.uid()
-    ))
-  );
 
 -- Books: readable by all authenticated users
 create policy "Books are readable by authenticated users" on books

@@ -76,7 +76,7 @@ router.post('/request', requireAuth, async (req, res) => {
     return res.status(400).json({ error: 'Reference must be 100 characters or fewer.' })
   }
 
-  // Validate receipt MIME type — prevents XSS via SVG/script injection in admin lightbox
+  // Validate receipt MIME type + magic bytes — prevents XSS via SVG/script injection
   if (receipt_data) {
     const ALLOWED_MIME_PREFIXES = ['data:image/jpeg;', 'data:image/png;', 'data:image/webp;', 'data:image/gif;']
     const isValidImage = ALLOWED_MIME_PREFIXES.some(p => receipt_data.startsWith(p))
@@ -86,6 +86,21 @@ router.post('/request', requireAuth, async (req, res) => {
     // Backend size guard: ~6MB base64 ≈ 4.5MB file
     if (receipt_data.length > 6_000_000) {
       return res.status(400).json({ error: 'Receipt image must be under 5MB.' })
+    }
+    // Magic-bytes validation: verify the base64 payload starts with actual image signatures
+    try {
+      const base64Body = receipt_data.split(',')[1]
+      const buffer = Buffer.from(base64Body, 'base64')
+      const isPng = buffer.slice(0, 8).equals(Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]))
+      const isJpg = buffer.slice(0, 2).equals(Buffer.from([0xFF, 0xD8]))
+      const isGif = buffer.slice(0, 6).equals(Buffer.from([0x47, 0x49, 0x46, 0x38, 0x39, 0x61])) ||
+                    buffer.slice(0, 6).equals(Buffer.from([0x47, 0x49, 0x46, 0x38, 0x37, 0x61]))
+      const isWebp = buffer.slice(8, 12).equals(Buffer.from([0x57, 0x45, 0x42, 0x50])) // RIFF....WEBP
+      if (!isPng && !isJpg && !isGif && !isWebp) {
+        return res.status(400).json({ error: 'Receipt image failed integrity check.' })
+      }
+    } catch {
+      return res.status(400).json({ error: 'Invalid receipt image data.' })
     }
   }
 
@@ -298,6 +313,21 @@ router.post('/credits/request', requireAuth, async (req, res) => {
   }
   if (receipt_data.length > 6_000_000) {
     return res.status(400).json({ error: 'Receipt image must be under 5MB.' })
+  }
+  // Magic-bytes validation
+  try {
+    const base64Body = receipt_data.split(',')[1]
+    const buffer = Buffer.from(base64Body, 'base64')
+    const isPng = buffer.slice(0, 8).equals(Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]))
+    const isJpg = buffer.slice(0, 2).equals(Buffer.from([0xFF, 0xD8]))
+    const isGif = buffer.slice(0, 6).equals(Buffer.from([0x47, 0x49, 0x46, 0x38, 0x39, 0x61])) ||
+                  buffer.slice(0, 6).equals(Buffer.from([0x47, 0x49, 0x46, 0x38, 0x37, 0x61]))
+    const isWebp = buffer.slice(8, 12).equals(Buffer.from([0x57, 0x45, 0x42, 0x50]))
+    if (!isPng && !isJpg && !isGif && !isWebp) {
+      return res.status(400).json({ error: 'Receipt image failed integrity check.' })
+    }
+  } catch {
+    return res.status(400).json({ error: 'Invalid receipt image data.' })
   }
 
   // Block if already has a pending credit top-up request

@@ -9,6 +9,22 @@ const sm = require('../lib/session-manager')
 // In-memory login state per user
 // status: 'connecting' | 'waiting_mfa' | 'success' | 'error'
 const loginState = {}
+const connectLocks = new Map()
+
+async function withConnectLock(userId, fn) {
+  while (connectLocks.has(userId)) {
+    try { await connectLocks.get(userId) } catch {}
+  }
+  let resolve
+  const promise = new Promise(r => { resolve = r })
+  connectLocks.set(userId, promise)
+  try {
+    return await fn()
+  } finally {
+    connectLocks.delete(userId)
+    resolve()
+  }
+}
 
 // POST /api/auth/connect
 // Starts a silent Playwright login flow server-side. Returns immediately; poll /connect-status for progress.
@@ -36,8 +52,8 @@ router.post('/connect', requireAuth, async (req, res) => {
     return res.status(429).json({ error: 'Too many connection attempts. Please wait before trying again.' })
   }
 
-  // If a login is already in progress for this user, reject
-  if (loginState[userId]?.status === 'connecting' || loginState[userId]?.status === 'waiting_mfa') {
+  // Atomic connect lock: prevents race-condition double browser spawn
+  if (connectLocks.has(userId)) {
     return res.status(409).json({ error: 'Login already in progress' })
   }
 
@@ -45,7 +61,7 @@ router.post('/connect', requireAuth, async (req, res) => {
   res.json({ status: 'connecting' })
 
   // Run login flow asynchronously — client polls /connect-status
-  ;(async () => {
+  await withConnectLock(userId, async () => {
     // Hard timeout: if login doesn't complete in 3 minutes, give up
     const loginTimeout = setTimeout(() => {
       if (loginState[userId]?.status === 'connecting' || loginState[userId]?.status === 'waiting_mfa') {
@@ -77,15 +93,21 @@ router.post('/connect', requireAuth, async (req, res) => {
           if (ainsId) {
             const hash = crypto.createHash('sha256').update(String(ainsId)).digest('hex')
 
-            const { data: conflict } = await supabase
+            const { data: userConflict } = await supabase
               .from('users')
               .select('id')
               .eq('ains_user_id_hash', hash)
               .neq('id', userId)
               .maybeSingle()
 
-            if (conflict) {
-              loginState[userId] = { status: 'error', message: 'This AINS account is already connected to another NilamDesk account.' }
+            const { data: slotConflict } = await supabase
+              .from('family_slots')
+              .select('id')
+              .eq('ains_user_id_hash', hash)
+              .maybeSingle()
+
+            if (userConflict || slotConflict) {
+              loginState[userId] = { status: 'error', message: 'This AINS account is already connected to another NilamDesk account or slot.' }
               return
             }
 
@@ -118,8 +140,8 @@ router.post('/connect', requireAuth, async (req, res) => {
         }))
       })
 
-      const encrypted = encrypt(sessionData)
-      const encryptedEmail = encrypt(email)
+      const encrypted = encrypt(sessionData, userId)
+      const encryptedEmail = encrypt(email, userId)
 
       const { error } = await supabase
         .from('users')
@@ -144,7 +166,7 @@ router.post('/connect', requireAuth, async (req, res) => {
     }
     // Auto-cleanup: if client never polls for the result, remove after 10 minutes
     setTimeout(() => { delete loginState[userId] }, 10 * 60 * 1000)
-  })()
+  })
 })
 
 // GET /api/auth/connect-status
@@ -183,7 +205,7 @@ router.get('/saved-email', requireAuth, async (req, res) => {
       .single()
 
     if (data?.ains_email_encrypted) {
-      const email = decrypt(data.ains_email_encrypted)
+      const email = decrypt(data.ains_email_encrypted, userId)
       return res.json({ email })
     }
     res.json({ email: '' })

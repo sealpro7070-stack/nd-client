@@ -17,7 +17,34 @@ const PLAN_MAX = { free: 1, tester: 10, plus: 30, family: 50, noob: 999 }
 // Per-user/slot lock: prevents simultaneous bot runs for the same user
 const activeBotRuns = new Map()
 
-async function withLock(key, fn) {
+// Global browser semaphore: caps total concurrent Playwright instances (~150-300 MB each)
+const MAX_CONCURRENT_BROWSERS = parseInt(process.env.MAX_CONCURRENT_BROWSERS, 10) || 5
+let activeBrowserCount = 0
+const browserWaitQueue = []
+
+async function acquireBrowserSlot(timeoutMs = 30000) {
+  if (activeBrowserCount < MAX_CONCURRENT_BROWSERS) {
+    activeBrowserCount++
+    return () => { activeBrowserCount-- ; releaseBrowserSlot() }
+  }
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('Browser pool full — try again later')), timeoutMs)
+    browserWaitQueue.push((releaseFn) => {
+      clearTimeout(timer)
+      resolve(releaseFn)
+    })
+  })
+}
+
+function releaseBrowserSlot() {
+  if (browserWaitQueue.length > 0 && activeBrowserCount < MAX_CONCURRENT_BROWSERS) {
+    activeBrowserCount++
+    const next = browserWaitQueue.shift()
+    next(() => { activeBrowserCount-- ; releaseBrowserSlot() })
+  }
+}
+
+async function withLock(key, fn, timeoutMs = 180000) {
   // Wait for any existing run on this key to finish
   while (activeBotRuns.has(key)) {
     try { await activeBotRuns.get(key) } catch { /* ignore errors from previous run */ }
@@ -26,7 +53,10 @@ async function withLock(key, fn) {
   const promise = new Promise(r => { resolve = r })
   activeBotRuns.set(key, promise)
   try {
-    return await fn()
+    return await Promise.race([
+      fn(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Bot run timed out')), timeoutMs))
+    ])
   } finally {
     activeBotRuns.delete(key)
     resolve()
@@ -105,7 +135,7 @@ async function _startBot(userId, directCookie, directSsUser, directSsProfile, di
   // 3. Decrypt and parse AINS session data
   let ssToken = null, ssUser = null, ssProfile = null, cookiesToInject = []
   try {
-    const rawDecrypted = decrypt(user.ains_cookie_encrypted)
+    const rawDecrypted = decrypt(user.ains_cookie_encrypted, userId)
 
     try {
       // New format: JSON with ssToken, ssUser, ssProfile, cookies
@@ -159,7 +189,7 @@ async function _startBot(userId, directCookie, directSsUser, directSsProfile, di
     .select('book_id')
     .eq('user_id', userId)
     .is('family_slot_id', null)
-    .in('status', ['success'])
+    .in('status', ['success', 'pending'])
 
   if (isFree) {
     // Weekly window: Monday 00:00:00 to now
@@ -249,17 +279,24 @@ async function _startBot(userId, directCookie, directSsUser, directSsProfile, di
   if (insertErr) throw new Error(`Failed to create submission records: ${insertErr.message}`)
   if (!insertedSubs) throw new Error('Failed to create submission records: no data returned')
 
-  // 8. Run the browser bot with injected session
-  const result = await runBot({
-    user,
-    settings: userSettings,
-    cookie: ssToken,
-    ssUser,
-    ssProfile,
-    cookies: cookiesToInject,
-    books: shuffled,
-    submissions: insertedSubs,
-  })
+  // 8. Run the browser bot with injected session (global semaphore)
+  let releaseBrowser
+  let result
+  try {
+    releaseBrowser = await acquireBrowserSlot()
+    result = await runBot({
+      user,
+      settings: userSettings,
+      cookie: ssToken,
+      ssUser,
+      ssProfile,
+      cookies: cookiesToInject,
+      books: shuffled,
+      submissions: insertedSubs,
+    })
+  } finally {
+    if (releaseBrowser) releaseBrowser()
+  }
 
   // 9. Deduct credits for successful submissions
   if (!isAdminUser) {
@@ -305,10 +342,14 @@ async function _startBotForSlot(userId, slotId, slot) {
   const planExpired = user.plan_expires_at && new Date(user.plan_expires_at) < new Date()
   if (user.plan !== 'family' || planExpired) throw new Error('Family plan required or has expired.')
 
+  // Credit check for family slots
+  const isAdminUser = isAdminEmail(user.email)
+  const creditBalance = isAdminUser ? Infinity : (user.credits || 0)
+
   // Decrypt slot session — supports both new JSON format and legacy plain-cookie
   let ssToken = null, ssUser = null, ssProfile = null, cookiesToInject = []
   try {
-    const raw = decrypt(slot.ains_cookie_encrypted)
+    const raw = decrypt(slot.ains_cookie_encrypted, slotId)
     try {
       const sessionData = JSON.parse(raw)
       ssToken = sessionData.ssToken
@@ -378,16 +419,47 @@ async function _startBotForSlot(userId, slotId, slot) {
   if (insertErr) throw new Error(`Failed to create slot submission records: ${insertErr.message}`)
   if (!insertedSubs) throw new Error('Failed to create slot submission records: no data returned')
 
-  const result = await runBot({
-    user,
-    settings: { language: slot.language || 'Melayu', books_per_month: slot.books_per_month || 4 },
-    cookie: ssToken,
-    ssUser,
-    ssProfile,
-    cookies: cookiesToInject,
-    books: shuffled,
-    submissions: insertedSubs,
-  })
+  // Credit check: require credits for family slot books
+  if (!isAdminUser && creditBalance <= 0) {
+    throw new Error('No credits remaining. Top up credits to continue submitting.')
+  }
+
+  // Run bot under global browser semaphore
+  let releaseBrowser
+  let result
+  try {
+    releaseBrowser = await acquireBrowserSlot()
+    result = await runBot({
+      user,
+      settings: { language: slot.language || 'Melayu', books_per_month: slot.books_per_month || 4 },
+      cookie: ssToken,
+      ssUser,
+      ssProfile,
+      cookies: cookiesToInject,
+      books: shuffled,
+      submissions: insertedSubs,
+    })
+  } finally {
+    if (releaseBrowser) releaseBrowser()
+  }
+
+  // Deduct credits for successful family slot submissions
+  if (!isAdminUser) {
+    try {
+      const { data: finalSubs } = await supabase
+        .from('submissions')
+        .select('status')
+        .in('id', insertedSubs.map(s => s.id))
+
+      const successCount = finalSubs?.filter(s => s.status === 'success').length || 0
+      if (successCount > 0) {
+        await supabase.rpc('add_credits', { target_user_id: userId, amount: -successCount })
+        console.log(`[bot] Deducted ${successCount} credit(s) for family slot ${slotId}`)
+      }
+    } catch (err) {
+      console.warn('[bot] Credit deduction for family slot failed:', err.message)
+    }
+  }
 
   return result
 }

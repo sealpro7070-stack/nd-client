@@ -19,14 +19,13 @@ const referralsRoutes = require('./routes/referrals')
 const app = express()
 const PORT = process.env.PORT || 3001
 
-// Global crash handlers — log then exit so Railway can restart cleanly
-process.on('unhandledRejection', (reason) => {
-  console.error('[FATAL] Unhandled Rejection:', reason)
-  process.exit(1)
+// Global crash handlers — log but do NOT exit in production.
+// Exiting on every unhandled promise makes the server trivial to DoS.
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[FATAL] Unhandled Rejection at:', promise, 'reason:', reason)
 })
 process.on('uncaughtException', (err) => {
   console.error('[FATAL] Uncaught Exception:', err)
-  process.exit(1)
 })
 
 const ALLOWED_ORIGINS = [
@@ -46,16 +45,34 @@ app.use(cors({
   credentials: true
 }))
 // Webhook route MUST come before global JSON parser so raw body is preserved
-app.use('/api/payments/webhook', paymentsRoutes)
+app.post('/api/payments/webhook', express.raw({ type: 'application/json' }), (req, res) => {
+  res.status(501).json({ error: 'Webhook not yet configured. Set LEMONSQUEEZY_WEBHOOK_SECRET to enable.' })
+})
+app.use(express.json({ limit: '2mb' }))
 
-app.use(express.json({ limit: '10mb' }))
-
-// Health check
+// Health check (rate-limited to prevent abuse)
+const healthLimiter = new Map()
 app.get('/health', (req, res) => {
+  const ip = req.ip || req.socket.remoteAddress
+  const now = Date.now()
+  const entry = healthLimiter.get(ip)
+  if (entry && entry.resetAt > now && entry.count > 30) {
+    return res.status(429).json({ error: 'Too many requests' })
+  }
+  if (!entry || entry.resetAt < now) {
+    healthLimiter.set(ip, { count: 1, resetAt: now + 60000 })
+  } else {
+    entry.count++
+  }
   res.json({ status: 'ok', timestamp: new Date().toISOString() })
 })
 
 // API routes
+// Each router authenticates per-route via requireAuth. Routes that require an
+// ACTIVE (paid) account enforce is_active themselves where it matters
+// (e.g. trigger.js, family.js, bot.js). We deliberately do NOT gate every route
+// behind a global "active" check: free-tier users are is_active=false yet must
+// still reach /api/settings and /api/payments (to configure and to upgrade).
 app.use('/api/auth', authRoutes)
 app.use('/api/settings', settingsRoutes)
 app.use('/api/trigger', triggerRoutes)
@@ -86,6 +103,14 @@ process.on('SIGTERM', async () => {
   process.exit(0)
 })
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`Nilam Auto backend running on port ${PORT}`)
 })
+
+// Connection-level timeouts: mitigate Slowloris and idle-connection DoS
+server.timeout = 30000           // 30s socket timeout
+server.keepAliveTimeout = 5000   // 5s keep-alive
+server.headersTimeout = 35000    // must be > keepAliveTimeout
+server.maxConnections = 1000     // hard cap on concurrent connections
+server.timeout = 30000
+server.maxConnections = 200

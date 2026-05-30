@@ -12,17 +12,18 @@ function getKey() {
   throw new Error('ENCRYPTION_KEY must be 64 hex characters (32 bytes)')
 }
 
-function encrypt(plaintext) {
+function encrypt(plaintext, aad = '') {
   const key = getKey()
   const iv = crypto.randomBytes(IV_LENGTH)
   const cipher = crypto.createCipheriv(ALGORITHM, key, iv)
+  if (aad) cipher.setAAD(Buffer.from(aad, 'utf8'))
   const encrypted = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()])
   const tag = cipher.getAuthTag()
   // Format: iv:tag:encrypted (all hex)
   return `${iv.toString('hex')}:${tag.toString('hex')}:${encrypted.toString('hex')}`
 }
 
-function decrypt(ciphertext) {
+function decrypt(ciphertext, aad = '') {
   const key = getKey()
   const [ivHex, tagHex, encryptedHex] = ciphertext.split(':')
   if (!ivHex || !tagHex || !encryptedHex) throw new Error('Invalid ciphertext format')
@@ -31,6 +32,7 @@ function decrypt(ciphertext) {
   const encrypted = Buffer.from(encryptedHex, 'hex')
   const decipher = crypto.createDecipheriv(ALGORITHM, key, iv)
   decipher.setAuthTag(tag)
+  if (aad) decipher.setAAD(Buffer.from(aad, 'utf8'))
   return decipher.update(encrypted, undefined, 'utf8') + decipher.final('utf8')
 }
 

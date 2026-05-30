@@ -11,7 +11,7 @@ const router   = express.Router()
 const crypto   = require('crypto')
 const supabase = require('../lib/supabase')
 const { encrypt, decrypt } = require('../lib/crypto')
-const { requireAuth, checkRateLimit } = require('../lib/auth-middleware')
+const { requireAuth, requireActive, checkRateLimit } = require('../lib/auth-middleware')
 const sm       = require('../lib/session-manager')
 const { startBotForSlot } = require('../bot/bot')
 
@@ -36,11 +36,12 @@ function scheduleSlotCleanup(stateKey) {
 async function requireFamily(req, res, next) {
   const { data: user, error: dbError } = await supabase
     .from('users')
-    .select('plan, plan_expires_at')
+    .select('plan, plan_expires_at, is_active')
     .eq('id', req.authUser.id)
     .single()
 
   if (dbError) return res.status(500).json({ error: 'Could not verify plan' })
+  if (!user?.is_active) return res.status(403).json({ error: 'Account not activated' })
 
   const expired = user?.plan_expires_at && new Date(user.plan_expires_at) < new Date()
   if (user?.plan !== 'family' || expired) {
@@ -62,7 +63,7 @@ router.get('/slots', requireAuth, requireFamily, async (req, res) => {
   const slots = (data || []).map(s => {
     let email = null
     if (s.ains_email_encrypted) {
-      try { email = decrypt(s.ains_email_encrypted) } catch {}
+      try { email = decrypt(s.ains_email_encrypted, s.id) } catch {}
     }
     return {
       id:              s.id,
@@ -223,15 +224,16 @@ router.post('/slots/:slotId/connect', requireAuth, requireFamily, async (req, re
             await supabase.from('family_slots')
               .update({ ains_user_id_hash: hash })
               .eq('id', slotId)
+              .eq('user_id', userId)
           }
         } catch {}
       }
 
       const sessionData = JSON.stringify({ ssToken, ssUser, ssProfile, cookies })
       await supabase.from('family_slots').update({
-        ains_cookie_encrypted: encrypt(sessionData),
-        ains_email_encrypted:  encrypt(email),
-      }).eq('id', slotId)
+        ains_cookie_encrypted: encrypt(sessionData, slotId),
+        ains_email_encrypted:  encrypt(email, slotId),
+      }).eq('id', slotId).eq('user_id', userId)
 
       slotConnectState[stateKey] = { status: 'success' }
       scheduleSlotCleanup(stateKey)
@@ -269,9 +271,15 @@ router.get('/slots/:slotId/connect-status', requireAuth, requireFamily, async (r
 })
 
 // ── POST /api/family/slots/:slotId/trigger
-router.post('/slots/:slotId/trigger', requireAuth, requireFamily, async (req, res) => {
+router.post('/slots/:slotId/trigger', requireAuth, requireActive, requireFamily, async (req, res) => {
   const { slotId } = req.params
   const userId = req.authUser.id
+
+  // Rate limit: 5 slot triggers per user per hour
+  const isAdmin = require('../lib/auth-middleware').isAdminEmail(req.authUser?.email)
+  if (!isAdmin && !checkRateLimit(`slot-trigger:${userId}:${slotId}`, 5, 3600000)) {
+    return res.status(429).json({ error: 'Too many slot triggers. Maximum 5 per hour.' })
+  }
 
   const { data: slot } = await supabase
     .from('family_slots')

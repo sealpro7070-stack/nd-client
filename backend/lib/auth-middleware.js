@@ -46,10 +46,13 @@ setInterval(() => {
 }, 5 * 60 * 1000)
 
 async function requireAuth(req, res, next) {
+  const start = Date.now()
   const authHeader = req.headers.authorization || ''
   const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : ''
 
   if (!token) {
+    const elapsed = Date.now() - start
+    if (elapsed < 80) await new Promise(r => setTimeout(r, 80 - elapsed))
     return res.status(401).json({ error: 'Authentication required' })
   }
 
@@ -57,22 +60,43 @@ async function requireAuth(req, res, next) {
   const cached = tokenCache.get(token)
   if (cached && cached.expiresAt > Date.now()) {
     req.authUser = cached.user
+    const elapsed = Date.now() - start
+    if (elapsed < 80) await new Promise(r => setTimeout(r, 80 - elapsed))
     return next()
   }
 
   try {
     const { data: { user }, error } = await supabase.auth.getUser(token)
     if (error || !user) {
+      const elapsed = Date.now() - start
+      if (elapsed < 80) await new Promise(r => setTimeout(r, 80 - elapsed))
       return res.status(401).json({ error: 'Invalid or expired session. Please log in again.' })
     }
 
     tokenCache.set(token, { user, expiresAt: Date.now() + TOKEN_CACHE_TTL })
     req.authUser = user
+    const elapsed = Date.now() - start
+    if (elapsed < 80) await new Promise(r => setTimeout(r, 80 - elapsed))
     next()
   } catch (err) {
     console.error('[auth] Token validation failed:', err.message)
+    const elapsed = Date.now() - start
+    if (elapsed < 80) await new Promise(r => setTimeout(r, 80 - elapsed))
     return res.status(401).json({ error: 'Authentication failed' })
   }
 }
 
-module.exports = { requireAuth, checkRateLimit, isAdminEmail, ADMIN_EMAILS }
+async function requireActive(req, res, next) {
+  if (isAdminEmail(req.authUser?.email)) return next()
+  const { data, error } = await supabase
+    .from('users')
+    .select('is_active')
+    .eq('id', req.authUser.id)
+    .single()
+  if (error || !data?.is_active) {
+    return res.status(403).json({ error: 'Account not activated' })
+  }
+  next()
+}
+
+module.exports = { requireAuth, requireActive, checkRateLimit, isAdminEmail, ADMIN_EMAILS }

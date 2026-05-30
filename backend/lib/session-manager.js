@@ -10,12 +10,34 @@ const sessions = {} // { userId: { browser, context, page } }
 
 const AINS_URL = 'https://ains.moe.gov.my'
 const MFA_TIMEOUT_MS = 3 * 60 * 1000 // 3 minutes for user to approve MFA
+const MAX_CONCURRENT_BROWSERS = 3
+let activeBrowserCount = 0
+const browserWaitQueue = []
+
+async function acquireBrowserSlot() {
+  if (activeBrowserCount < MAX_CONCURRENT_BROWSERS) {
+    activeBrowserCount++
+    return
+  }
+  return new Promise((resolve) => browserWaitQueue.push(resolve))
+}
+
+function releaseBrowserSlot() {
+  activeBrowserCount = Math.max(0, activeBrowserCount - 1)
+  const next = browserWaitQueue.shift()
+  if (next) {
+    activeBrowserCount++
+    next()
+  }
+}
 
 /**
  * Launch a headless Chromium browser with anti-bot masking
  */
 async function createSession(userId) {
   console.log(`[session] Creating session for user ${userId}`)
+
+  await acquireBrowserSlot()
 
   if (sessions[userId]) {
     await destroySession(userId).catch(() => {})
@@ -85,13 +107,17 @@ function getSession(userId) {
  */
 async function destroySession(userId) {
   const session = sessions[userId]
-  if (!session) return
+  if (!session) {
+    releaseBrowserSlot()
+    return
+  }
 
   try {
     await session.browser.close().catch(() => {})
   } catch {}
 
   delete sessions[userId]
+  releaseBrowserSlot()
   console.log(`[session] Destroyed session for ${userId}`)
 }
 

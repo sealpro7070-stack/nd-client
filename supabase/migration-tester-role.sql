@@ -2,6 +2,12 @@
 -- Tester: 1 month expiry, is_active=true, 10 credits (once per plan period).
 -- Run this in Supabase SQL Editor AFTER migration-grant-plan.sql.
 
+-- Allow 'tester' in the users.plan check constraint (original schema only had
+-- free/plus/family/noob, so setting plan='tester' was rejected).
+ALTER TABLE users DROP CONSTRAINT IF EXISTS users_plan_check;
+ALTER TABLE users ADD CONSTRAINT users_plan_check
+  CHECK (plan IN ('free','plus','family','noob','tester'));
+
 CREATE OR REPLACE FUNCTION grant_plan(
   target_user_id UUID,
   target_plan    TEXT,
@@ -37,7 +43,9 @@ BEGIN
   UPDATE users
   SET plan            = target_plan,
       plan_expires_at = v_expires,
-      is_active       = COALESCE(v_active, is_active)
+      -- Qualify with table name: bare "is_active" is ambiguous against the
+      -- function's RETURNS TABLE(... is_active ...) output column.
+      is_active       = COALESCE(v_active, users.is_active)
   WHERE id = target_user_id;
 
   -- Grant credits ONCE per active plan period (idempotent via ledger)
@@ -49,7 +57,7 @@ BEGIN
       AND (cg.expires_at IS NULL OR cg.expires_at > now());
 
     IF v_existing = 0 THEN
-      UPDATE users SET credits = GREATEST(0, credits + v_credit_amount)
+      UPDATE users SET credits = GREATEST(0, users.credits + v_credit_amount)
       WHERE id = target_user_id;
 
       INSERT INTO credit_grants (user_id, plan, amount, expires_at)
