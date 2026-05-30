@@ -114,37 +114,21 @@ router.post('/set-role', requireAdmin, async (req, res) => {
     return res.status(400).json({ error: `role must be one of: ${VALID_ROLES.join(', ')}` })
   }
 
-  // noob role: no expiry, stays until admin changes it
-  // paid plans: set expiry 1 year from now when granted manually
-  const updates = { plan: role }
-  if (role === 'plus' || role === 'family') {
-    const expires = new Date()
-    expires.setFullYear(expires.getFullYear() + 1)
-    updates.plan_expires_at = expires.toISOString()
-    updates.is_active = true
-  } else if (role === 'noob') {
-    updates.plan_expires_at = null  // noob never expires
-    updates.is_active = true
-  } else if (role === 'free') {
-    updates.plan_expires_at = null
-    // don't change is_active on downgrade — admin controls that separately
-  }
-
-  const { data, error } = await supabase
-    .from('users')
-    .update(updates)
-    .eq('id', userId)
-    .select('id, email, plan, is_active')
-    .single()
+  // grant_plan is atomic + idempotent: it sets plan/expiry/is_active and grants
+  // 150 credits ONCE per active plan period. Clicking Approve repeatedly will not
+  // double-credit, and plan + credits can never end up in a partial state.
+  const { data, error } = await supabase.rpc('grant_plan', {
+    target_user_id: userId,
+    target_plan: role,
+  })
 
   if (error) return res.status(500).json({ error: error.message })
 
-  // Grant 150 credits when assigning a paid plan
-  if (role === 'plus' || role === 'family') {
-    await supabase.rpc('add_credits', { target_user_id: userId, amount: 150 })
-  }
-
-  res.json({ success: true, user: data })
+  const result = Array.isArray(data) ? data[0] : data
+  res.json({
+    success: true,
+    user: { id: userId, plan: result?.plan, is_active: result?.is_active, credits: result?.credits },
+  })
 })
 
 // POST /api/admin/activate — toggle is_active for a user

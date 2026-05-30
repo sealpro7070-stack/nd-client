@@ -208,10 +208,24 @@ router.post('/register', requireAuth, async (req, res) => {
   try {
     const isAdmin = isAdminEmail(req.authUser.email)
 
+    // register() is called on EVERY login. It must NOT clobber existing state
+    // (plan, credits, is_active) — doing so previously deactivated paid users
+    // on every sign-in. Insert defaults only for brand-new users; never update
+    // an existing row's plan/credits/activation here.
+    const insertPayload = { id, email, is_active: isAdmin }
+    if (delima_id) insertPayload.delima_id = delima_id
+
+    const { error: insertErr } = await supabase
+      .from('users')
+      .upsert(insertPayload, { onConflict: 'id', ignoreDuplicates: true })
+
+    if (insertErr) return res.status(500).json({ error: 'Registration failed. Please try again.' })
+
+    // Return the current row (existing or just-created), untouched.
     const { data, error } = await supabase
       .from('users')
-      .upsert({ id, email, delima_id, is_active: isAdmin }, { onConflict: 'id' })
       .select()
+      .eq('id', id)
       .single()
 
     if (error) return res.status(500).json({ error: 'Registration failed. Please try again.' })
