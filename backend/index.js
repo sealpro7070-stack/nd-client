@@ -112,6 +112,4 @@ const server = app.listen(PORT, () => {
 server.timeout = 30000           // 30s socket timeout
 server.keepAliveTimeout = 5000   // 5s keep-alive
 server.headersTimeout = 35000    // must be > keepAliveTimeout
-server.maxConnections = 1000     // hard cap on concurrent connections
-server.timeout = 30000
-server.maxConnections = 200
+server.maxConnections = 200      // hard cap on concurrent connections
