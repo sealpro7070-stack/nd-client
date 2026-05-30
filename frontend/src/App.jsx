@@ -59,6 +59,8 @@ function AppLayout({ children }) {
       <main className="max-w-5xl mx-auto px-4 py-5 pb-28 sm:pb-8">{children}</main>
       <footer className="hidden sm:block border-t border-line py-4">
         <div className="max-w-5xl mx-auto px-4 flex items-center justify-center gap-4">
+          <a href="https://discord.gg/ZmXMFSpZnb" target="_blank" rel="noopener noreferrer" className="text-xs text-subtle hover:text-muted transition-colors">Discord</a>
+          <span className="text-subtle text-xs">·</span>
           <Link to="/terms" className="text-xs text-subtle hover:text-muted transition-colors">Terms of Use</Link>
           <span className="text-subtle text-xs">·</span>
           <Link to="/privacy" className="text-xs text-subtle hover:text-muted transition-colors">Privacy Policy</Link>
