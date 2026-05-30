@@ -313,7 +313,7 @@ function Pricing({ onGetStarted, onNavigateUpgrade }) {
   )
 }
 
-function AuthSection({ mode, setMode, email, setEmail, password, setPassword, loading, message, isError, agreedToTerms, setAgreedToTerms, onSubmit, resending, resent, onResend, onForgot, forgotSent }) {
+function AuthSection({ mode, setMode, email, setEmail, password, setPassword, loading, message, isError, agreedToTerms, setAgreedToTerms, onSubmit, onForgot, forgotSent }) {
   if (mode === 'forgot') {
     return (
       <section id="auth" className="bg-cream border-t-[3px] border-ink py-16 sm:py-24 px-5">
@@ -442,13 +442,6 @@ function AuthSection({ mode, setMode, email, setEmail, password, setPassword, lo
             </p>
           </form>
 
-          <div className="mt-4 pt-4 border-t-[2px] border-ink/10 text-center">
-            <p className="text-xs text-ink/50 mb-2">Didn't receive your verification email?</p>
-            <button type="button" onClick={onResend} disabled={resending || resent}
-              className="text-sm font-extrabold text-cobalt hover:underline disabled:opacity-50 disabled:no-underline">
-              {resending ? 'Sending…' : resent ? 'Email sent ✓' : 'Resend verification email'}
-            </button>
-          </div>
         </div>
       </div>
     </section>
@@ -488,9 +481,7 @@ export default function Landing() {
   const [loading, setLoading]           = useState(false)
   const [message, setMessage]           = useState('')
   const [isError, setIsError]           = useState(false)
-  const [resending, setResending]       = useState(false)
-  const [resent, setResent]             = useState(false)
-  const [agreedToTerms, setAgreedToTerms] = useState(false)
+const [agreedToTerms, setAgreedToTerms] = useState(false)
   const [forgotSent, setForgotSent]     = useState(false)
 
   useEffect(() => {
@@ -543,7 +534,7 @@ export default function Landing() {
           setIsError(true); return
         }
         if (data?.user) syncUserToBackend(data.user)
-        setMessage('Check your email to confirm your account.')
+        setMessage('Account created! Taking you to your dashboard…')
       } else {
         const { data, error } = await supabase.auth.signInWithPassword({ email, password })
         if (error) {
@@ -551,8 +542,6 @@ export default function Landing() {
           setMessage(
             msg.includes('invalid login') || msg.includes('invalid credentials')
               ? 'Incorrect email or password. Please try again.'
-              : msg.includes('email not confirmed')
-              ? 'Please verify your email first. Check your inbox or resend below.'
               : error.message
           )
           setIsError(true); return
@@ -583,19 +572,7 @@ export default function Landing() {
     else { setForgotSent(true) }
   }
 
-  async function handleResend() {
-    if (!email) { setMessage('Enter your email address first.'); setIsError(true); return }
-    setResending(true); setMessage(''); setIsError(false)
-    const { error } = await supabase.auth.resend({
-      type: 'signup', email,
-      options: { emailRedirectTo: import.meta.env.VITE_SITE_URL || 'https://nilamdesk.vercel.app' },
-    })
-    setResending(false)
-    if (error) { setMessage(error.message); setIsError(true) }
-    else { setResent(true); setMessage('Verification email sent — check your inbox.') }
-  }
-
-  function scrollToAuth(m = 'signup') {
+function scrollToAuth(m = 'signup') {
     setMode(m); setMessage(''); setAgreedToTerms(false)
     document.getElementById('auth')?.scrollIntoView({ behavior: 'smooth' })
   }
@@ -616,8 +593,7 @@ export default function Landing() {
         loading={loading} message={message} isError={isError}
         agreedToTerms={agreedToTerms} setAgreedToTerms={setAgreedToTerms}
         onSubmit={handleAuth}
-        resending={resending} resent={resent} onResend={handleResend}
-        onForgot={handleForgot} forgotSent={forgotSent}
+onForgot={handleForgot} forgotSent={forgotSent}
       />
       <Footer />
     </div>
