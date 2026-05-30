@@ -84,8 +84,8 @@ router.post('/request', requireAuth, async (req, res) => {
     if (!isValidImage) {
       return res.status(400).json({ error: 'Receipt must be a JPEG, PNG, WebP, or GIF image.' })
     }
-    // Backend size guard: ~6MB base64 ≈ 4.5MB file
-    if (receipt_data.length > 6_000_000) {
+    // Backend size guard: ~7.2M base64 chars ≈ 5MB file (matches UI "max 5 MB")
+    if (receipt_data.length > 7_200_000) {
       return res.status(400).json({ error: 'Receipt image must be under 5MB.' })
     }
     // Magic-bytes validation: verify the base64 payload starts with actual image signatures
@@ -315,7 +315,7 @@ router.post('/credits/request', requireAuth, async (req, res) => {
   if (!ALLOWED_MIME_PREFIXES.some(p => receipt_data.startsWith(p))) {
     return res.status(400).json({ error: 'Receipt must be a JPEG, PNG, WebP, or GIF image.' })
   }
-  if (receipt_data.length > 6_000_000) {
+  if (receipt_data.length > 7_200_000) {
     return res.status(400).json({ error: 'Receipt image must be under 5MB.' })
   }
   // Magic-bytes validation

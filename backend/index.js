@@ -48,7 +48,8 @@ app.use(cors({
 app.post('/api/payments/webhook', express.raw({ type: 'application/json' }), (req, res) => {
   res.status(501).json({ error: 'Webhook not yet configured. Set LEMONSQUEEZY_WEBHOOK_SECRET to enable.' })
 })
-app.use(express.json({ limit: '2mb' }))
+// 8mb covers base64 receipt uploads (route caps receipt_data at ~6M chars)
+app.use(express.json({ limit: '8mb' }))
 
 // Health check (rate-limited to prevent abuse)
 const healthLimiter = new Map()

@@ -362,11 +362,10 @@ export default function Upgrade() {
 
           <div className="p-5 sm:p-6 space-y-4">
             <SummaryRow label="NilamDesk Pro — yearly" value={`RM ${price.toFixed(2)}`} />
-            <SummaryRow label="Tax (SST 8%)" value={`RM ${(price * 0.08).toFixed(2)}`} muted />
             <div className="border-t-[2px] border-ink/15 pt-3 flex items-baseline justify-between">
               <span className="font-display font-black text-ink text-base">Total today</span>
               <span className="font-display font-black text-ink text-3xl tabular-nums">
-                RM {(price * 1.08).toFixed(2)}
+                RM {price.toFixed(2)}
               </span>
             </div>
 
@@ -386,7 +385,7 @@ export default function Upgrade() {
                 <div>
                   <p className="font-mono text-cobalt text-[10px] font-bold tracking-[0.3em] uppercase">// step 1</p>
                   <p className="font-display font-black text-ink text-sm mt-1">
-                    Scan the QR to pay <span className="text-cobalt">RM {(price * 1.08).toFixed(2)}</span>
+                    Scan the QR to pay <span className="text-cobalt">RM {price.toFixed(2)}</span>
                   </p>
                   <p className="text-[11px] text-ink/55 font-medium mt-1">
                     Works with TNG eWallet, Maybank2u, GrabPay, Boost, MAE — anything that supports DuitNow QR.
