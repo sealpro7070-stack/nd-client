@@ -332,7 +332,7 @@ export default function Upgrade() {
           </div>
 
           <div className="p-5 sm:p-6 space-y-4">
-            <SummaryRow label="NilamDesk Pro — monthly" value={`RM ${price}.00`} />
+            <SummaryRow label="NilamDesk Pro — yearly" value={`RM ${price.toFixed(2)}`} />
             <SummaryRow label="Tax (SST 8%)" value={`RM ${(price * 0.08).toFixed(2)}`} muted />
             <div className="border-t-[2px] border-ink/15 pt-3 flex items-baseline justify-between">
               <span className="font-display font-black text-ink text-base">Total today</span>

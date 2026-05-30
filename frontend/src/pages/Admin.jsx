@@ -510,7 +510,7 @@ export default function Admin() {
                         }`}>{pr.status}</span>
                       </div>
                       <div className="text-xs text-muted mt-1 flex flex-wrap gap-3">
-                        <span>RM{pr.amount}/year</span>
+                        <span>RM{(pr.amount / 100).toFixed(2)}{pr.type === 'credit_topup' ? ' top-up' : '/year'}</span>
                         <span>{new Date(pr.created_at).toLocaleString('en-MY')}</span>
                         {pr.reference && <span>Ref: <strong className="text-heading">{pr.reference}</strong></span>}
                         {pr.reviewed_by && <span>Reviewed by: {pr.reviewed_by}</span>}

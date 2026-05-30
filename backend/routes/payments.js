@@ -15,7 +15,8 @@ const router    = express.Router()
 const supabase  = require('../lib/supabase')
 const { requireAuth } = require('../lib/auth-middleware')
 
-const PLAN_PRICES = { plus: 18, family: 48 }
+// Prices in sen (1 RM = 100 sen). payment_requests.amount is stored in sen.
+const PLAN_PRICES = { plus: 4990, family: 4800 }
 const PLAN_LABELS = { plus: 'Plus', family: 'Family' }
 
 // ─── Admin guard ──────────────────────────────────────────────────────────────
@@ -222,8 +223,9 @@ router.post('/admin/review', requireAuth, requireAdmin, async (req, res) => {
     const requestType = pr.type || 'plan_upgrade'
 
     if (requestType === 'credit_topup') {
-      // Add credits to user balance
-      const creditsToAdd = pr.credits_amount || pr.amount
+      // Add credits to user balance. credits_amount holds the credit COUNT;
+      // pr.amount is money in sen, so fall back to sen/100 (1 credit = RM1).
+      const creditsToAdd = pr.credits_amount ?? Math.round(pr.amount / 100)
       const { error: creditErr } = await supabase.rpc('add_credits', {
         target_user_id: pr.user_id,
         amount: creditsToAdd,
@@ -273,12 +275,14 @@ router.post('/admin/review', requireAuth, requireAdmin, async (req, res) => {
             .maybeSingle()
 
           if (rc && rc.active) {
-            const commission = Math.round(pr.amount * Number(rc.rate) * 100) / 100
+            // pr.amount is in sen; referral_commissions stores RM (numeric).
+            const orderRM = pr.amount / 100
+            const commission = Math.round(orderRM * Number(rc.rate) * 100) / 100
             await supabase.from('referral_commissions').upsert({
               code:               rc.code,
               referred_user_id:   pr.user_id,
               payment_request_id: pr.id,
-              order_amount:       pr.amount,
+              order_amount:       orderRM,
               commission_amount:  commission,
             }, { onConflict: 'referred_user_id', ignoreDuplicates: true })
           }
@@ -352,8 +356,8 @@ router.post('/credits/request', requireAuth, async (req, res) => {
       user_id:        userId,
       type:           'credit_topup',
       plan:           null,
-      amount:         amount,
-      credits_amount: amount,
+      amount:         amount * 100,   // money in sen (1 credit = RM1 = 100 sen)
+      credits_amount: amount,         // credit COUNT
       receipt_data:   receipt_data,
     })
     .select()
