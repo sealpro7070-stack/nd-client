@@ -36,7 +36,7 @@ async function sendReminderEmail(toEmail, scheduleDay) {
   if (!transporter) return
 
   const from    = process.env.SMTP_FROM || `"Nilam Auto" <${process.env.SMTP_USER}>`
-  const siteUrl = process.env.SITE_URL  || 'https://nilamdesk.vercel.app'
+  const siteUrl = process.env.SITE_URL  || 'https://nilamdesk.com'
   const dashboardUrl = `${siteUrl}/dashboard`
 
   const html = `

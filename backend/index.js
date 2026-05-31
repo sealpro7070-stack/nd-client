@@ -30,6 +30,8 @@ process.on('uncaughtException', (err) => {
 
 const ALLOWED_ORIGINS = [
   process.env.FRONTEND_URL,
+  'https://nilamdesk.com',
+  'https://www.nilamdesk.com',
   'https://nilamdesk.vercel.app',
   'https://nilam-auto.vercel.app',
   'http://localhost:5173',

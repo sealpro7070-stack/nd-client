@@ -768,7 +768,7 @@ export default function Admin() {
             {/* Create code */}
             <div className="card-p">
               <h2 className="font-display text-base font-bold text-heading mb-1">Create Referral Code</h2>
-              <p className="text-xs text-muted mb-4">Give a marketer a code. They share <code className="text-brand-600">nilamdesk.vercel.app/?ref=CODE</code>. You earn nothing; they earn the rate on each referred user's first paid order.</p>
+              <p className="text-xs text-muted mb-4">Give a marketer a code. They share <code className="text-brand-600">nilamdesk.com/?ref=CODE</code>. You earn nothing; they earn the rate on each referred user's first paid order.</p>
               <form onSubmit={createCode} className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <input
                   type="text" placeholder="Code (e.g. AISHA)" value={newCode.code}

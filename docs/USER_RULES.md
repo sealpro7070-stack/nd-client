@@ -72,6 +72,6 @@ This is a plain-language summary of every rule that affects what users can and c
 
 ## 9. Referrals (for marketers)
 
-- Marketers get a referral code and share `nilamdesk.vercel.app/?ref=CODE`.
+- Marketers get a referral code and share `nilamdesk.com/?ref=CODE`.
 - They earn commission (default 10%) on a referred user's **first approved paid order only** (plan upgrades, not credit top-ups).
 - Payouts are handled manually by admin.

@@ -106,7 +106,7 @@ export default function Guide() {
           },
           {
             q: 'Does it work on mobile?',
-            a: 'Yes — open nilamdesk.vercel.app in any mobile browser. Everything works the same way.',
+            a: 'Yes — open nilamdesk.com in any mobile browser. Everything works the same way.',
           },
           {
             q: 'How does the monthly reminder work?',

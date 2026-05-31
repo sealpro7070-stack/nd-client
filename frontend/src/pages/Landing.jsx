@@ -531,7 +531,7 @@ const [agreedToTerms, setAgreedToTerms] = useState(false)
       if (mode === 'signup') {
         const { data, error } = await supabase.auth.signUp({
           email, password,
-          options: { emailRedirectTo: import.meta.env.VITE_SITE_URL || 'https://nilamdesk.vercel.app' },
+          options: { emailRedirectTo: import.meta.env.VITE_SITE_URL || 'https://nilamdesk.com' },
         })
         if (error) {
           const msg = error.message?.toLowerCase() ?? ''
@@ -576,7 +576,7 @@ const [agreedToTerms, setAgreedToTerms] = useState(false)
   async function handleForgot(e) {
     e.preventDefault()
     setLoading(true); setMessage(''); setIsError(false)
-    const siteUrl = import.meta.env.VITE_SITE_URL || 'https://nilamdesk.vercel.app'
+    const siteUrl = import.meta.env.VITE_SITE_URL || 'https://nilamdesk.com'
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${siteUrl}/reset-password`,
     })

@@ -3,7 +3,7 @@
  *
  * Flow:
  *   1. Admin creates a referral code for a marketer (POST /admin/codes)
- *   2. Marketer shares  https://nilamdesk.vercel.app/?ref=THEIRCODE
+ *   2. Marketer shares  https://nilamdesk.com/?ref=THEIRCODE
  *   3. New user signs up with that code stored on their account (users.referred_by)
  *   4. When that user's FIRST plan payment is approved, payments.js records a
  *      commission row (10% of the order) — see record on payment approval.
