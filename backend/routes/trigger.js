@@ -47,7 +47,7 @@ router.post('/', requireAuth, async (req, res) => {
     await supabase.from('users').upsert({
       id:        userId,
       email:     req.authUser.email,
-      is_active: isAdmin,
+      is_active: true,
     }, { onConflict: 'id' })
 
     // Re-fetch after upsert — use maybeSingle() again
