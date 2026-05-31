@@ -108,10 +108,7 @@ router.post('/', requireAuth, async (req, res) => {
           skipMsg = `Daily limit reached (max 30 books/day). Your remaining credits will carry over — try again tomorrow.`
           break
         case 'no_credits':
-          skipMsg = `You're out of book credits. Top up credits on the Upgrade page to submit more.`
-          break
-        case 'free_weekly_used':
-          skipMsg = `Already submitted your 1 free book this week. Your free quota resets every Monday — or top up credits to submit more now.`
+          skipMsg = `You're out of book credits. You've used all your free books — top up credits on the Upgrade page to submit more.`
           break
         default:
           skipMsg = `Nothing to do — you've already submitted everything available right now.`

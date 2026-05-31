@@ -1,0 +1,65 @@
+name: Daily Database Backup
+
+# Runs a full pg_dump of the Supabase database every day, encrypts it,
+# and pushes the encrypted file into a SEPARATE private backup repo.
+# Old backups (older than 30 days) are pruned to keep the repo small.
+#
+# Required GitHub Actions secrets (Settings -> Secrets and variables -> Actions):
+#   SUPABASE_DB_URL    Supabase connection string (Project Settings -> Database -> URI)
+#   BACKUP_PASSPHRASE  A strong password you invent. KEEP IT SAFE - needed to decrypt.
+#   BACKUP_REPO        The backup repo, e.g. sealpro7070-stack/nilamdesk-backups
+#   BACKUP_REPO_TOKEN  A fine-grained PAT with Contents: Read/Write on BACKUP_REPO
+
+on:
+  schedule:
+    # 18:00 UTC = 02:00 MYT (next day). Daily.
+    - cron: '0 18 * * *'
+  workflow_dispatch: {}   # lets you run it manually from the Actions tab
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install PostgreSQL 16 client
+        run: |
+          sudo sh -c 'echo "deb https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/pgdg.gpg
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-16
+
+      - name: Dump and encrypt database
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          STAMP=$(date -u +'%Y-%m-%d_%H%M%S')
+          FILE="nilamdesk_${STAMP}.sql.gz"
+          # --no-owner / --no-privileges keep the dump portable for restore.
+          pg_dump "$SUPABASE_DB_URL" --no-owner --no-privileges \
+            | gzip \
+            | gpg --batch --yes --symmetric --cipher-algo AES256 \
+                  --passphrase "$BACKUP_PASSPHRASE" \
+                  -o "${FILE}.gpg"
+          echo "OUT_FILE=${FILE}.gpg" >> "$GITHUB_ENV"
+          ls -lh "${FILE}.gpg"
+
+      - name: Push backup to private repo
+        env:
+          BACKUP_REPO: ${{ secrets.BACKUP_REPO }}
+          BACKUP_REPO_TOKEN: ${{ secrets.BACKUP_REPO_TOKEN }}
+        run: |
+          git clone --depth 1 "https://x-access-token:${BACKUP_REPO_TOKEN}@github.com/${BACKUP_REPO}.git" backup-repo
+          mkdir -p backup-repo/dumps
+          mv "$OUT_FILE" backup-repo/dumps/
+          cd backup-repo
+          # Prune dumps older than 30 days
+          find dumps -name '*.sql.gz.gpg' -type f -mtime +30 -delete
+          git config user.name  "backup-bot"
+          git config user.email "backup-bot@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Nothing to commit."
+          else
+            git commit -m "backup: ${OUT_FILE}"
+            git push
+          fi

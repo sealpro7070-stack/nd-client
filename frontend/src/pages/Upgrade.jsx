@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
 const FREE_FEATURES = [
-  { label: '1 book per week',           ok: true  },
+  { label: '8 free books to start',     ok: true  },
   { label: '1 language at a time',      ok: true  },
   { label: 'Manual submit only',        ok: true  },
   { label: 'Email reminders',           ok: true  },

@@ -272,7 +272,7 @@ function Pricing({ onGetStarted, onNavigateUpgrade }) {
               <span className="font-bold text-ink/60 text-sm">forever</span>
             </div>
             <ul className="mt-5 space-y-2.5">
-              {['1 book per week', '1 language at a time', 'Manual trigger', 'Email reminders'].map(f => (
+              {['8 free books to start', '1 language at a time', 'Manual trigger', 'Email reminders'].map(f => (
                 <li key={f} className="flex items-start gap-2.5 text-sm font-semibold text-ink">
                   <span className="w-5 h-5 rounded-md border-[2px] border-ink flex items-center justify-center flex-shrink-0 mt-[1px]" style={{ background: '#2F5DDB' }}>
                     <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M2 6.5l2.5 2.5L10 3" stroke="#F4F1EA" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" /></svg>

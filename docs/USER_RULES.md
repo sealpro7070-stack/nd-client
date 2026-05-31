@@ -9,7 +9,8 @@ This is a plain-language summary of every rule that affects what users can and c
 - **Credits are the single source of truth for how many books you can submit.** 1 credit = 1 successfully submitted book.
 - Credits are **only deducted when a submission succeeds.** Failed/timed-out submissions cost nothing.
 - Credits **do not expire** and are **not reset** when your plan period ends. If you bought credits, they stay until you use them.
-- New users get **1 free credit** on signup.
+- New users get **8 free credits** on signup. This is your entire free allowance — **8 free books, lifetime** (no weekly or monthly reset). Once they're used, top up to submit more.
+- To stop abuse, **each AINS account can only ever be connected once** — you can't create extra NilamDesk accounts to farm more free books with the same AINS login.
 - Buy more credits any time on the **Upgrade** page. (RM49.90/year = 150 book credits.)
 
 ## 2. Daily safety cap: 30 books per day
@@ -23,13 +24,13 @@ This is a plain-language summary of every rule that affects what users can and c
 
 | Plan | Free book allowance | Notes |
 |------|--------------------|-------|
-| **Free** | 1 free book per week | Resets every Monday (MYT). Beyond that, spend credits. |
+| **Free** | 8 free books, lifetime | The 8 free credits given at signup. No reset. Beyond that, buy credits. |
 | **Plus / Paid** | — | Volume = credits you hold, up to 30/day. |
 | **Family** | — | Up to 3 child "slots", each its own AINS account. Credits are shared across slots; each slot still capped at 30/day. |
 | **Noob (tester)** | 999 | Admin-granted tester role, never expires. |
 | **Admin** | Unlimited | No caps, no rate limits. |
 
-- Your plan controls **features** (e.g. Family slots) and the **free weekly book** — it no longer caps how many credits you can spend.
+- Your plan controls **features** (e.g. Family slots) — it no longer caps how many credits you can spend.
 - When a paid plan period ends you revert to "free" features, **but your purchased credits remain usable.**
 
 ## 4. How a submission run works
@@ -37,15 +38,14 @@ This is a plain-language summary of every rule that affects what users can and c
 1. You pick how many books and which language, then press submit.
 2. The bot checks, in order:
    - **Daily cap** — have you already hit 30 books today? If yes → stops with "Daily limit reached."
-   - **Credits** — do you have credits (or your 1 free weekly book if on Free)? If none → stops with "Out of credits."
+   - **Credits** — do you have credits left? (Free users start with 8.) If none → stops with "Out of credits."
    - **Duplicates** — books you already submitted this period are skipped so you don't submit the same book twice.
 3. It submits up to the smallest of: what you asked for, your remaining credits, and your remaining daily allowance.
 4. You're charged 1 credit per book that succeeds.
 
 ### Messages you might see
 - **"Daily limit reached (max 30 books/day). Your remaining credits will carry over — try again tomorrow."** — you hit today's safety cap; come back tomorrow.
-- **"You're out of book credits."** — top up on the Upgrade page.
-- **"Already submitted your 1 free book this week..."** — Free plan weekly book used; resets Monday or top up credits.
+- **"You're out of book credits. You've used all your free books..."** — your 8 free books (or bought credits) are spent; top up on the Upgrade page.
 - **"Nothing to do — you've already submitted everything available right now."** — no new books left to submit for now.
 
 ## 5. Rate limits (anti-spam)

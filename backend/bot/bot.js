@@ -68,19 +68,6 @@ async function withLock(key, fn, timeoutMs = 180000) {
   }
 }
 
-// Returns Monday 00:00:00 MYT (UTC+8) of the current ISO week, expressed as UTC
-// Railway servers run UTC — offset by +8h so the week resets at midnight MYT, not midnight UTC
-function getWeekStart() {
-  const MYT_OFFSET_MS = 8 * 60 * 60 * 1000
-  const nowMYT = new Date(Date.now() + MYT_OFFSET_MS)
-  const day = nowMYT.getUTCDay()    // day-of-week in MYT
-  const mondayMYT = new Date(nowMYT)
-  mondayMYT.setUTCDate(nowMYT.getUTCDate() - ((day + 6) % 7))
-  mondayMYT.setUTCHours(0, 0, 0, 0)
-  // Convert back to UTC for Supabase comparison
-  return new Date(mondayMYT.getTime() - MYT_OFFSET_MS)
-}
-
 // Returns 00:00:00 MYT (UTC+8) of the current day, expressed as UTC.
 // Used for the per-day submission safety cap.
 function getDayStart() {
@@ -178,7 +165,6 @@ async function _startBot(userId, directCookie, directSsUser, directSsProfile, di
   }
 
   // 4. Check existing submissions (used to skip duplicate books, NOT to cap volume)
-  // Free plan → 1 free book per WEEK (Monday 00:00 MYT); paid users spend credits.
   // Volume is governed by credits + the DAILY_MAX safety cap below.
 
   // Clean up stale pending records (older than 5 min) — prevents phantom quota blocks
@@ -194,34 +180,27 @@ async function _startBot(userId, directCookie, directSsUser, directSsProfile, di
   const now   = new Date()
   const month = now.getMonth() + 1
   const year  = now.getFullYear()
-  const isFree = activePlan === 'free'
 
-  let existingQuery = supabase
+  // Dedup window: skip books already submitted this month so the same book
+  // isn't sent twice. Volume itself is governed purely by credits + DAILY_MAX.
+  const { data: existing } = await supabase
     .from('submissions')
     .select('book_id')
     .eq('user_id', userId)
     .is('family_slot_id', null)
     .in('status', ['success', 'pending'])
-
-  if (isFree) {
-    // Weekly window: Monday 00:00:00 to now
-    existingQuery = existingQuery.gte('created_at', getWeekStart().toISOString())
-  } else {
-    existingQuery = existingQuery.eq('month', month).eq('year', year)
-  }
-
-  const { data: existing } = await existingQuery
+    .eq('month', month)
+    .eq('year', year)
 
   const alreadySubmitted = existing || []
   const alreadyBookIds   = alreadySubmitted.map(s => s.book_id)
 
   // ── Limits: CREDITS are the source of truth ───────────────
-  // Free users get 1 credit-free book per week; everyone else spends 1 credit
-  // per successful book. The plan tier no longer caps volume — buying credits
-  // is what lets a user submit more.
+  // Every user spends 1 credit per successful book. New users get 8 free credits
+  // at signup — that is the entire free allowance (lifetime, no weekly reset).
+  // Buying more credits is what lets a user submit more.
   const creditBalance  = isAdminUser ? Infinity : (user.credits || 0)
-  const freeRemaining  = isFree ? Math.max(0, 1 - alreadySubmitted.length) : 0
-  const creditCeiling  = isAdminUser ? Infinity : (isFree ? freeRemaining + creditBalance : creditBalance)
+  const creditCeiling  = creditBalance
 
   // Anti-detection daily cap: count today's submissions (success + pending) for
   // this user and allow at most DAILY_MAX per calendar day (MYT).
@@ -246,7 +225,7 @@ async function _startBot(userId, directCookie, directSsUser, directSsProfile, di
   } else {
     needed = Math.min(userSettings.books_per_month || 4, ceiling)
   }
-  console.log(`[bot] plan=${activePlan} credits=${creditBalance} freeSlot=${freeRemaining} dailyLeft=${dailyRemaining} → submitting ${needed}`)
+  console.log(`[bot] plan=${activePlan} credits=${creditBalance} dailyLeft=${dailyRemaining} → submitting ${needed}`)
 
   if (needed <= 0) {
     if (dailyRemaining <= 0) {
@@ -255,7 +234,7 @@ async function _startBot(userId, directCookie, directSsUser, directSsProfile, di
     }
     if (creditCeiling <= 0) {
       console.log('[bot] No credits remaining. Nothing to do.')
-      return { success: true, skipped: true, reason: isFree ? 'free_weekly_used' : 'no_credits' }
+      return { success: true, skipped: true, reason: 'no_credits' }
     }
     console.log('[bot] Nothing to do.')
     return { success: true, skipped: true, reason: 'already_complete' }
@@ -327,13 +306,9 @@ async function _startBot(userId, directCookie, directSsUser, directSsProfile, di
 
       const successCount = finalSubs?.filter(s => s.status === 'success').length || 0
       if (successCount > 0) {
-        // For free users: the first book(s) of the week are free — don't deduct those
-        const freeUsedThisRun = isFree ? Math.min(freeRemaining, successCount) : 0
-        const creditsToDeduct = successCount - freeUsedThisRun
-        if (creditsToDeduct > 0) {
-          await supabase.rpc('add_credits', { target_user_id: userId, amount: -creditsToDeduct })
-          console.log(`[bot] Deducted ${creditsToDeduct} credit(s) (${successCount} succeeded, ${freeUsedThisRun} were free)`)
-        }
+        // Every successful book costs 1 credit (the 8 free books ARE credits).
+        await supabase.rpc('add_credits', { target_user_id: userId, amount: -successCount })
+        console.log(`[bot] Deducted ${successCount} credit(s)`)
       }
     } catch (err) {
       console.warn('[bot] Credit deduction failed:', err.message)
