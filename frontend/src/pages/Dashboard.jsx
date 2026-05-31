@@ -90,8 +90,8 @@ export default function Dashboard() {
         const userPlan = isAdminUser ? 'noob' : (ud?.plan || 'free')
         setPlan(userPlan)
         setCredits(ud?.credits || 0)
-        // Clamp bookCount to the plan's actual limit (settings may have a higher value than the plan allows)
-        const planMax = userPlan === 'free' ? 1 : userPlan === 'noob' ? 999 : 30
+        // Clamp bookCount to the daily cap (volume is credit-driven for all users)
+        const planMax = userPlan === 'noob' ? 999 : 30
         setBookCount(prev => Math.min(prev, planMax))
         if (!connected) setShowAINSModal(true)
 
@@ -327,7 +327,7 @@ export default function Dashboard() {
   const nextReminder = settings?.auto_schedule
     ? `Day ${settings.schedule_day} of next month`
     : 'No reminder set'
-  const periodCount = plan === 'free' ? (stats.thisWeek ?? 0) : stats.thisMonth
+  const periodCount = stats.thisMonth
   const pct = bookCount > 0 ? Math.min((periodCount / bookCount) * 100, 100) : 0
 
   return (
@@ -382,8 +382,8 @@ export default function Dashboard() {
 
         <div className="relative mt-5">
           <div className="flex justify-between text-[11px] mb-1.5 font-bold">
-            <span className="text-cream/60 uppercase tracking-wider">{plan === 'free' ? "This week's progress" : "Monthly progress"}</span>
-            <span className="text-cream tabular-nums">{periodCount} / {bookCount} {plan === 'free' ? 'book' : 'books'}</span>
+            <span className="text-cream/60 uppercase tracking-wider">Monthly progress</span>
+            <span className="text-cream tabular-nums">{periodCount} / {bookCount} books</span>
           </div>
           <div className="w-full h-3 bg-cream/15 rounded-full overflow-hidden border-[2px] border-ink/40">
             <motion.div
@@ -402,9 +402,7 @@ export default function Dashboard() {
           { label: 'This Month', value: stats.thisMonth,  accent: 'bg-yellow' },
           { label: 'All Time',   value: stats.successful, accent: 'bg-cobalt text-cream' },
           { label: 'Language',   value: settings?.language ?? '—', accent: 'bg-[#A8E6A1]' },
-          plan !== 'free'
-            ? { label: 'Credits', value: credits, accent: 'bg-[#FF8FA3]' }
-            : { label: 'Next Run', value: settings?.auto_schedule ? `Day ${settings.schedule_day}` : 'Manual', accent: 'bg-[#FF8FA3]' },
+          { label: 'Credits', value: credits, accent: 'bg-[#FF8FA3]' },
         ].map((s, i) => (
           <motion.div
             key={s.label}
@@ -503,7 +501,7 @@ export default function Dashboard() {
               <button
                 type="button"
                 onClick={() => setBookCount(v => Math.min(plan === 'free' ? 1 : plan === 'noob' ? 999 : 30, v + 1))}
-                disabled={bookCount >= (plan === 'free' ? 1 : plan === 'noob' ? 999 : 30) || triggering}
+                disabled={bookCount >= (plan === 'noob' ? 999 : 30) || triggering}
                 className="w-11 h-11 rounded-lg bg-cream border-[2px] border-ink font-black text-xl text-ink disabled:opacity-30 disabled:cursor-not-allowed"
               >+</button>
             </div>
