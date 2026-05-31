@@ -812,7 +812,7 @@ export default function Dashboard() {
           </div>
           <div className="min-w-0">
             <p className="font-display font-black text-sm">Need help? Join our Discord</p>
-            <p className="text-xs text-white/70 font-medium truncate">Get support, updates & talk to other teachers.</p>
+            <p className="text-xs text-white/70 font-medium truncate">Get support, updates & talk to other students.</p>
           </div>
         </div>
         <span className="font-mono text-xs font-bold flex-shrink-0">Join →</span>
