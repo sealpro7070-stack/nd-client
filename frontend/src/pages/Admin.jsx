@@ -391,15 +391,15 @@ export default function Admin() {
   return (
     <div className="min-h-screen bg-page">
       {/* Header */}
-      <div className="bg-white border-b border-line px-6 py-5 sticky top-0 z-10">
+      <div className="bg-white border-b border-line px-4 py-4 sticky top-0 z-10">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <div>
-            <h1 className="font-display text-xl font-extrabold text-heading">Admin Panel</h1>
-            <p className="text-muted text-sm mt-0.5">User management &amp; approvals</p>
+            <h1 className="font-display text-lg font-extrabold text-heading">Admin Panel</h1>
+            <p className="text-muted text-xs mt-0.5 hidden sm:block">User management &amp; approvals</p>
           </div>
-          <div className="flex items-center gap-3">
-            <button onClick={() => { fetchUsers(); fetchPayments() }} className="btn-ghost text-sm py-2 px-4">Refresh</button>
-            <button onClick={() => navigate('/dashboard')} className="btn-ghost text-sm py-2 px-4">← Dashboard</button>
+          <div className="flex items-center gap-2">
+            <button onClick={() => { fetchUsers(); fetchPayments() }} className="btn-ghost text-xs py-1.5 px-3">Refresh</button>
+            <button onClick={() => navigate('/dashboard')} className="btn-ghost text-xs py-1.5 px-3">← Back</button>
           </div>
         </div>
       </div>
@@ -422,7 +422,7 @@ export default function Admin() {
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-2 mb-5 border-b border-line">
+        <div className="flex gap-1 mb-5 border-b border-line overflow-x-auto">
           {[
             { id: 'overview', label: 'Overview' },
             { id: 'users',    label: 'Users' },
@@ -433,7 +433,7 @@ export default function Admin() {
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
-              className={`px-5 py-2.5 text-sm font-bold border-b-2 transition-colors -mb-px ${
+              className={`px-3 sm:px-5 py-2.5 text-sm font-bold border-b-2 transition-colors -mb-px whitespace-nowrap flex-shrink-0 ${
                 tab === t.id
                   ? 'border-brand-600 text-brand-600'
                   : 'border-transparent text-muted hover:text-heading'
@@ -572,118 +572,195 @@ export default function Admin() {
             ) : filtered.length === 0 ? (
               <div className="card-p text-center py-12 text-muted">No users found.</div>
             ) : (
-              <div className="card p-0 overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-gray-50 border-b border-line text-left">
-                      <th className="px-5 py-3 text-xs font-bold text-muted uppercase tracking-wide">User</th>
-                      <th className="px-5 py-3 text-xs font-bold text-muted uppercase tracking-wide hidden md:table-cell">Plan</th>
-                      <th className="px-5 py-3 text-xs font-bold text-muted uppercase tracking-wide text-center">Credits</th>
-                      <th className="px-5 py-3 text-xs font-bold text-muted uppercase tracking-wide hidden md:table-cell">Cookie</th>
-                      <th className="px-5 py-3 text-xs font-bold text-muted uppercase tracking-wide hidden md:table-cell">Records</th>
-                      <th className="px-5 py-3 text-xs font-bold text-muted uppercase tracking-wide">Joined</th>
-                      <th className="px-5 py-3 text-xs font-bold text-muted uppercase tracking-wide text-center">Status</th>
-                      <th className="px-5 py-3 text-xs font-bold text-muted uppercase tracking-wide text-center">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filtered.map((user, i) => (
-                      <tr key={user.id} className={`border-b border-line/50 hover:bg-brand-50/30 transition-colors ${i === filtered.length - 1 ? 'border-0' : ''}`}>
-                        <td className="px-5 py-4">
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center font-bold text-sm flex-shrink-0">
-                              {(user.email || '?')[0].toUpperCase()}
-                            </div>
-                            <div>
-                              <div className="font-semibold text-heading max-w-[180px] truncate">{user.email}</div>
-                              <div className="text-xs text-muted md:hidden">{user.delima_id || '—'}</div>
-                            </div>
+              <>
+                {/* Mobile cards — shown on small screens */}
+                <div className="md:hidden space-y-3">
+                  {filtered.map(user => (
+                    <div key={user.id} className="card-p">
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="w-10 h-10 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center font-bold flex-shrink-0">
+                          {(user.email || '?')[0].toUpperCase()}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="font-semibold text-heading text-sm truncate">{user.email}</div>
+                          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                            <span className={`text-xs font-bold px-2 py-0.5 rounded-full capitalize ${
+                              user.plan === 'family' ? 'bg-ok-100 text-ok-700' :
+                              user.plan === 'plus'   ? 'bg-brand-100 text-brand-700' :
+                              user.plan === 'noob'   ? 'bg-purple-100 text-purple-700' :
+                              user.plan === 'tester' ? 'bg-yellow-100 text-yellow-700' :
+                                                       'bg-gray-100 text-gray-600'
+                            }`}>{user.plan || 'free'}</span>
+                            {user.is_active ? (
+                              <span className="inline-flex items-center gap-1 bg-ok-100 text-ok-700 text-xs font-semibold px-2 py-0.5 rounded-full">
+                                <span className="w-1.5 h-1.5 bg-ok-500 rounded-full" /> Active
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 bg-warn-100 text-warn-600 text-xs font-semibold px-2 py-0.5 rounded-full">
+                                <span className="w-1.5 h-1.5 bg-warn-500 rounded-full" /> Pending
+                              </span>
+                            )}
                           </div>
-                        </td>
-                        <td className="px-5 py-4 hidden md:table-cell">
-                          <span className={`text-xs font-bold px-2 py-0.5 rounded-full capitalize ${
-                            user.plan === 'family' ? 'bg-ok-100 text-ok-700' :
-                            user.plan === 'plus'   ? 'bg-brand-100 text-brand-700' :
-                            user.plan === 'noob'   ? 'bg-purple-100 text-purple-700' :
-                            user.plan === 'tester' ? 'bg-yellow-100 text-yellow-700' :
-                                                     'bg-gray-100 text-gray-600'
-                          }`}>{user.plan || 'free'}{user.plan === 'noob' ? ' 🧪' : user.plan === 'tester' ? ' 🔬' : ''}</span>
-                        </td>
-                        <td className="px-5 py-4 text-center">
-                          <div className="flex flex-col items-center gap-1">
-                            <span className="font-bold text-heading text-sm tabular-nums">{user.credits ?? 0}</span>
+                        </div>
+                        <div className="text-right flex-shrink-0">
+                          <div className="font-bold text-heading text-xl tabular-nums">{user.credits ?? 0}</div>
+                          <div className="text-xs text-muted">credits</div>
+                        </div>
+                      </div>
+                      {isAdminEmail(user.email) ? (
+                        <p className="text-xs text-brand-500 font-bold text-center py-2">👑 Admin</p>
+                      ) : (
+                        <div className="space-y-2">
+                          <select
+                            value={user.plan || 'free'}
+                            disabled={roleTarget === user.id}
+                            onChange={e => setRole(user.id, e.target.value)}
+                            className="input w-full text-sm disabled:opacity-50"
+                          >
+                            <option value="free">Free</option>
+                            <option value="plus">Plus</option>
+                            <option value="family">Family</option>
+                            <option value="tester">Tester 🔬</option>
+                            <option value="noob">Noob 🧪</option>
+                          </select>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => toggleActivate(user.id, user.is_active)}
+                              className={`flex-1 text-sm font-bold py-2.5 rounded-xl transition ${
+                                user.is_active
+                                  ? 'bg-danger-50 text-danger-600 hover:bg-danger-100'
+                                  : 'bg-brand-600 text-white hover:bg-brand-700'
+                              }`}
+                            >
+                              {user.is_active ? 'Deactivate' : 'Approve ✓'}
+                            </button>
                             <button
                               onClick={() => { setGrantTarget({ id: user.id, email: user.email, credits: user.credits ?? 0 }); setGrantAmount(''); setGrantNote('') }}
-                              className="text-xs font-semibold text-brand-600 hover:underline"
-                            >Grant</button>
-                          </div>
-                        </td>
-                        <td className="px-5 py-4 hidden md:table-cell">
-                          {user.has_cookie
-                            ? <span className="text-ok-600 font-semibold text-xs">✓ Saved</span>
-                            : <span className="text-subtle text-xs">Not saved</span>}
-                        </td>
-                        <td className="px-5 py-4 hidden md:table-cell text-muted text-xs">
-                          {user.submissions_success} / {user.submissions_total}
-                        </td>
-                        <td className="px-5 py-4 text-subtle text-xs">
-                          {user.created_at ? new Date(user.created_at).toLocaleDateString('en-MY') : '—'}
-                        </td>
-                        <td className="px-5 py-4 text-center">
-                          {user.is_active ? (
-                            <span className="inline-flex items-center gap-1 bg-ok-100 text-ok-700 text-xs font-semibold px-2.5 py-1 rounded-full">
-                              <span className="w-1.5 h-1.5 bg-ok-500 rounded-full" /> Active
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 bg-warn-100 text-warn-600 text-xs font-semibold px-2.5 py-1 rounded-full">
-                              <span className="w-1.5 h-1.5 bg-warn-500 rounded-full" /> Pending
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-5 py-4 text-center">
-                          <div className="flex flex-col items-center gap-1">
-                            {isAdminEmail(user.email) ? (
-                              <span className="text-xs text-brand-500 font-bold">👑 Admin</span>
-                            ) : (
-                              <>
-                                {/* Role selector */}
-                                <select
-                                  value={user.plan || 'free'}
-                                  disabled={roleTarget === user.id}
-                                  onChange={e => setRole(user.id, e.target.value)}
-                                  className="text-xs font-semibold px-2 py-1 rounded-lg border border-line bg-white text-heading w-full max-w-[110px] cursor-pointer disabled:opacity-50"
-                                >
-                                  <option value="free">Free</option>
-                                  <option value="plus">Plus</option>
-                                  <option value="family">Family</option>
-                                  <option value="tester">Tester 🔬</option>
-                                  <option value="noob">Noob 🧪</option>
-                                </select>
-                                <button
-                                  onClick={() => toggleActivate(user.id, user.is_active)}
-                                  className={`text-xs font-semibold px-3 py-1.5 rounded-lg transition w-full max-w-[110px] ${
-                                    user.is_active
-                                      ? 'bg-danger-50 text-danger-600 hover:bg-danger-100'
-                                      : 'bg-brand-600 text-white hover:bg-brand-700'
-                                  }`}
-                                >
-                                  {user.is_active ? 'Deactivate' : 'Approve'}
-                                </button>
-                              </>
-                            )}
-                            <button
-                              onClick={() => setConnectTarget({ id: user.id, email: user.email })}
-                              className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-brand-50 text-brand-700 hover:bg-brand-100 transition w-full max-w-[110px]"
+                              className="flex-1 text-sm font-bold py-2.5 rounded-xl bg-brand-50 text-brand-700 hover:bg-brand-100 transition"
                             >
-                              {user.has_cookie ? 'Reconnect AINS' : 'Connect AINS'}
+                              + Credits
                             </button>
                           </div>
-                        </td>
+                          <button
+                            onClick={() => setConnectTarget({ id: user.id, email: user.email })}
+                            className="w-full text-sm font-bold py-2.5 rounded-xl bg-gray-50 text-gray-700 hover:bg-gray-100 transition"
+                          >
+                            {user.has_cookie ? 'Reconnect AINS' : 'Connect AINS'}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Desktop table — hidden on small screens */}
+                <div className="hidden md:block card p-0 overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-gray-50 border-b border-line text-left">
+                        <th className="px-5 py-3 text-xs font-bold text-muted uppercase tracking-wide">User</th>
+                        <th className="px-5 py-3 text-xs font-bold text-muted uppercase tracking-wide">Plan</th>
+                        <th className="px-5 py-3 text-xs font-bold text-muted uppercase tracking-wide text-center">Credits</th>
+                        <th className="px-5 py-3 text-xs font-bold text-muted uppercase tracking-wide">Cookie</th>
+                        <th className="px-5 py-3 text-xs font-bold text-muted uppercase tracking-wide">Records</th>
+                        <th className="px-5 py-3 text-xs font-bold text-muted uppercase tracking-wide">Joined</th>
+                        <th className="px-5 py-3 text-xs font-bold text-muted uppercase tracking-wide text-center">Status</th>
+                        <th className="px-5 py-3 text-xs font-bold text-muted uppercase tracking-wide text-center">Action</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {filtered.map((user, i) => (
+                        <tr key={user.id} className={`border-b border-line/50 hover:bg-brand-50/30 transition-colors ${i === filtered.length - 1 ? 'border-0' : ''}`}>
+                          <td className="px-5 py-4">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center font-bold text-sm flex-shrink-0">
+                                {(user.email || '?')[0].toUpperCase()}
+                              </div>
+                              <div className="font-semibold text-heading max-w-[180px] truncate">{user.email}</div>
+                            </div>
+                          </td>
+                          <td className="px-5 py-4">
+                            <span className={`text-xs font-bold px-2 py-0.5 rounded-full capitalize ${
+                              user.plan === 'family' ? 'bg-ok-100 text-ok-700' :
+                              user.plan === 'plus'   ? 'bg-brand-100 text-brand-700' :
+                              user.plan === 'noob'   ? 'bg-purple-100 text-purple-700' :
+                              user.plan === 'tester' ? 'bg-yellow-100 text-yellow-700' :
+                                                       'bg-gray-100 text-gray-600'
+                            }`}>{user.plan || 'free'}{user.plan === 'noob' ? ' 🧪' : user.plan === 'tester' ? ' 🔬' : ''}</span>
+                          </td>
+                          <td className="px-5 py-4 text-center">
+                            <div className="flex flex-col items-center gap-1">
+                              <span className="font-bold text-heading text-sm tabular-nums">{user.credits ?? 0}</span>
+                              <button
+                                onClick={() => { setGrantTarget({ id: user.id, email: user.email, credits: user.credits ?? 0 }); setGrantAmount(''); setGrantNote('') }}
+                                className="text-xs font-semibold text-brand-600 hover:underline"
+                              >Grant</button>
+                            </div>
+                          </td>
+                          <td className="px-5 py-4">
+                            {user.has_cookie
+                              ? <span className="text-ok-600 font-semibold text-xs">✓ Saved</span>
+                              : <span className="text-subtle text-xs">Not saved</span>}
+                          </td>
+                          <td className="px-5 py-4 text-muted text-xs">{user.submissions_success} / {user.submissions_total}</td>
+                          <td className="px-5 py-4 text-subtle text-xs">
+                            {user.created_at ? new Date(user.created_at).toLocaleDateString('en-MY') : '—'}
+                          </td>
+                          <td className="px-5 py-4 text-center">
+                            {user.is_active ? (
+                              <span className="inline-flex items-center gap-1 bg-ok-100 text-ok-700 text-xs font-semibold px-2.5 py-1 rounded-full">
+                                <span className="w-1.5 h-1.5 bg-ok-500 rounded-full" /> Active
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 bg-warn-100 text-warn-600 text-xs font-semibold px-2.5 py-1 rounded-full">
+                                <span className="w-1.5 h-1.5 bg-warn-500 rounded-full" /> Pending
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-5 py-4 text-center">
+                            <div className="flex flex-col items-center gap-1">
+                              {isAdminEmail(user.email) ? (
+                                <span className="text-xs text-brand-500 font-bold">👑 Admin</span>
+                              ) : (
+                                <>
+                                  <select
+                                    value={user.plan || 'free'}
+                                    disabled={roleTarget === user.id}
+                                    onChange={e => setRole(user.id, e.target.value)}
+                                    className="text-xs font-semibold px-2 py-1 rounded-lg border border-line bg-white text-heading w-full max-w-[110px] cursor-pointer disabled:opacity-50"
+                                  >
+                                    <option value="free">Free</option>
+                                    <option value="plus">Plus</option>
+                                    <option value="family">Family</option>
+                                    <option value="tester">Tester 🔬</option>
+                                    <option value="noob">Noob 🧪</option>
+                                  </select>
+                                  <button
+                                    onClick={() => toggleActivate(user.id, user.is_active)}
+                                    className={`text-xs font-semibold px-3 py-1.5 rounded-lg transition w-full max-w-[110px] ${
+                                      user.is_active
+                                        ? 'bg-danger-50 text-danger-600 hover:bg-danger-100'
+                                        : 'bg-brand-600 text-white hover:bg-brand-700'
+                                    }`}
+                                  >
+                                    {user.is_active ? 'Deactivate' : 'Approve'}
+                                  </button>
+                                </>
+                              )}
+                              <button
+                                onClick={() => setConnectTarget({ id: user.id, email: user.email })}
+                                className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-brand-50 text-brand-700 hover:bg-brand-100 transition w-full max-w-[110px]"
+                              >
+                                {user.has_cookie ? 'Reconnect AINS' : 'Connect AINS'}
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
             )}
           </>
         )}
@@ -691,12 +768,12 @@ export default function Admin() {
         {/* ── Payments tab ── */}
         {tab === 'payments' && (
           <>
-            <div className="flex gap-2 mb-5">
+            <div className="flex gap-2 mb-5 overflow-x-auto">
               {['pending', 'approved', 'rejected', 'all'].map(f => (
                 <button
                   key={f}
                   onClick={() => setPayFilter(f)}
-                  className={`px-4 py-2 rounded-xl text-sm font-bold border transition-all capitalize ${
+                  className={`px-4 py-2 rounded-xl text-sm font-bold border transition-all capitalize whitespace-nowrap flex-shrink-0 ${
                     payFilter === f
                       ? 'bg-brand-600 text-white border-brand-600'
                       : 'bg-white border-line text-muted hover:border-brand-300 hover:text-brand-600'
