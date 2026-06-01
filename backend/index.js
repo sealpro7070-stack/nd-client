@@ -1,5 +1,4 @@
 require('dotenv').config()
-console.log('[BOOT] ENV CHECK — SUPABASE_URL:', process.env.SUPABASE_URL || '(MISSING)')
 require('express-async-errors')
 const express = require('express')
 const cors = require('cors')
