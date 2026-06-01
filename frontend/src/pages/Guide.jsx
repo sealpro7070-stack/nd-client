@@ -16,26 +16,26 @@ const STEPS = [
   {
     n: '2',
     title: 'Connect your AINS account',
-    body: 'On the Dashboard, click "Connect AINS Account". Enter your AINS (DELIMa) email and password. The system will log in on your behalf — if your account uses Microsoft 2FA, you\'ll see a number to tap in your Microsoft Authenticator app. Once approved, your session is captured and saved.',
-    tip: 'Your password is used once to log in and immediately discarded. Only your encrypted session cookie is saved — never your password. If connection fails even with correct credentials, Microsoft may have blocked the automated sign-in from the server. Fix: manually log into ains.moe.gov.my in your browser first, then try connecting again.',
+    body: 'On the Dashboard, click "Connect AINS Account". Enter your AINS (DELIMa) email and password. The system will log in on your behalf — if your account uses Microsoft 2FA, you\'ll see a number to tap in your Microsoft Authenticator app. Once approved, your session is captured and active.',
+    tip: 'Your password is used once to log in and immediately discarded — it is never saved. If connection fails even with correct credentials, Microsoft may have blocked the automated sign-in. Fix: open ains.moe.gov.my in your browser, log in manually once, then try connecting again here.',
   },
   {
     n: '3',
-    title: 'Submit your books',
-    body: 'Choose your language and number of books, then tap "Submit Now". The bot logs into AINS using your saved session and fills in your reading records one by one. Each submission takes about 30–60 seconds. Check the live progress panel and History afterwards.',
-    tip: 'AINS has a hard limit of 30 book records per day — this is enforced by the government portal, not NilamDesk. If you hit it, you\'ll see "Daily limit reached — try again tomorrow." Credits are only deducted when a submission succeeds.',
+    title: 'Submit immediately — sessions are short-lived',
+    body: 'Your AINS session expires in roughly 30 minutes. Once connected, go straight to the Dashboard and tap "Submit Now" without delay. Choose your language and number of books, then submit. The bot uses your active session to fill in your reading records one by one.',
+    tip: 'Do not wait after connecting. Connect → Submit Now is a single sitting. If you wait too long and the session expires, you will need to reconnect before submitting.',
   },
   {
     n: '4',
     title: 'Understand submission results',
-    body: 'Each book will show Done, Failed, or Daily limit reached. A "Failed" result usually means AINS rejected that specific book (e.g. the form updated and our automation couldn\'t complete it) — other books in the same run may still succeed. A "Daily limit reached" means AINS\'s 30/day quota was full; those credits are not charged and the books will be available to resubmit tomorrow.',
-    tip: 'If all books fail with a form error, AINS may have updated their website. This is outside NilamDesk\'s control — check back in a day or two as updates are rolled out.',
+    body: 'Each book will show Done, Failed, or Daily limit reached. A "Failed" result usually means AINS rejected that book (e.g. already submitted, or the form was updated). A "Daily limit reached" means AINS\'s hard cap of 30 books/day was full — those credits are not charged and the books can be resubmitted the next day.',
+    tip: 'Credits are only deducted when a submission succeeds. Failed and limit-reached books are never charged.',
   },
   {
     n: '5',
-    title: 'Reconnect when your session expires',
-    body: 'AINS sessions last roughly 30 days. When yours expires, submissions will fail with "session expired". Go to Dashboard → click Reconnect, log in again with your AINS credentials, and approve the MFA prompt. Your new session is saved and you\'re ready to submit again.',
-    tip: 'You stay in full control — NilamDesk never submits in the background without you. Every run is triggered by you tapping Submit Now.',
+    title: 'Next time — reconnect and submit again',
+    body: 'Every submission session requires a fresh connection. Each time you want to submit books, click "Connect AINS Account" on the Dashboard, log in, approve MFA, and then tap Submit Now straight away. There is no persistent background automation — every run is triggered by you.',
+    tip: 'This keeps you fully in control. NilamDesk never submits without your active involvement each session.',
   },
 ]
 
@@ -54,9 +54,9 @@ export default function Guide() {
         <div className="absolute -right-8 -top-8 w-32 h-32 bg-white/5 rounded-full pointer-events-none" />
         <div className="relative">
           <p className="text-brand-200 text-xs font-bold uppercase tracking-widest mb-2">How it works</p>
-          <p className="font-display text-xl font-bold mb-3">You log in. We automate the rest.</p>
+          <p className="font-display text-xl font-bold mb-3">You connect. We handle the form filling.</p>
           <p className="text-brand-100 text-sm leading-relaxed">
-            You log in to AINS yourself (including any 2FA required). We capture your session and use it each month to submit your reading records automatically — so you never miss a deadline.
+            Each session: connect your AINS account (including 2FA), then tap Submit Now. We use your active session to fill in all your reading records automatically — no manual form clicking required.
           </p>
           <div className="mt-4 flex items-center gap-2 bg-white/10 rounded-xl px-3 py-2 w-fit">
             <svg className="w-4 h-4 text-brand-200" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
@@ -115,8 +115,8 @@ export default function Guide() {
             a: 'You get 8 free book credits when you sign up — no payment required. Credits are only deducted when a submission succeeds. To submit more, upgrade to the annual plan (RM49.90/year for 150 credits).',
           },
           {
-            q: 'What if my session expires?',
-            a: 'Sessions expire after ~30 days. On the Dashboard, click Reconnect, log in with your AINS credentials, and approve the MFA prompt. A fresh session will be captured and saved.',
+            q: 'How long does a session last?',
+            a: 'Your AINS session is active for roughly 30 minutes after connecting. This means you must connect and submit in the same sitting — do not wait after connecting. Each time you want to submit books, start with a fresh Connect.',
           },
           {
             q: 'Does it work on mobile?',
