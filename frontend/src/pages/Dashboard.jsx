@@ -157,6 +157,7 @@ export default function Dashboard() {
     }
     progressPollRef.current = setTimeout(pollProgress, 2000)
 
+    let triggerFailed = false
     try {
       const token = await getToken()
       await fetch(`${BACKEND}/api/settings`, {
@@ -174,7 +175,12 @@ export default function Dashboard() {
       setTriggerMsg(data.message || 'Done! Check History for details.')
       setSettings(s => ({ ...s, language: apiLang, books_per_month: count }))
     } catch (err) {
-      setTriggerMsg(err.message)
+      triggerFailed = true
+      // A dropped connection (server restarting / brief outage) surfaces as a
+      // bare "Failed to fetch" / TypeError — translate it into something a user
+      // can act on instead of a scary raw error.
+      const isNetwork = err.name === 'TypeError' || /failed to fetch|networkerror|load failed/i.test(err.message)
+      setTriggerMsg(isNetwork ? 'Server is busy or restarting — please wait a moment and try again.' : err.message)
       setIsError(true)
       if (/session expired|reconnect/i.test(err.message)) {
         setCredsStatus('none')
@@ -191,7 +197,17 @@ export default function Dashboard() {
         .is('family_slot_id', null)
         .gte('created_at', triggerTime)
         .order('created_at', { ascending: true })
-      if (data) setLiveProgress(data)
+      if (data) {
+        // If the trigger died, any rows still "pending" are orphaned (the run
+        // crashed before resolving them). Show them as failed so they don't
+        // spin "Sending" forever — the backend's stale-pending sweep will mark
+        // them failed in the DB on the next run.
+        setLiveProgress(triggerFailed
+          ? data.map(s => s.status === 'pending'
+              ? { ...s, status: 'failed', error_message: s.error_message || 'Interrupted — please try again' }
+              : s)
+          : data)
+      }
     }
   }
 
