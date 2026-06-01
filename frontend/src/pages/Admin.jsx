@@ -180,8 +180,9 @@ export default function Admin() {
   // ── Referrals ──────────────────────────────────────────────
   async function fetchCodes() {
     try {
+      const freshToken = token || (await supabase.auth.getSession()).data.session?.access_token
       const res = await fetch(`${BACKEND_URL}/api/referrals/admin/codes`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${freshToken}` }
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
@@ -191,8 +192,9 @@ export default function Admin() {
 
   async function fetchCommissions() {
     try {
+      const freshToken = token || (await supabase.auth.getSession()).data.session?.access_token
       const url = `${BACKEND_URL}/api/referrals/admin/commissions${commFilter !== 'all' ? `?status=${commFilter}` : ''}`
-      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${freshToken}` } })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
       setCommissions(data.commissions || [])
