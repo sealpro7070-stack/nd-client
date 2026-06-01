@@ -1,18 +1,60 @@
 import { Routes, Route, Navigate, NavLink, Link } from 'react-router-dom'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, lazy, Suspense, Component } from 'react'
 import { supabase } from './lib/supabase'
-import Landing  from './pages/Landing'
-import Dashboard from './pages/Dashboard'
-import Settings  from './pages/Settings'
-import History   from './pages/History'
-import Admin     from './pages/Admin'
-import Upgrade   from './pages/Upgrade'
-import Guide     from './pages/Guide'
-import Privacy       from './pages/Privacy'
-import Terms         from './pages/Terms'
-import Marketer      from './pages/Marketer'
-import ResetPassword from './pages/ResetPassword'
 import Navbar    from './components/Navbar'
+
+// Code-split each page into its own chunk so the initial load only ships the
+// route the visitor actually landed on (heavy pages like recharts-powered
+// Admin/Dashboard no longer bloat the first paint).
+const Landing       = lazy(() => import('./pages/Landing'))
+const Dashboard     = lazy(() => import('./pages/Dashboard'))
+const Settings      = lazy(() => import('./pages/Settings'))
+const History       = lazy(() => import('./pages/History'))
+const Admin         = lazy(() => import('./pages/Admin'))
+const Upgrade       = lazy(() => import('./pages/Upgrade'))
+const Guide         = lazy(() => import('./pages/Guide'))
+const Privacy       = lazy(() => import('./pages/Privacy'))
+const Terms         = lazy(() => import('./pages/Terms'))
+const Marketer      = lazy(() => import('./pages/Marketer'))
+const ResetPassword = lazy(() => import('./pages/ResetPassword'))
+
+function Spinner() {
+  return (
+    <div className="flex items-center justify-center min-h-screen bg-page">
+      <span style={{ width: 32, height: 32, border: '3px solid #0F172A', borderTopColor: '#FFD23F', borderRadius: '50%', animation: 'spin 0.8s linear infinite', display: 'inline-block' }} />
+    </div>
+  )
+}
+
+// After a deploy, an open tab may request a now-deleted chunk hash and the
+// dynamic import() rejects. Catch that once, force a single hard reload to
+// pull the fresh index, and only show a fallback if the reload also fails.
+class ChunkErrorBoundary extends Component {
+  constructor(props) {
+    super(props)
+    this.state = { failed: false }
+  }
+  static getDerivedStateFromError() {
+    return { failed: true }
+  }
+  componentDidCatch() {
+    if (!sessionStorage.getItem('chunk-reloaded')) {
+      sessionStorage.setItem('chunk-reloaded', '1')
+      window.location.reload()
+    }
+  }
+  render() {
+    if (this.state.failed && sessionStorage.getItem('chunk-reloaded')) {
+      return (
+        <div className="flex flex-col items-center justify-center min-h-screen bg-page gap-3 px-4 text-center">
+          <p className="text-muted">Something went wrong loading the page.</p>
+          <button onClick={() => { sessionStorage.removeItem('chunk-reloaded'); window.location.reload() }} className="px-4 py-2 rounded-xl bg-brand-500 text-ink font-bold">Reload</button>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
 
 function AuthGuard({ children }) {
   const [authed, setAuthed] = useState(null)
@@ -23,32 +65,30 @@ function AuthGuard({ children }) {
     })
     return () => subscription.unsubscribe()
   }, [])
-  if (authed === null) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-page">
-        <span style={{ width: 32, height: 32, border: '3px solid #0F172A', borderTopColor: '#FFD23F', borderRadius: '50%', animation: 'spin 0.8s linear infinite', display: 'inline-block' }} />
-      </div>
-    )
-  }
+  if (authed === null) return <Spinner />
   return authed ? children : <Navigate to="/" replace />
 }
 
 function App() {
   return (
-    <Routes>
-      <Route path="/"         element={<Landing />} />
-      <Route path="/upgrade"  element={<AuthGuard><Upgrade /></AuthGuard>} />
-      <Route path="/admin"    element={<AuthGuard><Admin /></AuthGuard>} />
-      <Route path="/dashboard" element={<AuthGuard><AppLayout><Dashboard /></AppLayout></AuthGuard>} />
-      <Route path="/settings"  element={<AuthGuard><AppLayout><Settings /></AppLayout></AuthGuard>} />
-      <Route path="/history"   element={<AuthGuard><AppLayout><History /></AppLayout></AuthGuard>} />
-      <Route path="/guide"     element={<AuthGuard><AppLayout><Guide /></AppLayout></AuthGuard>} />
-      <Route path="/privacy"        element={<Privacy />} />
-      <Route path="/terms"          element={<Terms />} />
-      <Route path="/m"              element={<Marketer />} />
-      <Route path="/reset-password" element={<ResetPassword />} />
-      <Route path="*"          element={<Navigate to="/" replace />} />
-    </Routes>
+    <ChunkErrorBoundary>
+      <Suspense fallback={<Spinner />}>
+        <Routes>
+          <Route path="/"         element={<Landing />} />
+          <Route path="/upgrade"  element={<AuthGuard><Upgrade /></AuthGuard>} />
+          <Route path="/admin"    element={<AuthGuard><Admin /></AuthGuard>} />
+          <Route path="/dashboard" element={<AuthGuard><AppLayout><Dashboard /></AppLayout></AuthGuard>} />
+          <Route path="/settings"  element={<AuthGuard><AppLayout><Settings /></AppLayout></AuthGuard>} />
+          <Route path="/history"   element={<AuthGuard><AppLayout><History /></AppLayout></AuthGuard>} />
+          <Route path="/guide"     element={<AuthGuard><AppLayout><Guide /></AppLayout></AuthGuard>} />
+          <Route path="/privacy"        element={<Privacy />} />
+          <Route path="/terms"          element={<Terms />} />
+          <Route path="/m"              element={<Marketer />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="*"          element={<Navigate to="/" replace />} />
+        </Routes>
+      </Suspense>
+    </ChunkErrorBoundary>
   )
 }
 
