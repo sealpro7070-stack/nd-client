@@ -22,32 +22,9 @@ const DAILY_MAX = 30
 // Per-user/slot lock: prevents simultaneous bot runs for the same user
 const activeBotRuns = new Map()
 
-// Global browser semaphore: caps total concurrent Playwright instances (~150-300 MB each)
-const MAX_CONCURRENT_BROWSERS = parseInt(process.env.MAX_CONCURRENT_BROWSERS, 10) || 5
-let activeBrowserCount = 0
-const browserWaitQueue = []
-
-async function acquireBrowserSlot(timeoutMs = 30000) {
-  if (activeBrowserCount < MAX_CONCURRENT_BROWSERS) {
-    activeBrowserCount++
-    return () => { activeBrowserCount-- ; releaseBrowserSlot() }
-  }
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error('Browser pool full — try again later')), timeoutMs)
-    browserWaitQueue.push((releaseFn) => {
-      clearTimeout(timer)
-      resolve(releaseFn)
-    })
-  })
-}
-
-function releaseBrowserSlot() {
-  if (browserWaitQueue.length > 0 && activeBrowserCount < MAX_CONCURRENT_BROWSERS) {
-    activeBrowserCount++
-    const next = browserWaitQueue.shift()
-    next(() => { activeBrowserCount-- ; releaseBrowserSlot() })
-  }
-}
+// Browser concurrency is capped by the shared global pool (lib/browser-pool.js)
+// so the AINS-connect flow and the submission bot share ONE memory budget.
+const { acquireBrowserSlot } = require('../lib/browser-pool')
 
 async function withLock(key, fn, timeoutMs = 180000) {
   // Wait for any existing run on this key to finish
@@ -181,19 +158,29 @@ async function _startBot(userId, directCookie, directSsUser, directSsProfile, di
   const month = now.getMonth() + 1
   const year  = now.getFullYear()
 
-  // Dedup window: skip books already submitted this month so the same book
-  // isn't sent twice. Volume itself is governed purely by credits + DAILY_MAX.
-  const { data: existing } = await supabase
-    .from('submissions')
-    .select('book_id')
-    .eq('user_id', userId)
-    .is('family_slot_id', null)
-    .in('status', ['success', 'pending'])
-    .eq('month', month)
-    .eq('year', year)
+  // Dedup: never resend a book this AINS account already has. We exclude two sets
+  // (all-time, not just this month — AINS rejects duplicates far beyond one month):
+  //   1. books already submitted (success) or in-flight (pending)
+  //   2. books AINS previously rejected as "Duplicate entry" (failed + 'duplicate')
+  const [{ data: doneRows }, { data: dupRows }] = await Promise.all([
+    supabase
+      .from('submissions')
+      .select('book_id')
+      .eq('user_id', userId)
+      .is('family_slot_id', null)
+      .in('status', ['success', 'pending']),
+    supabase
+      .from('submissions')
+      .select('book_id')
+      .eq('user_id', userId)
+      .is('family_slot_id', null)
+      .eq('status', 'failed')
+      .eq('error_message', 'duplicate'),
+  ])
 
-  const alreadySubmitted = existing || []
-  const alreadyBookIds   = alreadySubmitted.map(s => s.book_id)
+  const alreadyBookIds = [...new Set(
+    [...(doneRows || []), ...(dupRows || [])].map(s => s.book_id).filter(Boolean)
+  )]
 
   // ── Limits: CREDITS are the source of truth ───────────────
   // Every user spends 1 credit per successful book. New users get 8 free credits
@@ -257,7 +244,9 @@ async function _startBot(userId, directCookie, directSsUser, directSsProfile, di
     throw new Error(`No ${userSettings.language} books available. Please add more books to the seed data.`)
   }
 
-  const shuffled = fisherYates(availableBooks).slice(0, needed)
+  const ranked   = fisherYates(availableBooks)
+  const shuffled = ranked.slice(0, needed)
+  const spareBooks = ranked.slice(needed) // replacement pool for any AINS duplicates
   console.log(`[bot] Selected ${shuffled.length} book(s):`, shuffled.map(b => b.title))
 
   // 7. Create pending submission records
@@ -291,6 +280,10 @@ async function _startBot(userId, directCookie, directSsUser, directSsProfile, di
       cookies: cookiesToInject,
       books: shuffled,
       submissions: insertedSubs,
+      spareBooks,
+      month,
+      year,
+      familySlotId: null,
     })
   } finally {
     if (releaseBrowser) releaseBrowser()
@@ -378,16 +371,27 @@ async function _startBotForSlot(userId, slotId, slot) {
     .eq('status', 'pending')
     .lt('created_at', new Date(Date.now() - 5 * 60 * 1000).toISOString())
 
-  const { data: existing } = await supabase
-    .from('submissions')
-    .select('book_id')
-    .eq('user_id', userId)
-    .eq('family_slot_id', slotId)
-    .eq('month', month)
-    .eq('year', year)
-    .in('status', ['success'])
+  // Dedup (all-time, per slot): exclude books already submitted (success/pending)
+  // and books AINS rejected as duplicates (failed + 'duplicate' marker).
+  const [{ data: doneRows }, { data: dupRows }] = await Promise.all([
+    supabase
+      .from('submissions')
+      .select('book_id')
+      .eq('user_id', userId)
+      .eq('family_slot_id', slotId)
+      .in('status', ['success', 'pending']),
+    supabase
+      .from('submissions')
+      .select('book_id')
+      .eq('user_id', userId)
+      .eq('family_slot_id', slotId)
+      .eq('status', 'failed')
+      .eq('error_message', 'duplicate'),
+  ])
 
-  const alreadyBookIds = (existing || []).map(s => s.book_id)
+  const alreadyBookIds = [...new Set(
+    [...(doneRows || []), ...(dupRows || [])].map(s => s.book_id).filter(Boolean)
+  )]
 
   // Credits (shared at the parent-user level) are the volume authority.
   const creditCeiling = isAdminUser ? Infinity : creditBalance
@@ -420,7 +424,9 @@ async function _startBotForSlot(userId, slotId, slot) {
   const { data: availableBooks } = await booksQuery.limit(200)
   if (!availableBooks?.length) throw new Error('No books available for this slot.')
 
-  const shuffled = fisherYates(availableBooks).slice(0, needed)
+  const ranked   = fisherYates(availableBooks)
+  const shuffled = ranked.slice(0, needed)
+  const spareBooks = ranked.slice(needed) // replacement pool for any AINS duplicates
 
   const { data: insertedSubs, error: insertErr } = await supabase
     .from('submissions')
@@ -447,6 +453,10 @@ async function _startBotForSlot(userId, slotId, slot) {
       cookies: cookiesToInject,
       books: shuffled,
       submissions: insertedSubs,
+      spareBooks,
+      month,
+      year,
+      familySlotId: slotId,
     })
   } finally {
     if (releaseBrowser) releaseBrowser()

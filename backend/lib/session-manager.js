@@ -5,31 +5,12 @@
  */
 
 const { chromium } = require('playwright')
+const { acquireBrowserSlot } = require('./browser-pool')
 
-const sessions = {} // { userId: { browser, context, page } }
+const sessions = {} // { userId: { browser, context, page, releaseBrowser } }
 
 const AINS_URL = 'https://ains.moe.gov.my'
 const MFA_TIMEOUT_MS = 3 * 60 * 1000 // 3 minutes for user to approve MFA
-const MAX_CONCURRENT_BROWSERS = 3
-let activeBrowserCount = 0
-const browserWaitQueue = []
-
-async function acquireBrowserSlot() {
-  if (activeBrowserCount < MAX_CONCURRENT_BROWSERS) {
-    activeBrowserCount++
-    return
-  }
-  return new Promise((resolve) => browserWaitQueue.push(resolve))
-}
-
-function releaseBrowserSlot() {
-  activeBrowserCount = Math.max(0, activeBrowserCount - 1)
-  const next = browserWaitQueue.shift()
-  if (next) {
-    activeBrowserCount++
-    next()
-  }
-}
 
 /**
  * Launch a headless Chromium browser with anti-bot masking
@@ -37,22 +18,30 @@ function releaseBrowserSlot() {
 async function createSession(userId) {
   console.log(`[session] Creating session for user ${userId}`)
 
-  await acquireBrowserSlot()
-
+  // Destroy any pre-existing session first so its slot is freed before we take one.
   if (sessions[userId]) {
     await destroySession(userId).catch(() => {})
   }
 
-  const browser = await chromium.launch({
-    headless: true,
-    args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-blink-features=AutomationControlled',
-      '--disable-features=IsolateOrigins,site-per-process',
-      '--disable-ipc-flooding-protection',
-    ],
-  })
+  // Wait up to 30s for a free browser slot, then fail fast (caller returns "busy").
+  const releaseBrowser = await acquireBrowserSlot()
+
+  let browser
+  try {
+    browser = await chromium.launch({
+      headless: true,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-blink-features=AutomationControlled',
+        '--disable-features=IsolateOrigins,site-per-process',
+        '--disable-ipc-flooding-protection',
+      ],
+    })
+  } catch (err) {
+    releaseBrowser()
+    throw err
+  }
 
   const context = await browser.newContext({
     userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
@@ -91,7 +80,7 @@ async function createSession(userId) {
     }
   })
 
-  sessions[userId] = { browser, context, page }
+  sessions[userId] = { browser, context, page, releaseBrowser }
   return sessions[userId]
 }
 
@@ -107,17 +96,14 @@ function getSession(userId) {
  */
 async function destroySession(userId) {
   const session = sessions[userId]
-  if (!session) {
-    releaseBrowserSlot()
-    return
-  }
+  if (!session) return
 
   try {
     await session.browser.close().catch(() => {})
   } catch {}
 
   delete sessions[userId]
-  releaseBrowserSlot()
+  if (session.releaseBrowser) session.releaseBrowser()
   console.log(`[session] Destroyed session for ${userId}`)
 }
 

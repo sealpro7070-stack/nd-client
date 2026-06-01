@@ -69,7 +69,13 @@ async function takeScreenshot(page, label) {
   }
 }
 
-async function runBot({ user, settings, cookie, ssUser, ssProfile, cookies, books, submissions }) {
+// error_message sentinel marking a book AINS rejected as "Duplicate entry".
+// bot.js excludes these book_ids from future runs so the same book is never retried.
+const DUP_MARKER = 'duplicate'
+// Max books we'll swap through per slot when AINS keeps reporting duplicates.
+const MAX_REPLACEMENTS = 5
+
+async function runBot({ user, settings, cookie, ssUser, ssProfile, cookies, books, submissions, spareBooks = [], month, year, familySlotId = null }) {
   let browser
   try {
     const launched = await launchBrowser()
@@ -91,38 +97,70 @@ async function runBot({ user, settings, cookie, ssUser, ssProfile, cookies, book
     console.log(`[bot] Logged in. Starting ${books.length} submission(s) for ${user.email}`)
 
     const results = []
+    const spares = Array.isArray(spareBooks) ? [...spareBooks] : []
 
     for (let i = 0; i < books.length; i++) {
-      const book = books[i]
+      let book = books[i]
       const submission = submissions[i]
+      let replacements = 0
+      let resolved = false
 
-      console.log(`[bot] [${i + 1}/${books.length}] Submitting: "${book.title}"`)
+      while (!resolved) {
+        console.log(`[bot] [${i + 1}/${books.length}] Submitting: "${book.title}"`)
 
-      try {
-        await fillForm(page, book, settings)
+        try {
+          await fillForm(page, book, settings)
 
-        await supabase
-          .from('submissions')
-          .update({ status: 'success', submitted_at: new Date().toISOString() })
-          .eq('id', submission.id)
+          await supabase
+            .from('submissions')
+            .update({ status: 'success', book_id: book.id, submitted_at: new Date().toISOString() })
+            .eq('id', submission.id)
 
-        results.push({ book: book.title, status: 'success' })
-        console.log(`[bot] ✓ Success: "${book.title}"`)
+          results.push({ book: book.title, status: 'success' })
+          console.log(`[bot] ✓ Success: "${book.title}"`)
+          resolved = true
 
-      } catch (err) {
-        console.error(`[bot] ✗ Failed: "${book.title}" — ${err.message}`)
+        } catch (err) {
+          // Session expired — stop all submissions, let outer catch handle it
+          if (err.code === 'SESSION_EXPIRED') throw err
 
-        // Session expired — stop all submissions, let outer catch handle it
-        if (err.code === 'SESSION_EXPIRED') throw err
-
-        await takeScreenshot(page, `fail-${book.title.replace(/\s+/g, '-').slice(0, 20)}`)
-
-        await supabase
-          .from('submissions')
-          .update({ status: 'failed' })
-          .eq('id', submission.id)
-
-        results.push({ book: book.title, status: 'failed', error: err.message })
+          // AINS already has this book on the account. Record it so it's never
+          // picked again, then swap in a replacement so the run still hits target.
+          const isDuplicate = /duplicate entry/i.test(err.message || '')
+          if (isDuplicate) {
+            const spare = replacements < MAX_REPLACEMENTS ? spares.shift() : null
+            if (spare) {
+              console.log(`[bot] ↻ "${book.title}" already on AINS — recording + swapping to "${spare.title}"`)
+              // The submission row will be reused for the replacement, so persist
+              // the duplicate book separately as a marker row (failed, not charged).
+              await supabase.from('submissions').insert({
+                user_id: user.id, book_id: book.id, month, year,
+                status: 'failed', error_message: DUP_MARKER, family_slot_id: familySlotId,
+              }).then(() => {}, () => {})
+              replacements++
+              book = spare
+              await page.waitForTimeout(1500)
+              continue
+            }
+            // No replacement left — this row itself becomes the duplicate record.
+            console.log(`[bot] ↻ "${book.title}" already on AINS — no replacement available`)
+            await supabase
+              .from('submissions')
+              .update({ status: 'failed', error_message: DUP_MARKER })
+              .eq('id', submission.id)
+            results.push({ book: book.title, status: 'duplicate', error: err.message })
+            resolved = true
+          } else {
+            console.error(`[bot] ✗ Failed: "${book.title}" — ${err.message}`)
+            await takeScreenshot(page, `fail-${book.title.replace(/\s+/g, '-').slice(0, 20)}`)
+            await supabase
+              .from('submissions')
+              .update({ status: 'failed' })
+              .eq('id', submission.id)
+            results.push({ book: book.title, status: 'failed', error: err.message })
+            resolved = true
+          }
+        }
       }
 
       // Random human-like delay between submissions (3–8 seconds)
