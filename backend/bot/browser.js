@@ -98,6 +98,7 @@ async function runBot({ user, settings, cookie, ssUser, ssProfile, cookies, book
 
     const results = []
     const spares = Array.isArray(spareBooks) ? [...spareBooks] : []
+    let dailyLimitHit = false
 
     for (let i = 0; i < books.length; i++) {
       let book = books[i]
@@ -123,6 +124,19 @@ async function runBot({ user, settings, cookie, ssUser, ssProfile, cookies, book
         } catch (err) {
           // Session expired — stop all submissions, let outer catch handle it
           if (err.code === 'SESSION_EXPIRED') throw err
+
+          // AINS 30/day limit hit — mark this and all remaining submissions, stop run.
+          if (err.code === 'DAILY_LIMIT') {
+            const limitMsg = 'AINS daily limit reached — try again tomorrow.'
+            const remainingIds = submissions.slice(i).map(s => s.id)
+            await supabase.from('submissions').update({ status: 'failed', error_message: limitMsg }).in('id', remainingIds)
+            submissions.slice(i).forEach((s, idx) => {
+              results.push({ book: (books[i + idx] || book).title, status: 'failed', error: limitMsg })
+            })
+            console.log(`[bot] Daily limit hit — stopping run, marked ${remainingIds.length} submission(s).`)
+            dailyLimitHit = true
+            resolved = true
+          }
 
           // AINS already has this book on the account. Record it so it's never
           // picked again, then swap in a replacement so the run still hits target.
@@ -162,6 +176,8 @@ async function runBot({ user, settings, cookie, ssUser, ssProfile, cookies, book
           }
         }
       }
+
+      if (dailyLimitHit) break
 
       // Random human-like delay between submissions (3–8 seconds)
       if (i < books.length - 1) {

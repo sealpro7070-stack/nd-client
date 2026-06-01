@@ -10,30 +10,32 @@ const STEPS = [
   {
     n: '1',
     title: 'Create your NilamDesk account',
-    body: 'Sign up with your personal email and a password. Check your inbox for a verification link and click it to activate your account.',
-    tip: 'Use Gmail, Outlook, or any personal email — avoid school emails which may block automated messages.',
+    body: 'Sign up with your personal email and a password. Check your inbox for a verification link and click it to activate your account. You get 8 free book credits on sign-up — no payment needed to try it out.',
+    tip: 'Use Gmail, Outlook, or any personal email — avoid school emails which may block verification messages.',
   },
   {
     n: '2',
-    title: 'Set your preferences',
-    body: 'Go to Settings. Choose your book language (Malay, English, Chinese, or Tamil), number of books per month (1–8), and pick a schedule day for the monthly auto-run.',
+    title: 'Connect your AINS account',
+    body: 'On the Dashboard, click "Connect AINS Account". Enter your AINS (DELIMa) email and password. The system will log in on your behalf — if your account uses Microsoft 2FA, you\'ll see a number to tap in your Microsoft Authenticator app. Once approved, your session is captured and saved.',
+    tip: 'Your password is used once to log in and immediately discarded. Only your encrypted session cookie is saved — never your password. If connection fails even with correct credentials, Microsoft may have blocked the automated sign-in from the server. Fix: manually log into ains.moe.gov.my in your browser first, then try connecting again.',
   },
   {
     n: '3',
-    title: 'Connect your AINS account',
-    body: 'On the Dashboard, click "Connect & Submit". A popup will show the AINS login page. Complete your login normally — if you use 2FA (Microsoft/Google), you\'ll verify it yourself. Once logged in, we capture your session and close the popup.',
-    tip: 'Your AINS password is used once to log in and immediately discarded. Only your encrypted session is stored — never your password.',
+    title: 'Submit your books',
+    body: 'Choose your language and number of books, then tap "Submit Now". The bot logs into AINS using your saved session and fills in your reading records one by one. Each submission takes about 30–60 seconds. Check the live progress panel and History afterwards.',
+    tip: 'AINS has a hard limit of 30 book records per day — this is enforced by the government portal, not NilamDesk. If you hit it, you\'ll see "Daily limit reached — try again tomorrow." Credits are only deducted when a submission succeeds.',
   },
   {
     n: '4',
-    title: 'Bot submits automatically',
-    body: 'Once your session is captured, the bot automatically logs in using your session and submits your records. This takes 1–2 minutes. Check History to see what was submitted.',
+    title: 'Understand submission results',
+    body: 'Each book will show Done, Failed, or Daily limit reached. A "Failed" result usually means AINS rejected that specific book (e.g. the form updated and our automation couldn\'t complete it) — other books in the same run may still succeed. A "Daily limit reached" means AINS\'s 30/day quota was full; those credits are not charged and the books will be available to resubmit tomorrow.',
+    tip: 'If all books fail with a form error, AINS may have updated their website. This is outside NilamDesk\'s control — check back in a day or two as updates are rolled out.',
   },
   {
     n: '5',
-    title: 'Get reminded — submit in one tap',
-    body: 'With monthly reminders enabled, you\'ll get an email on your chosen day each month. Open the app, tap Submit Now, and your records are submitted in under a minute. Works on PC and mobile.',
-    tip: 'Because AINS sessions expire after ~30 days, we send a reminder instead of running silently in the background — so you\'re always in control.',
+    title: 'Reconnect when your session expires',
+    body: 'AINS sessions last roughly 30 days. When yours expires, submissions will fail with "session expired". Go to Dashboard → click Reconnect, log in again with your AINS credentials, and approve the MFA prompt. Your new session is saved and you\'re ready to submit again.',
+    tip: 'You stay in full control — NilamDesk never submits in the background without you. Every run is triggered by you tapping Submit Now.',
   },
 ]
 
@@ -93,24 +95,32 @@ export default function Guide() {
         <h2 className="font-display text-base font-bold text-heading">Common Questions</h2>
         {[
           {
-            q: 'Can I use Google or Microsoft to log in?',
-            a: 'Yes — and that\'s the benefit of this approach. You complete the login yourself (including any 2FA), then we capture your session. Unlike the old approach, you\'re in control.',
+            q: 'Connection failed — but my password is correct. Why?',
+            a: 'Microsoft sometimes blocks automated sign-ins from server IPs as a security measure. This is not a wrong password. Fix: open ains.moe.gov.my in your browser, log in manually once, then come back to NilamDesk and try connecting again. The manual login resets Microsoft\'s risk score for your account.',
+          },
+          {
+            q: 'What is the 30 books per day limit?',
+            a: 'AINS (the government portal) enforces a maximum of 30 book records per day per account. NilamDesk cannot bypass this — it is a server-side limit on the government system. If you hit it, your remaining books are not charged and will be available to submit the next day.',
+          },
+          {
+            q: 'Why did a submission fail?',
+            a: 'A submission can fail for a few reasons: (1) AINS updated their form and our automation couldn\'t complete it — this is the most common cause and is fixed as updates are rolled out; (2) the book was already submitted to that AINS account before; (3) your session expired mid-run. Failed submissions are not charged credits.',
           },
           {
             q: 'Is my password stored?',
             a: 'No. Your AINS password is used once to log in and capture your session, then immediately discarded — it is never saved to our database. Only your encrypted session cookie is stored.',
           },
           {
+            q: 'How many free books do I get?',
+            a: 'You get 8 free book credits when you sign up — no payment required. Credits are only deducted when a submission succeeds. To submit more, upgrade to the annual plan (RM49.90/year for 150 credits).',
+          },
+          {
             q: 'What if my session expires?',
-            a: 'Sessions expire after ~30 days. Go to Settings → AINS Account → Reconnect, log in again, and we\'ll capture a fresh session.',
+            a: 'Sessions expire after ~30 days. On the Dashboard, click Reconnect, log in with your AINS credentials, and approve the MFA prompt. A fresh session will be captured and saved.',
           },
           {
             q: 'Does it work on mobile?',
-            a: 'Yes — open nilamdesk.com in any mobile browser. Everything works the same way.',
-          },
-          {
-            q: 'How does the monthly reminder work?',
-            a: 'On the day you set in Settings, you\'ll receive an email reminder at 9 AM Malaysia time. Open the app and tap Submit Now — the bot submits your records immediately while your session is fresh.',
+            a: 'Yes — open nilamdesk.com in any mobile browser. The full flow including connecting AINS and submitting books works on phone.',
           },
         ].map((faq, i) => (
           <div key={i} className="border-t border-line pt-4 first:border-0 first:pt-0">

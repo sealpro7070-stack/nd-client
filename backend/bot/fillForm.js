@@ -57,6 +57,16 @@ async function fillForm(page, book, settings) {
     throw err
   }
 
+  // Detect AINS daily submission limit (30/day) — AINS shows a notice page instead
+  // of the normal source-selection cards when the quota is full.
+  const pageText = await page.textContent('body').catch(() => '')
+  if (/reached.*limit|daily.*limit|limit.*record|had reached|30.*rekod|submission limit/i.test(pageText)) {
+    console.warn('[fillForm] AINS daily submission limit reached')
+    const err = new Error('AINS daily limit reached — try again tomorrow.')
+    err.code = 'DAILY_LIMIT'
+    throw err
+  }
+
   // Click the "Buku/E-Buku" card
   await page.locator('text=Buku/E-Buku').first().waitFor({ timeout: 15000 })
   await page.locator('text=Buku/E-Buku').first().click()

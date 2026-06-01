@@ -325,6 +325,13 @@ export default function ConnectAINSModal({ isOpen, onClose, onSuccess, targetUse
                 <p className="text-danger-700 font-semibold text-sm mb-1">Connection failed</p>
                 <p className="text-danger-600 text-sm">{errorMsg}</p>
               </div>
+              <div className="bg-yellow/40 border border-ink/20 rounded-lg px-3 py-2.5 flex items-start gap-2">
+                <span className="text-sm flex-shrink-0 mt-0.5">💡</span>
+                <p className="text-xs text-ink/80 leading-snug">
+                  <strong>If your credentials are correct:</strong> Microsoft sometimes blocks automated sign-ins from server IPs — this is not a wrong password.{' '}
+                  Fix: open <strong>ains.moe.gov.my</strong> in your browser, log in manually, then come back here and try connecting again.
+                </p>
+              </div>
               <button
                 onClick={handleTryAgain}
                 className="w-full py-2.5 bg-brand-600 text-white rounded-xl font-bold text-sm hover:bg-brand-700 transition-colors"
