@@ -157,7 +157,49 @@ export default function Dashboard() {
     }
     progressPollRef.current = setTimeout(pollProgress, 2000)
 
-    let triggerFailed = false
+    // Read the latest submission rows for this run. The DB — written by the
+    // bot as each book resolves — is the single source of truth, NOT the HTTP
+    // response. A dropped connection does NOT mean the books failed: the bot
+    // keeps running server-side and writes "success" as it goes.
+    const fetchProgress = async () => {
+      const { data } = await supabase
+        .from('submissions')
+        .select('id, status, error_message, books(title)')
+        .eq('user_id', userId)
+        .is('family_slot_id', null)
+        .gte('created_at', triggerTime)
+        .order('created_at', { ascending: true })
+      return data || []
+    }
+
+    // When the HTTP request drops mid-run, watch the DB until every row stops
+    // being "pending" (the bot finished writing real results) or a grace
+    // window elapses. This prevents false "FAILED" on books AINS accepted.
+    const waitForCompletion = async (graceMs = 4 * 60 * 1000) => {
+      stopProgressPoll()
+      const deadline = Date.now() + graceMs
+      while (Date.now() < deadline) {
+        const rows = await fetchProgress()
+        if (rows.length) setLiveProgress(rows)
+        const settled = rows.length > 0 && rows.every(s => s.status !== 'pending')
+        if (settled) {
+          const ok = rows.filter(s => s.status === 'success').length
+          setTriggerMsg(`Done! ${ok}/${rows.length} submitted. Check History for details.`)
+          setIsError(ok === 0)
+          return
+        }
+        await new Promise(r => setTimeout(r, 3000))
+      }
+      // Grace expired with rows still pending — the run genuinely stalled.
+      const rows = await fetchProgress()
+      setLiveProgress(rows.map(s => s.status === 'pending'
+        ? { ...s, status: 'failed', error_message: s.error_message || 'Timed out — please try again' }
+        : s))
+      setTriggerMsg('Submission timed out — please check History and retry any that did not complete.')
+      setIsError(true)
+    }
+
+    let finalized = false
     try {
       const token = await getToken()
       await fetch(`${BACKEND}/api/settings`, {
@@ -172,41 +214,43 @@ export default function Dashboard() {
       })
       const data = await res.json()
       if (!res.ok || data.success === false) throw new Error(data.error || 'Failed to start')
-      setTriggerMsg(data.message || 'Done! Check History for details.')
       setSettings(s => ({ ...s, language: apiLang, books_per_month: count }))
+      // The backend returns a "submitting in background" message when the run
+      // outlives its 170s HTTP window — the bot is still going, so wait on the DB.
+      if (/background|few minutes|still (running|submitting)/i.test(data.message || '')) {
+        setTriggerMsg('Still submitting — keep this page open while we finish...')
+        setIsError(false)
+        await waitForCompletion()
+        finalized = true
+      } else {
+        setTriggerMsg(data.message || 'Done! Check History for details.')
+      }
     } catch (err) {
-      triggerFailed = true
-      // A dropped connection (server restarting / brief outage) surfaces as a
-      // bare "Failed to fetch" / TypeError — translate it into something a user
-      // can act on instead of a scary raw error.
-      const isNetwork = err.name === 'TypeError' || /failed to fetch|networkerror|load failed/i.test(err.message)
-      setTriggerMsg(isNetwork ? 'Server is busy or restarting — please wait a moment and try again.' : err.message)
-      setIsError(true)
       if (/session expired|reconnect/i.test(err.message)) {
+        setTriggerMsg(err.message)
+        setIsError(true)
         setCredsStatus('none')
         setShowAINSModal(true)
+      } else if (err.name === 'TypeError' || /failed to fetch|networkerror|load failed/i.test(err.message)) {
+        // Connection dropped (server restart / brief outage). The bot is almost
+        // certainly still running server-side — do NOT call this a failure.
+        // Watch the DB for the real outcome instead of guessing.
+        setTriggerMsg('Connection dropped, but submission is still running — keep this page open while we finish...')
+        setIsError(false)
+        await waitForCompletion()
+        finalized = true
+      } else {
+        setTriggerMsg(err.message)
+        setIsError(true)
       }
     } finally {
       setTriggering(false)
       stopProgressPoll()
-      // Final poll to capture last status updates
-      const { data } = await supabase
-        .from('submissions')
-        .select('id, status, error_message, books(title)')
-        .eq('user_id', userId)
-        .is('family_slot_id', null)
-        .gte('created_at', triggerTime)
-        .order('created_at', { ascending: true })
-      if (data) {
-        // If the trigger died, any rows still "pending" are orphaned (the run
-        // crashed before resolving them). Show them as failed so they don't
-        // spin "Sending" forever — the backend's stale-pending sweep will mark
-        // them failed in the DB on the next run.
-        setLiveProgress(triggerFailed
-          ? data.map(s => s.status === 'pending'
-              ? { ...s, status: 'failed', error_message: s.error_message || 'Interrupted — please try again' }
-              : s)
-          : data)
+      // Only refresh from the DB if waitForCompletion didn't already set the
+      // final UI state — otherwise we'd clobber its message/status.
+      if (!finalized) {
+        const rows = await fetchProgress()
+        if (rows.length) setLiveProgress(rows)
       }
     }
   }
