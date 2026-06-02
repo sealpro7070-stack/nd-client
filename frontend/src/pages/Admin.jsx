@@ -22,6 +22,9 @@ export default function Admin() {
   const [commFilter, setCommFilter]   = useState('pending')
   const [newCode, setNewCode]         = useState({ code: '', owner_name: '', owner_contact: '', rate: '10' })
   const [creatingCode, setCreatingCode] = useState(false)
+  // Quiz funnel leads state
+  const [leads, setLeads]             = useState([])
+  const [leadFilter, setLeadFilter]   = useState('all')
   const [loading, setLoading]   = useState(true)
   const [error, setError]       = useState(null)
   const [search, setSearch]     = useState('')
@@ -49,6 +52,7 @@ export default function Admin() {
   useEffect(() => { if (tab === 'settings') fetchQrSettings() }, [tab])
   useEffect(() => { if (tab === 'referrals') { fetchCodes(); fetchCommissions() } }, [tab, commFilter])
   useEffect(() => { if (tab === 'overview') fetchCodes() }, [tab])
+  useEffect(() => { if (tab === 'leads') fetchLeads() }, [tab])
   useEffect(() => { if (grantTarget) fetchGrantHistory(grantTarget.id); else setGrantHistory([]) }, [grantTarget])
 
   async function checkAdminAndLoad() {
@@ -199,6 +203,51 @@ export default function Admin() {
       if (!res.ok) throw new Error(data.error)
       setCommissions(data.commissions || [])
     } catch (err) { showToast(err.message, 'error') }
+  }
+
+  async function fetchLeads() {
+    try {
+      const freshToken = token || (await supabase.auth.getSession()).data.session?.access_token
+      const res = await fetch(`${BACKEND_URL}/api/leads`, {
+        headers: { Authorization: `Bearer ${freshToken}` }
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      setLeads(data.leads || [])
+    } catch (err) { showToast(err.message, 'error') }
+  }
+
+  async function updateLeadStatus(id, status) {
+    try {
+      const freshToken = token || (await supabase.auth.getSession()).data.session?.access_token
+      const res = await fetch(`${BACKEND_URL}/api/leads/status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${freshToken}` },
+        body: JSON.stringify({ id, status }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      setLeads(ls => ls.map(l => l.id === id ? { ...l, status } : l))
+    } catch (err) { showToast(err.message, 'error') }
+  }
+
+  function exportLeadsCsv() {
+    const rows = leadFilter === 'all' ? leads : leads.filter(l => l.status === leadFilter)
+    const esc = v => `"${String(v ?? '').replace(/"/g, '""')}"`
+    const header = ['name', 'email', 'computed_hours', 'q1', 'q2', 'q3', 'ref', 'status', 'created_at']
+    const lines = rows.map(l => [
+      l.name, l.email, l.computed_hours,
+      l.answers?.q1, l.answers?.q2, l.answers?.q3,
+      l.ref, l.status, l.created_at,
+    ].map(esc).join(','))
+    const csv = [header.join(','), ...lines].join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `nilamdesk-leads-${new Date().toISOString().slice(0, 10)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
   }
 
   async function createCode(e) {
@@ -430,6 +479,7 @@ export default function Admin() {
             { id: 'users',    label: 'Users' },
             { id: 'payments', label: `Payments${pendingPayCount > 0 ? ` (${pendingPayCount})` : ''}` },
             { id: 'referrals', label: 'Referrals' },
+            { id: 'leads',    label: 'Leads' },
             { id: 'settings', label: 'Settings' },
           ].map(t => (
             <button
@@ -1002,6 +1052,79 @@ export default function Admin() {
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+        {/* ── Leads tab (quiz funnel) ── */}
+        {tab === 'leads' && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <div className="flex gap-1">
+                {['all', 'new', 'contacted', 'converted'].map(f => (
+                  <button
+                    key={f}
+                    onClick={() => setLeadFilter(f)}
+                    className={`px-3 py-1.5 text-xs font-bold rounded-lg capitalize transition-colors ${
+                      leadFilter === f ? 'bg-brand-600 text-white' : 'bg-line/40 text-muted hover:text-heading'
+                    }`}
+                  >
+                    {f}
+                  </button>
+                ))}
+              </div>
+              <button
+                onClick={exportLeadsCsv}
+                disabled={!leads.length}
+                className="px-3 py-1.5 text-xs font-bold rounded-lg bg-heading text-white disabled:opacity-40"
+              >
+                Export CSV
+              </button>
+            </div>
+
+            {(() => {
+              const rows = leadFilter === 'all' ? leads : leads.filter(l => l.status === leadFilter)
+              if (!rows.length) {
+                return <p className="text-sm text-muted py-8 text-center">No leads yet.</p>
+              }
+              return (
+                <div className="overflow-x-auto card-p">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-left text-xs text-muted uppercase tracking-wide border-b border-line">
+                        <th className="py-2 pr-3">Name</th>
+                        <th className="py-2 pr-3">Email</th>
+                        <th className="py-2 pr-3">Hrs/mo</th>
+                        <th className="py-2 pr-3">Ref</th>
+                        <th className="py-2 pr-3">Date</th>
+                        <th className="py-2 pr-3">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.map(l => (
+                        <tr key={l.id} className="border-b border-line/60">
+                          <td className="py-2 pr-3 font-bold text-heading whitespace-nowrap">{l.name}</td>
+                          <td className="py-2 pr-3 text-muted whitespace-nowrap">{l.email}</td>
+                          <td className="py-2 pr-3 font-bold text-brand-600">{l.computed_hours}</td>
+                          <td className="py-2 pr-3 text-muted">{l.ref || '—'}</td>
+                          <td className="py-2 pr-3 text-muted whitespace-nowrap">{new Date(l.created_at).toLocaleDateString()}</td>
+                          <td className="py-2 pr-3">
+                            <select
+                              value={l.status}
+                              onChange={e => updateLeadStatus(l.id, e.target.value)}
+                              className="text-xs font-bold border border-line rounded-lg px-2 py-1 bg-white"
+                            >
+                              <option value="new">New</option>
+                              <option value="contacted">Contacted</option>
+                              <option value="converted">Converted</option>
+                            </select>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )
+            })()}
           </div>
         )}
 

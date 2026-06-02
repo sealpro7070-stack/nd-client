@@ -12,6 +12,7 @@ const adminRoutes    = require('./routes/admin')
 const paymentsRoutes = require('./routes/payments')
 const familyRoutes   = require('./routes/family')
 const referralsRoutes = require('./routes/referrals')
+const leadsRoutes    = require('./routes/leads')
 
 // Start cron scheduler (commented out until SMTP is configured)
 // require('./scheduler/cron')
@@ -84,6 +85,7 @@ app.use('/api/admin', adminRoutes)
 app.use('/api/payments', paymentsRoutes)
 app.use('/api/family', familyRoutes)
 app.use('/api/referrals', referralsRoutes)
+app.use('/api/leads', leadsRoutes)
 
 // 404 handler
 app.use((req, res) => {

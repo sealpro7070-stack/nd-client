@@ -489,10 +489,19 @@ const [agreedToTerms, setAgreedToTerms] = useState(false)
     // Capture a referral code from the URL (?ref=CODE) and remember it so it can
     // be attached when the user signs up — even if they sign up minutes later.
     try {
-      const ref = new URLSearchParams(window.location.search).get('ref')
+      const params = new URLSearchParams(window.location.search)
+      const ref = params.get('ref')
       if (ref) {
         const code = ref.trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 32)
         if (code) localStorage.setItem('nilam_ref', code)
+      }
+      // Arriving from the quiz result CTA (/?signup=1&email=...#auth): open the
+      // signup form, prefill their email, and scroll them straight to it.
+      if (params.get('signup') === '1') {
+        setMode('signup')
+        const e = params.get('email')
+        if (e) setEmail(e)
+        setTimeout(() => document.getElementById('auth')?.scrollIntoView({ behavior: 'smooth' }), 100)
       }
     } catch {}
 

@@ -17,6 +17,7 @@ const Privacy       = lazy(() => import('./pages/Privacy'))
 const Terms         = lazy(() => import('./pages/Terms'))
 const Marketer      = lazy(() => import('./pages/Marketer'))
 const ResetPassword = lazy(() => import('./pages/ResetPassword'))
+const Quiz          = lazy(() => import('./pages/Quiz'))
 
 function Spinner() {
   return (
@@ -84,6 +85,7 @@ function App() {
           <Route path="/privacy"        element={<Privacy />} />
           <Route path="/terms"          element={<Terms />} />
           <Route path="/m"              element={<Marketer />} />
+          <Route path="/quiz"           element={<Quiz />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="*"          element={<Navigate to="/" replace />} />
         </Routes>
