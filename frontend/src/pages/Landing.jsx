@@ -261,14 +261,14 @@ function Pricing({ onGetStarted, onNavigateUpgrade }) {
           Free is plenty.<br /><span className="text-cobalt">Pro is for the busy.</span>
         </h2>
         <p className="text-ink/60 mt-3 font-medium text-base sm:text-lg">
-          RM 49.90/year — less than 4 nasi lemak. 150 book credits, zero yearly NILAM panic.
+          From RM 25/year — less than 4 nasi lemak. Pick your credits, zero yearly NILAM panic.
         </p>
-        <div className="mt-12 grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-3xl">
+        <div className="mt-12 grid grid-cols-1 sm:grid-cols-3 gap-6 max-w-5xl">
           {/* Free */}
           <div className="bg-white border-[3px] border-ink rounded-2xl p-6 relative" style={{ boxShadow: '6px 6px 0 #0F172A' }}>
             <p className="font-display font-black text-ink text-xs uppercase tracking-[0.25em]">Free</p>
             <div className="flex items-baseline gap-2 mt-3">
-              <span className="font-display font-black text-ink text-6xl tracking-tighter">RM 0</span>
+              <span className="font-display font-black text-ink text-5xl tracking-tighter">RM 0</span>
               <span className="font-bold text-ink/60 text-sm">forever</span>
             </div>
             <ul className="mt-5 space-y-2.5">
@@ -283,6 +283,25 @@ function Pricing({ onGetStarted, onNavigateUpgrade }) {
             </ul>
             <button onClick={onGetStarted} className="mt-6 w-full chunky-btn chunky-btn--ghost justify-center">Start free</button>
           </div>
+          {/* Starter */}
+          <div className="bg-white border-[3px] border-ink rounded-2xl p-6 relative" style={{ boxShadow: '6px 6px 0 #0F172A' }}>
+            <p className="font-display font-black text-ink text-xs uppercase tracking-[0.25em]">Starter</p>
+            <div className="flex items-baseline gap-2 mt-3">
+              <span className="font-display font-black text-ink text-5xl tracking-tighter">RM 25</span>
+              <span className="font-bold text-ink/60 text-sm">per year</span>
+            </div>
+            <ul className="mt-5 space-y-2.5">
+              {['40 book credits / year', 'Credits deducted only on success', 'All 4 languages, mixed', 'Auto-submit every 1st of month', 'Email notifications'].map(f => (
+                <li key={f} className="flex items-start gap-2.5 text-sm font-semibold text-ink">
+                  <span className="w-5 h-5 rounded-md border-[2px] border-ink flex items-center justify-center flex-shrink-0 mt-[1px]" style={{ background: '#2F5DDB' }}>
+                    <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M2 6.5l2.5 2.5L10 3" stroke="#F4F1EA" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                  </span>
+                  {f}
+                </li>
+              ))}
+            </ul>
+            <button onClick={onGetStarted} className="mt-6 w-full chunky-btn chunky-btn--ghost justify-center">Get Starter — RM 25/yr</button>
+          </div>
           {/* Pro */}
           <div className="bg-yellow border-[3px] border-ink rounded-2xl p-6 relative" style={{ boxShadow: '8px 8px 0 #0F172A' }}>
             <div className="absolute -top-3 right-5 bg-ink text-cream text-[10px] font-black px-3 py-1 rounded-md tracking-widest border-[2px] border-ink">
@@ -290,7 +309,7 @@ function Pricing({ onGetStarted, onNavigateUpgrade }) {
             </div>
             <p className="font-display font-black text-ink text-xs uppercase tracking-[0.25em]">Pro</p>
             <div className="flex items-baseline gap-2 mt-3">
-              <span className="font-display font-black text-ink text-6xl tracking-tighter">RM 49.90</span>
+              <span className="font-display font-black text-ink text-5xl tracking-tighter">RM 49.90</span>
               <span className="font-bold text-ink/60 text-sm">per year</span>
             </div>
             <ul className="mt-5 space-y-2.5">
