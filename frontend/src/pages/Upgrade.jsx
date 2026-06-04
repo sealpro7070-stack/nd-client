@@ -13,6 +13,15 @@ const FREE_FEATURES = [
   { label: 'Priority support',          ok: false },
 ]
 
+const STARTER_FEATURES = [
+  { label: '40 book credits / year',           ok: true  },
+  { label: 'Credits deducted on success only', ok: true  },
+  { label: 'All 4 languages, mixed',           ok: true  },
+  { label: 'Auto-submit on day 1',             ok: true  },
+  { label: 'Email notifications',              ok: true  },
+  { label: 'Priority support',                 ok: false },
+]
+
 const PRO_FEATURES = [
   { label: '150 book credits / year',         ok: true },
   { label: 'Credits deducted on success only', ok: true },
@@ -21,6 +30,14 @@ const PRO_FEATURES = [
   { label: 'Email + SMS notifications',       ok: true },
   { label: 'Priority support (we reply lah)', ok: true },
 ]
+
+// Paid plan catalog. `slug` is the value sent to the backend (Pro maps to the
+// existing 'plus' plan). Prices here are display-only; the backend validates
+// the real price server-side from PLAN_PRICES.
+const PLANS = {
+  starter: { price: 25.00, slug: 'starter', label: 'NilamDesk Starter — yearly' },
+  pro:     { price: 49.90, slug: 'plus',    label: 'NilamDesk Pro — yearly' },
+}
 
 const BACKEND = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001'
 
@@ -44,8 +61,9 @@ export default function Upgrade() {
   const [creditSubmitting, setCreditSubmitting] = useState(false)
   const creditFileInputRef                      = useRef(null)
 
-  const price = 49.90
-  const sub   = 'per year'
+  // The currently selected paid plan (undefined when 'free' is selected).
+  const activePlan = PLANS[selected]
+  const price = activePlan?.price ?? 49.90
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -118,6 +136,7 @@ export default function Upgrade() {
 
   async function handleSubmitPayment() {
     if (!receiptData) { setErrorMsg('Please upload your receipt.'); return }
+    if (!activePlan)  { setErrorMsg('Please select a plan.'); return }
     setSubmitting(true)
     setErrorMsg('')
     try {
@@ -126,7 +145,7 @@ export default function Upgrade() {
       const res = await fetch(`${BACKEND}/api/payments/request`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
-        body: JSON.stringify({ plan: 'plus', receipt_data: receiptData }),
+        body: JSON.stringify({ plan: activePlan.slug, receipt_data: receiptData }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to submit request')
@@ -166,7 +185,7 @@ export default function Upgrade() {
       </div>
 
       {/* ── Plan cards ────────────────────────────────── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
         <PlanCard
           title="Free"
           price="RM 0"
@@ -176,10 +195,18 @@ export default function Upgrade() {
           onSelect={() => setSelected('free')}
         />
         <PlanCard
+          title="Starter"
+          price="RM 25"
+          sub="per year"
+          features={STARTER_FEATURES}
+          selected={selected === 'starter'}
+          onSelect={() => setSelected('starter')}
+        />
+        <PlanCard
           title="Pro"
-          price={`RM ${price}`}
-          sub={sub}
-          badge="MOST POPULAR"
+          price="RM 49.90"
+          sub="per year"
+          badge="BEST VALUE"
           highlight
           features={PRO_FEATURES}
           selected={selected === 'pro'}
@@ -352,7 +379,7 @@ export default function Upgrade() {
       </div>
 
       {/* ── Payment summary ───────────────────────────── */}
-      {selected === 'pro' && (
+      {activePlan && (
         <div className="bg-white border-[3px] border-ink rounded-2xl overflow-hidden"
           style={{ boxShadow: '6px 6px 0 #0F172A' }}>
           <div className="px-5 py-3 bg-yellow border-b-[3px] border-ink flex items-center justify-between">
@@ -361,7 +388,7 @@ export default function Upgrade() {
           </div>
 
           <div className="p-5 sm:p-6 space-y-4">
-            <SummaryRow label="NilamDesk Pro — yearly" value={`RM ${price.toFixed(2)}`} />
+            <SummaryRow label={activePlan.label} value={`RM ${price.toFixed(2)}`} />
             <div className="border-t-[2px] border-ink/15 pt-3 flex items-baseline justify-between">
               <span className="font-display font-black text-ink text-base">Total today</span>
               <span className="font-display font-black text-ink text-3xl tabular-nums">

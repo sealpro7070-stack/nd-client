@@ -7,6 +7,7 @@ import Navbar    from './components/Navbar'
 // route the visitor actually landed on (heavy pages like recharts-powered
 // Admin/Dashboard no longer bloat the first paint).
 const Landing       = lazy(() => import('./pages/Landing'))
+const Auth          = lazy(() => import('./pages/Auth'))
 const Dashboard     = lazy(() => import('./pages/Dashboard'))
 const Settings      = lazy(() => import('./pages/Settings'))
 const History       = lazy(() => import('./pages/History'))
@@ -76,6 +77,8 @@ function App() {
       <Suspense fallback={<Spinner />}>
         <Routes>
           <Route path="/"         element={<Landing />} />
+          <Route path="/login"    element={<Auth />} />
+          <Route path="/signup"   element={<Auth />} />
           <Route path="/upgrade"  element={<AuthGuard><Upgrade /></AuthGuard>} />
           <Route path="/admin"    element={<AuthGuard><Admin /></AuthGuard>} />
           <Route path="/dashboard" element={<AuthGuard><AppLayout><Dashboard /></AppLayout></AuthGuard>} />

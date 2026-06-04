@@ -16,8 +16,8 @@ const supabase  = require('../lib/supabase')
 const { requireAuth } = require('../lib/auth-middleware')
 
 // Prices in sen (1 RM = 100 sen). payment_requests.amount is stored in sen.
-const PLAN_PRICES = { plus: 4990, family: 4800 }
-const PLAN_LABELS = { plus: 'Plus', family: 'Family' }
+const PLAN_PRICES = { plus: 4990, family: 4800, starter: 2500 }
+const PLAN_LABELS = { plus: 'Plus', family: 'Family', starter: 'Starter' }
 
 // ─── Admin guard ──────────────────────────────────────────────────────────────
 const { isAdminEmail } = require('../lib/auth-middleware')
@@ -69,7 +69,7 @@ router.post('/request', requireAuth, async (req, res) => {
   const { plan, reference, receipt_data } = req.body
 
   if (!PLAN_PRICES[plan]) {
-    return res.status(400).json({ error: 'Invalid plan. Must be "plus" or "family".' })
+    return res.status(400).json({ error: 'Invalid plan. Must be "starter", "plus", or "family".' })
   }
 
   // Validate reference length — prevents DoS via oversized strings
@@ -238,12 +238,13 @@ router.post('/admin/review', requireAuth, requireAdmin, async (req, res) => {
       }
     } else {
       // Plan upgrade
-      if (!['plus', 'family'].includes(pr.plan)) {
+      if (!['plus', 'family', 'starter'].includes(pr.plan)) {
         return res.status(400).json({ error: 'Invalid plan on this payment request.' })
       }
 
       // grant_plan is atomic + idempotent: sets plan/expiry/is_active and grants
-      // 150 credits ONCE per active plan period (via the credit_grants ledger).
+      // the plan's credits ONCE per active plan period (150 for plus/family,
+      // 40 for starter — the RPC decides per plan) via the credit_grants ledger.
       // This keeps the payment-approval path consistent with admin set-role.
       const { error: planErr } = await supabase.rpc('grant_plan', {
         target_user_id: pr.user_id,

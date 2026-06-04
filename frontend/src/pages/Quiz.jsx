@@ -95,7 +95,7 @@ export default function Quiz() {
   }
 
   function goSignup() {
-    navigate(`/?signup=1&email=${encodeURIComponent(email.trim())}#auth`)
+    navigate(`/signup?email=${encodeURIComponent(email.trim())}`)
   }
 
   const progress = Math.min(step, 3) / 3

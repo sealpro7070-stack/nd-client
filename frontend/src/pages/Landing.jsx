@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { Mascot, MascotMark } from '../components/Mascot'
@@ -313,141 +313,6 @@ function Pricing({ onGetStarted, onNavigateUpgrade }) {
   )
 }
 
-function AuthSection({ mode, setMode, email, setEmail, password, setPassword, loading, message, isError, agreedToTerms, setAgreedToTerms, onSubmit, onForgot, forgotSent }) {
-  if (mode === 'forgot') {
-    return (
-      <section id="auth" className="bg-cream border-t-[3px] border-ink py-16 sm:py-24 px-5">
-        <div className="max-w-md mx-auto">
-          <div className="text-center mb-8">
-            <h2 className="font-display font-black text-ink text-3xl sm:text-4xl tracking-tight">Reset password.</h2>
-            <p className="text-ink/60 text-sm mt-2 font-medium">
-              Remember it?{' '}
-              <button onClick={() => setMode('login')} className="text-cobalt font-extrabold hover:underline">Sign in</button>
-            </p>
-          </div>
-          <div className="bg-white border-[3px] border-ink rounded-2xl p-6" style={{ boxShadow: '8px 8px 0 #FFD23F' }}>
-            {forgotSent ? (
-              <div className="text-center py-4">
-                <p className="text-3xl mb-3">📬</p>
-                <p className="font-extrabold text-ink text-base">Check your email.</p>
-                <p className="text-sm text-ink/60 mt-1">We sent a password reset link to <span className="font-bold text-ink">{email}</span>.</p>
-                <button onClick={() => setMode('login')} className="mt-5 text-sm font-extrabold text-cobalt hover:underline">
-                  Back to sign in
-                </button>
-              </div>
-            ) : (
-              <form onSubmit={onForgot} className="space-y-4">
-                <div>
-                  <label className="block text-[11px] font-extrabold uppercase tracking-wider text-ink/60 mb-1">Email address</label>
-                  <input type="email" value={email} onChange={e => setEmail(e.target.value)}
-                    placeholder="student@school.edu.my" required
-                    className="w-full px-3 py-2.5 rounded-lg border-[2px] border-ink bg-white font-bold text-sm text-ink placeholder:text-ink/30 focus:outline-none focus:ring-2 focus:ring-yellow" />
-                </div>
-                {message && (
-                  <p className={`text-sm font-bold ${isError ? 'text-red-600' : 'text-[#0E7D4F]'}`}>{message}</p>
-                )}
-                <button type="submit" disabled={loading}
-                  className="w-full chunky-btn chunky-btn--primary chunky-btn--lg justify-center">
-                  {loading ? <><AuthSpinner />Sending…</> : 'Send reset link'}
-                </button>
-              </form>
-            )}
-          </div>
-        </div>
-      </section>
-    )
-  }
-
-  return (
-    <section id="auth" className="bg-cream border-t-[3px] border-ink py-16 sm:py-24 px-5">
-      <div className="max-w-md mx-auto">
-        <div className="text-center mb-8">
-          <h2 className="font-display font-black text-ink text-3xl sm:text-4xl tracking-tight">
-            {mode === 'login' ? 'Welcome back.' : 'Create your account.'}
-          </h2>
-          <p className="text-ink/60 text-sm mt-2 font-medium">
-            {mode === 'login' ? "Don't have an account? " : 'Already have an account? '}
-            <button onClick={() => { setMode(mode === 'login' ? 'signup' : 'login'); }}
-              className="text-cobalt font-extrabold hover:underline">
-              {mode === 'login' ? 'Sign up free' : 'Sign in'}
-            </button>
-          </p>
-        </div>
-
-        <div className="bg-white border-[3px] border-ink rounded-2xl p-6" style={{ boxShadow: '8px 8px 0 #FFD23F' }}>
-          {/* Mode tabs */}
-          <div className="flex gap-1 p-1 bg-cream rounded-xl mb-6 border-[2px] border-ink/10">
-            {[{ k: 'login', l: 'Sign In' }, { k: 'signup', l: 'Sign Up' }].map(t => (
-              <button key={t.k} onClick={() => { setMode(t.k); }}
-                className={`flex-1 py-2 rounded-lg text-sm font-extrabold transition-all ${
-                  mode === t.k ? 'bg-ink text-cream shadow-sm' : 'text-ink/60 hover:text-ink'
-                }`}>
-                {t.l}
-              </button>
-            ))}
-          </div>
-
-          <form onSubmit={onSubmit} className="space-y-4">
-            <div>
-              <label className="block text-[11px] font-extrabold uppercase tracking-wider text-ink/60 mb-1">Email address</label>
-              <input type="email" value={email} onChange={e => setEmail(e.target.value)}
-                placeholder="student@school.edu.my" required
-                className="w-full px-3 py-2.5 rounded-lg border-[2px] border-ink bg-white font-bold text-sm text-ink placeholder:text-ink/30 focus:outline-none focus:ring-2 focus:ring-yellow" />
-            </div>
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="block text-[11px] font-extrabold uppercase tracking-wider text-ink/60">Password</label>
-                {mode === 'login' && (
-                  <button type="button" onClick={() => setMode('forgot')}
-                    className="text-[11px] font-extrabold text-cobalt hover:underline">
-                    Forgot password?
-                  </button>
-                )}
-              </div>
-              <input type="password" value={password} onChange={e => setPassword(e.target.value)}
-                placeholder="••••••••" required minLength={6}
-                className="w-full px-3 py-2.5 rounded-lg border-[2px] border-ink bg-white font-bold text-sm text-ink placeholder:text-ink/30 focus:outline-none focus:ring-2 focus:ring-yellow" />
-            </div>
-
-            {message && (
-              <p className={`text-sm font-bold ${isError ? 'text-red-600' : 'text-[#0E7D4F]'}`}>{message}</p>
-            )}
-
-            {mode === 'signup' && (
-              <div className="flex items-start gap-2.5">
-                <input id="agree-terms" type="checkbox" checked={agreedToTerms} onChange={e => setAgreedToTerms(e.target.checked)}
-                  className="mt-0.5 w-4 h-4 rounded border-ink accent-cobalt cursor-pointer flex-shrink-0" />
-                <label htmlFor="agree-terms" className="text-xs text-ink/60 leading-relaxed cursor-pointer">
-                  I agree to the{' '}
-                  <Link to="/terms" target="_blank" className="text-cobalt font-extrabold hover:underline">Terms of Use</Link>
-                  {' '}and{' '}
-                  <Link to="/privacy" target="_blank" className="text-cobalt font-extrabold hover:underline">Privacy Policy</Link>.
-                  I understand my AINS session will be used to automate my reading record submissions.
-                </label>
-              </div>
-            )}
-
-            <button type="submit" disabled={loading || (mode === 'signup' && !agreedToTerms)}
-              className="w-full chunky-btn chunky-btn--primary chunky-btn--lg justify-center">
-              {loading
-                ? <><AuthSpinner />Processing…</>
-                : mode === 'login' ? 'Sign In' : 'Create Account'}
-            </button>
-
-            <p className="text-center text-xs text-ink/40 leading-relaxed">
-              By {mode === 'login' ? 'signing in' : 'creating an account'}, you agree to our{' '}
-              <Link to="/terms" target="_blank" className="underline hover:text-ink/60">Terms of Use</Link>
-              {' '}and{' '}
-              <Link to="/privacy" target="_blank" className="underline hover:text-ink/60">Privacy Policy</Link>.
-            </p>
-          </form>
-
-        </div>
-      </div>
-    </section>
-  )
-}
-
 function Footer() {
   return (
     <footer className="bg-ink text-cream px-5 py-10 sm:px-10 sm:py-14 border-t-[3px] border-ink">
@@ -476,14 +341,6 @@ function Footer() {
 
 export default function Landing() {
   const navigate = useNavigate()
-  const [email, setEmail]               = useState('')
-  const [password, setPassword]         = useState('')
-  const [mode, setMode]                 = useState('login')
-  const [loading, setLoading]           = useState(false)
-  const [message, setMessage]           = useState('')
-  const [isError, setIsError]           = useState(false)
-const [agreedToTerms, setAgreedToTerms] = useState(false)
-  const [forgotSent, setForgotSent]     = useState(false)
 
   useEffect(() => {
     // Capture a referral code from the URL (?ref=CODE) and remember it so it can
@@ -494,14 +351,6 @@ const [agreedToTerms, setAgreedToTerms] = useState(false)
       if (ref) {
         const code = ref.trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 32)
         if (code) localStorage.setItem('nilam_ref', code)
-      }
-      // Arriving from the quiz result CTA (/?signup=1&email=...#auth): open the
-      // signup form, prefill their email, and scroll them straight to it.
-      if (params.get('signup') === '1') {
-        setMode('signup')
-        const e = params.get('email')
-        if (e) setEmail(e)
-        setTimeout(() => document.getElementById('auth')?.scrollIntoView({ behavior: 'smooth' }), 100)
       }
     } catch {}
 
@@ -529,101 +378,16 @@ const [agreedToTerms, setAgreedToTerms] = useState(false)
     } catch {}
   }
 
-  async function handleAuth(e) {
-    e.preventDefault()
-    setLoading(true); setMessage(''); setIsError(false)
-    if (mode === 'signup' && !agreedToTerms) {
-      setMessage('Please agree to the Terms of Use and Privacy Policy to continue.')
-      setIsError(true); setLoading(false); return
-    }
-    try {
-      if (mode === 'signup') {
-        const { data, error } = await supabase.auth.signUp({
-          email, password,
-          options: { emailRedirectTo: import.meta.env.VITE_SITE_URL || 'https://nilamdesk.com' },
-        })
-        if (error) {
-          const msg = error.message?.toLowerCase() ?? ''
-          setMessage(
-            msg.includes('already registered') || msg.includes('email address is already taken')
-              ? 'An account with this email already exists. Please sign in instead.'
-              : error.message
-          )
-          setIsError(true); return
-        }
-        if (data?.user?.identities?.length === 0) {
-          setMessage('An account with this email already exists. Please sign in instead.')
-          setIsError(true); return
-        }
-        if (data?.user) syncUserToBackend(data.user)
-        setMessage('Account created! Taking you to your dashboard…')
-      } else {
-        const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-        if (error) {
-          const msg = error.message?.toLowerCase() ?? ''
-          setMessage(
-            msg.includes('invalid login') || msg.includes('invalid credentials')
-              ? 'Incorrect email or password. Please try again.'
-              : error.message
-          )
-          setIsError(true); return
-        }
-        if (data?.user) syncUserToBackend(data.user)
-        navigate('/dashboard')
-      }
-    } catch (err) {
-      const raw = err.message?.toLowerCase() ?? ''
-      setMessage(raw.includes('failed to fetch') || raw.includes('networkerror')
-        ? 'Connection error. Check your internet and try again.'
-        : err.message)
-      setIsError(true)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  async function handleForgot(e) {
-    e.preventDefault()
-    setLoading(true); setMessage(''); setIsError(false)
-    const siteUrl = import.meta.env.VITE_SITE_URL || 'https://nilamdesk.com'
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${siteUrl}/reset-password`,
-    })
-    setLoading(false)
-    if (error) { setMessage(error.message); setIsError(true) }
-    else { setForgotSent(true) }
-  }
-
-function scrollToAuth(m = 'signup') {
-    setMode(m); setMessage(''); setAgreedToTerms(false)
-    document.getElementById('auth')?.scrollIntoView({ behavior: 'smooth' })
-  }
-
   return (
     <div className="min-h-screen bg-cream overflow-x-hidden">
-      <Nav onSignIn={() => scrollToAuth('login')} onGetStarted={() => scrollToAuth('signup')} />
-      <Hero onGetStarted={() => scrollToAuth('signup')} />
+      <Nav onSignIn={() => navigate('/login')} onGetStarted={() => navigate('/signup')} />
+      <Hero onGetStarted={() => navigate('/signup')} />
       <MarqueeBar />
       <Problem />
       <HowItWorks />
       <DemoSection />
-      <Pricing onGetStarted={() => scrollToAuth('signup')} onNavigateUpgrade={() => navigate('/upgrade')} />
-      <AuthSection
-        mode={mode} setMode={m => { setMode(m); setMessage(''); setAgreedToTerms(false); setForgotSent(false) }}
-        email={email} setEmail={setEmail}
-        password={password} setPassword={setPassword}
-        loading={loading} message={message} isError={isError}
-        agreedToTerms={agreedToTerms} setAgreedToTerms={setAgreedToTerms}
-        onSubmit={handleAuth}
-onForgot={handleForgot} forgotSent={forgotSent}
-      />
+      <Pricing onGetStarted={() => navigate('/signup')} onNavigateUpgrade={() => navigate('/upgrade')} />
       <Footer />
     </div>
-  )
-}
-
-function AuthSpinner() {
-  return (
-    <span className="w-4 h-4 border-2 border-cream/30 border-t-cream rounded-full animate-spin" />
   )
 }
